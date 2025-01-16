@@ -1,30 +1,26 @@
-import React, { useState } from 'react';
-import { Container, Box, Typography } from '@mui/material';
-import LanguageSelector from './components/LanguageSelector';
-import StudySession from './components/StudySession';
-import { Language } from './types/types';
+import React from 'react';
+import logo from './logo.svg';
+import './App.css';
 
-function App() {
-  const [selectedLanguage, setSelectedLanguage] = useState<Language | null>(null);
-
+function App(): JSX.Element {
   return (
-    <Container maxWidth="md">
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom align="center">
-          Language SRS
-        </Typography>
-        
-        {!selectedLanguage ? (
-          <LanguageSelector onSelectLanguage={setSelectedLanguage} />
-        ) : (
-          <StudySession 
-            language={selectedLanguage} 
-            onExit={() => setSelectedLanguage(null)}
-          />
-        )}
-      </Box>
-    </Container>
+    <div className="App">
+      <header className="App-header">
+        <img src={logo} className="App-logo" alt="logo" />
+        <p>
+          Edit <code>src/App.tsx</code> and save to reload.
+        </p>
+        <a
+          className="App-link"
+          href="https://reactjs.org"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Learn React
+        </a>
+      </header>
+    </div>
   );
 }
 
-export default App; 
+export default App;

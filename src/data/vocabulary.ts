@@ -10,10 +10,13 @@ export const sampleVocabulary: VocabularyItem[] = [
     level: 'HSK1',
     nextReview: new Date(),
     interval: 1,
-    easeFactor: 2.5
+    easeFactor: 2.5,
+    examples: ['你好，我叫小明。'],
+    tags: ['greeting', 'basic'],
+    reviewHistory: []
   },
   {
-    id: 'ja-1',
+    id: 'ja-1', 
     word: 'こんにちは',
     pronunciation: 'konnichiwa',
     meaning: 'hello',
@@ -21,17 +24,23 @@ export const sampleVocabulary: VocabularyItem[] = [
     level: 'N5',
     nextReview: new Date(),
     interval: 1,
-    easeFactor: 2.5
+    easeFactor: 2.5,
+    examples: ['こんにちは、田中です。'],
+    tags: ['greeting', 'basic'],
+    reviewHistory: []
   },
   {
     id: 'ko-1',
     word: '안녕하세요',
-    pronunciation: 'annyeonghaseyo',
+    pronunciation: 'annyeonghaseyo', 
     meaning: 'hello',
     language: 'korean',
     level: 'TOPIK 1',
     nextReview: new Date(),
     interval: 1,
-    easeFactor: 2.5
+    easeFactor: 2.5,
+    examples: ['안녕하세요, 저는 민수입니다.'],
+    tags: ['greeting', 'basic'],
+    reviewHistory: []
   }
-]; 
+];

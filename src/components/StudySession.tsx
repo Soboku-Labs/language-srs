@@ -1,16 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Button, 
-  Stack,
-  LinearProgress,
-  IconButton,
-  Chip
-} from '@mui/material';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import { Card, Button, Progress } from '@nextui-org/react';
 import { VocabularyItem, Language } from '../types/types';
 import { calculateNextReview } from '../utils/srsAlgorithm';
 import { sampleVocabulary } from '../data/vocabulary';
@@ -95,107 +84,131 @@ const StudySession: React.FC<StudySessionProps> = ({ language, onExit }) => {
 
   if (!currentCard) {
     return (
-      <Box textAlign="center">
-        <Typography variant="h5" gutterBottom>
-          Session Complete!
-        </Typography>
-        <Typography variant="body1" gutterBottom>
-          Total Cards Reviewed: {studyStats.totalReviewed}
-          <br />
-          Accuracy: {((studyStats.correct / studyStats.totalReviewed) * 100).toFixed(1)}%
-          <br />
-          Best Streak: {studyStats.streak}
-        </Typography>
-        <Button variant="contained" onClick={onExit}>
+      <Card className="w-full max-w-lg mx-auto bg-white p-8 text-center">
+        <h3 className="text-2xl font-bold mb-6">Session Complete! 🎉</h3>
+        <div className="space-y-4 mb-8">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-lg font-medium">Total Cards Reviewed</p>
+            <p className="text-3xl font-bold text-primary">{studyStats.totalReviewed}</p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-lg font-medium">Accuracy</p>
+            <p className="text-3xl font-bold text-primary">
+              {((studyStats.correct / studyStats.totalReviewed) * 100).toFixed(1)}%
+            </p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-lg font-medium">Best Streak</p>
+            <p className="text-3xl font-bold text-primary">{studyStats.streak}</p>
+          </div>
+        </div>
+        <Button 
+          color="primary" 
+          size="lg"
+          className="w-full"
+          onClick={onExit}
+        >
           Return to Language Selection
         </Button>
-      </Box>
+      </Card>
     );
   }
 
   return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" gutterBottom>
+    <div className="max-w-2xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-xl font-bold text-gray-800">
           {language.name} - {currentCard.level}
-        </Typography>
-        <LinearProgress 
-          variant="determinate" 
-          value={((studyStats.totalReviewed) / (remainingCards.length + studyStats.totalReviewed)) * 100} 
-        />
-      </Box>
+        </h3>
+        <div className="text-sm font-medium text-gray-600">
+          {studyStats.totalReviewed + 1}/{remainingCards.length + studyStats.totalReviewed}
+        </div>
+      </div>
 
-      <Card sx={{ minHeight: 200, mb: 3 }}>
-        <CardContent>
-          <Stack direction="row" spacing={2} justifyContent="center" alignItems="center">
-            <Typography variant="h3" align="center">
-              {currentCard.word}
-            </Typography>
+      <div className="w-full bg-gray-200 rounded-full h-2 mb-8">
+        <div 
+          className="bg-primary h-2 rounded-full transition-all duration-300"
+          style={{ 
+            width: `${((studyStats.totalReviewed) / (remainingCards.length + studyStats.totalReviewed)) * 100}%` 
+          }}
+        />
+      </div>
+
+      <Card className="w-full bg-white shadow-lg mb-6">
+        <div className="p-8">
+          <div className="flex justify-center items-center gap-4 mb-6">
+            <h2 className="text-3xl font-bold">{currentCard.word}</h2>
             {currentCard.audioUrl && (
-              <IconButton onClick={playAudio}>
-                <VolumeUpIcon />
-              </IconButton>
+              <Button 
+                isIconOnly
+                color="primary" 
+                variant="light"
+                onClick={playAudio}
+                className="text-lg"
+              >
+                🔊
+              </Button>
             )}
-          </Stack>
+          </div>
 
           {isRevealed && (
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h5" align="center" color="textSecondary" gutterBottom>
+            <div className="space-y-4 mt-6">
+              <div className="text-gray-600 text-lg">
                 {currentCard.pronunciation}
-              </Typography>
-              <Typography variant="h5" align="center" gutterBottom>
+              </div>
+              <div className="text-xl font-medium">
                 {currentCard.meaning}
-              </Typography>
-              {currentCard.examples.map((example, index) => (
-                <Typography key={index} variant="body1" align="center" gutterBottom>
-                  {example}
-                </Typography>
-              ))}
-              {currentCard.tags.map((tag, index) => (
-                <Chip key={index} label={tag} sx={{ m: 0.5 }} />
-              ))}
-            </Box>
+              </div>
+              <div className="space-y-2">
+                {currentCard.examples.map((example, index) => (
+                  <div key={index} className="bg-gray-50 p-3 rounded-lg text-gray-700">
+                    {example}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
-        </CardContent>
+        </div>
       </Card>
 
       {!isRevealed ? (
         <Button 
-          variant="contained" 
-          fullWidth 
+          size="lg"
+          color="primary"
+          className="w-full"
           onClick={handleReveal}
         >
           Reveal Answer
         </Button>
       ) : (
-        <Stack direction="row" spacing={2}>
+        <div className="grid grid-cols-3 gap-4">
           <Button 
-            variant="contained" 
-            color="error" 
+            size="lg"
+            color="danger" 
+            className="w-full"
             onClick={() => handleGrade(1)}
-            fullWidth
           >
             Hard
           </Button>
           <Button 
-            variant="contained" 
-            color="warning" 
+            size="lg"
+            color="warning"
+            className="w-full"
             onClick={() => handleGrade(2)}
-            fullWidth
           >
             Good
           </Button>
           <Button 
-            variant="contained" 
-            color="success" 
+            size="lg"
+            color="success"
+            className="w-full"
             onClick={() => handleGrade(3)}
-            fullWidth
           >
             Easy
           </Button>
-        </Stack>
+        </div>
       )}
-    </Box>
+    </div>
   );
 };
 

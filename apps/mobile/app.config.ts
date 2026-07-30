@@ -1,0 +1,89 @@
+import type { ExpoConfig } from 'expo/config';
+
+/**
+ * Shared identifiers.
+ *
+ * The App Group and the SharedPreferences file name are the seam between the app
+ * and the home-screen widgets: the app writes the payload there, the widget reads
+ * it. They are declared once here and threaded through to the native code by the
+ * config plugins, because a mismatch produces a widget that renders the empty
+ * state forever with no error anywhere to explain why.
+ */
+export const BUNDLE_ID = 'com.languagesrs.app';
+export const APP_GROUP = `group.${BUNDLE_ID}`;
+export const ANDROID_PREFS_NAME = 'language_srs_widget';
+export const WIDGET_PAYLOAD_KEY = 'widget_snapshot';
+export const WIDGET_PENDING_KEY = 'widget_pending_grades';
+export const URL_SCHEME = 'languagesrs';
+
+const config: ExpoConfig = {
+  name: 'Language SRS',
+  slug: 'language-srs',
+  version: '0.1.0',
+  orientation: 'portrait',
+  scheme: URL_SCHEME,
+  // Two themes are light and two are dark, and the app picks per language rather
+  // than following the OS — so the system appearance setting is not consulted.
+  userInterfaceStyle: 'automatic',
+
+  ios: {
+    bundleIdentifier: BUNDLE_ID,
+    supportsTablet: true,
+    entitlements: {
+      'com.apple.security.application-groups': [APP_GROUP],
+    },
+    infoPlist: {
+      // Listening cards fall back to platform text-to-speech when an entry has
+      // no recorded audio, which every seed entry currently is.
+      UIBackgroundModes: ['audio'],
+    },
+  },
+
+  android: {
+    package: BUNDLE_ID,
+    adaptiveIcon: {
+      backgroundColor: '#0F172A',
+    },
+  },
+
+  web: {
+    bundler: 'metro',
+    // Static export so the web build is a plain set of files any host can serve.
+    output: 'static',
+  },
+
+  plugins: [
+    'expo-router',
+    [
+      'expo-splash-screen',
+      {
+        backgroundColor: '#0F172A',
+        resizeMode: 'contain',
+      },
+    ],
+    // Injects the WidgetKit extension and the Glance app widget, and wires both
+    // to the shared container. See plugins/withWidgets.ts.
+    [
+      './plugins/withWidgets',
+      {
+        appGroup: APP_GROUP,
+        prefsName: ANDROID_PREFS_NAME,
+        payloadKey: WIDGET_PAYLOAD_KEY,
+        pendingKey: WIDGET_PENDING_KEY,
+      },
+    ],
+  ],
+
+  experiments: {
+    typedRoutes: true,
+  },
+
+  extra: {
+    appGroup: APP_GROUP,
+    prefsName: ANDROID_PREFS_NAME,
+    payloadKey: WIDGET_PAYLOAD_KEY,
+    pendingKey: WIDGET_PENDING_KEY,
+  },
+};
+
+export default config;

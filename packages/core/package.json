@@ -1,0 +1,23 @@
+{
+  "name": "@language-srs/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Platform-agnostic domain logic for language-srs: exam curricula, FSRS scheduling, session queues, stats and the widget payload contract.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

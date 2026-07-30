@@ -1,0 +1,210 @@
+/**
+ * @language-srs/core — platform-agnostic domain logic.
+ *
+ * Deliberately free of React, React Native and DOM imports. The web build, the
+ * iOS app, the Android app and the home-screen widgets all consume this package,
+ * so anything that lands here runs identically on all four; anything that cannot
+ * belongs in the app layer behind the storage port.
+ */
+
+// Types
+export type {
+  Card,
+  CardState,
+  CardWithEntry,
+  DateOnly,
+  ExampleSentence,
+  LexicalEntry,
+  StudyProfile,
+  Timestamp,
+} from './types/card';
+export { DEFAULT_STUDY_PROFILE } from './types/card';
+export type {
+  CardKind,
+  CardKindWeights,
+  ExamLevel,
+  ExamSection,
+  ExamSkill,
+  ExamTrack,
+} from './types/exam';
+export { CARD_KINDS } from './types/exam';
+export type { LanguageCode, LanguageProfile, ScriptId } from './types/language';
+export {
+  LANGUAGE_CODES,
+  LANGUAGE_PROFILES,
+  getLanguageProfile,
+  isLanguageCode,
+} from './types/language';
+export type { GradeResult, Rating, ReviewLog, ReviewSource } from './types/review';
+export {
+  RATING_AGAIN,
+  RATING_EASY,
+  RATING_GOOD,
+  RATING_HARD,
+  RATING_LABELS,
+} from './types/review';
+
+// Exam curricula
+export {
+  EXAM_TRACKS,
+  HSK2_TRACK,
+  HSK3_TRACK,
+  JLPT_TRACK,
+  TOPIK_TRACK,
+  VSL_TRACK,
+  findExamLevel,
+  findExamTrack,
+  getCumulativeLevels,
+  getExamLevel,
+  getExamTrack,
+  getExamTracksForLanguage,
+  getExaminedSkills,
+  getLanguageForLevel,
+  getLevelIdsInScope,
+  getNextLevel,
+  getTrackForLevel,
+  getVocabularyDelta,
+  getWeightedCardKinds,
+  normaliseCardWeights,
+} from './exams';
+
+// Scheduling
+export {
+  DEFAULT_SCHEDULER_CONFIG,
+  FSRS_DEFAULT_WEIGHTS,
+  resolveSchedulerConfig,
+} from './srs/params';
+export type { SchedulerConfig } from './srs/params';
+export {
+  intervalForRetention,
+  retrievability,
+  stabilityForInterval,
+} from './srs/fsrs';
+export {
+  applyFuzz,
+  cardRetrievability,
+  gradeCard,
+  getExamPressure,
+  previewIntervals,
+  projectedRetrievability,
+} from './srs/scheduler';
+export type { ExamPressure, GradeOptions, IntervalPreview } from './srs/scheduler';
+
+// Cards
+export {
+  createCard,
+  generateCards,
+  generateCardsForEntry,
+  isCardKindApplicable,
+} from './cards/factory';
+
+// Sessions
+export {
+  EMPTY_DAILY_COUNTS,
+  buildStudyQueue,
+  countTodaysWork,
+  interleaveByKindWeights,
+} from './session/queue';
+export type { BuildQueueOptions, DailyCounts, QueueBreakdown, StudyQueue } from './session/queue';
+
+// Stats
+export {
+  computeCoverage,
+  computeRetention,
+  computeStreak,
+  forecastReviews,
+  meanRetrievability,
+} from './stats/metrics';
+export type { CoverageStats, ForecastDay, RetentionStats, StreakInfo } from './stats/metrics';
+export { computeExamReadiness, suggestDailyNewLimit } from './stats/readiness';
+export type { ExamReadiness, ReadinessVerdict } from './stats/readiness';
+
+// Themes — one per language, shared by the app and the native widgets
+export {
+  LANGUAGE_THEMES,
+  getCardKindColors,
+  getLanguageTheme,
+  getToneColor,
+  getToneColors,
+} from './theme/palettes';
+export type { LanguageTheme, ThemeColors, ThemeMode, ThemeRadius } from './theme/palettes';
+
+// Widget contract
+export {
+  WIDGET_SCHEMA_VERSION,
+  buildWidgetSnapshot,
+  buildWidgetTimeline,
+  kindLabel,
+  pickSpotlight,
+} from './widget/payload';
+export type {
+  WidgetCard,
+  WidgetCounts,
+  WidgetFamily,
+  WidgetGradeOption,
+  WidgetSnapshot,
+  WidgetTimeline,
+} from './widget/payload';
+export { applyPendingGrades } from './widget/pending';
+export type { ApplyPendingResult, PendingWidgetGrade } from './widget/pending';
+export {
+  APP_SCHEME,
+  linkToCard,
+  linkToGrade,
+  linkToHome,
+  linkToReveal,
+  linkToReview,
+  linkToSettings,
+  linkToStats,
+  parseDeepLink,
+} from './widget/deeplinks';
+export type { ParsedDeepLink } from './widget/deeplinks';
+
+// Storage
+export { MemoryStore, MirroringStore, readJson, writeJson } from './storage/port';
+export type { KeyValueStore } from './storage/port';
+
+// Data
+export {
+  JAPANESE_SEED,
+  KOREAN_SEED,
+  MANDARIN_SEED,
+  SEED_ENTRIES,
+  VIETNAMESE_SEED,
+  getSeedCounts,
+  getSeedEntries,
+} from './data/seed';
+export {
+  CSV_COLUMNS,
+  exportVocabularyJson,
+  parseVocabularyCsv,
+  parseVocabularyJson,
+} from './data/importer';
+export type { ImportIssue, ImportResult, ParseCsvOptions } from './data/importer';
+export { makeEntry } from './data/helpers';
+
+// Utilities
+export {
+  MS_PER_DAY,
+  MS_PER_MINUTE,
+  addDays,
+  addMinutes,
+  calendarDaysBetween,
+  daysBetween,
+  endOfStudyDay,
+  fixedClock,
+  formatInterval,
+  isDue,
+  startOfStudyDay,
+  studyDayOf,
+  systemClock,
+  toDateOnly,
+  toEpochMs,
+  toTimestamp,
+} from './utils/date';
+export type { Clock } from './utils/date';
+export { cardId, parseCardId, reviewLogId } from './utils/id';
+
+// Engine
+export { STORAGE_KEYS, StudyEngine } from './engine';
+export type { StudyEngineOptions } from './engine';

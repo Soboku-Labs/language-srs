@@ -1,197 +1,278 @@
 import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { findExamLevel, getLanguageProfile, kindLabel, type CardKind } from '@language-srs/core';
+import {
+  LANGUAGE_CODES,
+  getExamTracksForLanguage,
+  getLanguageProfile,
+  getLanguageTheme,
+  getTeacher,
+  type LanguageCode,
+} from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
-import { BigButton, Caption, Row, Screen, Stat, TextButton, Title } from '../src/components/ui';
-import { CountUp, Press, Rise } from '../src/motion/components';
+import { Caption, Screen } from '../src/components/ui';
+import { TeacherAvatar } from '../src/components/Teacher';
+import { Press, Rise } from '../src/motion/components';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
 
 /**
- * The dashboard.
+ * The landing page, and the app's front door.
  *
- * One question, answered immediately: is there anything to study, and how much.
- * An earlier version stacked six bordered panels here — today, session mix,
- * readiness, streak tiles, actions — which meant nothing stood out and the answer
- * took a scroll to find. Everything except the count, the button and a single row
- * of context now lives on the Progress screen, one tap away.
+ * Every launch starts here rather than in the middle of whatever was last open.
+ * That is the point of the rewrite: there is one place the app begins, it holds
+ * the four languages and the four teachers, and everything else is reached from
+ * it. A learner studying two languages switches by coming back to the front door
+ * rather than by finding a picker buried behind the dashboard.
  *
- * The screen resolves top to bottom on arrival, and the count rolls up rather than
- * appearing: it is the number the whole screen exists to deliver, and the motion
- * puts the eye on it before the button below it.
+ * It says three things and nothing else: what this is, how it teaches, and who
+ * teaches it. The exam machinery, the readiness maths and the settings all live
+ * past the door.
  */
-export default function Dashboard() {
-  const { engine, revision } = useEngine();
-  const theme = useTheme();
+export default function Landing() {
+  const { engine, revision, setActiveLanguage } = useEngine();
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
 
-  const view = useMemo(() => {
-    const profile = engine.getProfile();
+  const state = useMemo(() => {
+    // Started means *reviewed*, not merely having a profile. The engine creates a
+    // default Mandarin profile on first launch so there is something to schedule
+    // against, and offering to "continue" a language nobody has opened yet would
+    // greet a first-time visitor with somebody else's progress.
+    const started = LANGUAGE_CODES.filter((code) => hasHistory(engine, code));
+    const active = engine.activeLanguage;
     return {
-      profile,
-      language: getLanguageProfile(profile.languageCode),
-      level: findExamLevel(profile.targetLevelId),
-      queue: engine.getQueue(),
-      stats: engine.getStats(),
-      readiness: engine.getReadiness(),
+      started: new Set(started),
+      resume: started.includes(active) ? active : started[0],
+      waiting: countWaiting(engine, active),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, revision]);
 
-  const { profile, language, level, queue, stats, readiness } = view;
-  const waiting = queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning;
+  const open = async (code: LanguageCode) => {
+    await setActiveLanguage(code);
+    router.push('/home');
+  };
 
   return (
     <Screen>
-      {/* Tapping the language is how you switch it — no menu needed. */}
-      <Rise index={0}>
-        <Press onPress={() => router.push('/languages')} style={styles.header}>
-          <Text style={styles.emoji}>{language.emoji}</Text>
-          <View style={styles.headerText}>
-            <Title>{language.name}</Title>
-            <Caption>
-              {level?.shortName}
-              {profile.examDate ? ` · ${describeCountdown(readiness.daysToExam)}` : ''}
-            </Caption>
+      <Rise index={0} style={styles.masthead}>
+        <Text style={styles.wordmark}>language·srs</Text>
+        <Text style={styles.headline}>Four languages.{'\n'}Four teachers.</Text>
+        <Text style={styles.standfirst}>
+          Ten minutes a day of spaced repetition, shaped like the exam you are sitting. Choose a language and meet the
+          person who takes you through it.
+        </Text>
+      </Rise>
+
+      {state.resume ? (
+        <Rise index={1}>
+          <ResumeRow
+            code={state.resume}
+            waiting={countWaiting(engine, state.resume)}
+            onPress={() => void open(state.resume!)}
+          />
+        </Rise>
+      ) : null}
+
+      <Rise index={2} style={styles.method}>
+        <Text style={styles.sectionLabel}>How it is taught</Text>
+        {TEACHING.map((item) => (
+          <View key={item.title} style={styles.methodRow}>
+            <Text style={styles.methodNumber}>{item.number}</Text>
+            <View style={styles.methodText}>
+              <Text style={styles.methodTitle}>{item.title}</Text>
+              <Text style={styles.methodBody}>{item.body}</Text>
+            </View>
           </View>
-          <Text style={styles.chevron}>›</Text>
-        </Press>
+        ))}
       </Rise>
 
-      <Rise index={1} style={styles.hero}>
-        {waiting > 0 ? (
-          <>
-            <CountUp value={waiting} style={styles.count} />
-            <Text style={styles.countLabel}>{waiting === 1 ? 'card waiting' : 'cards waiting'}</Text>
-            <MixBar mix={queue.kindMix} />
-          </>
-        ) : (
-          <>
-            <Text style={styles.count}>✨</Text>
-            <Text style={styles.countLabel}>All caught up</Text>
-            <Caption>
-              {queue.nextDueAt
-                ? `More lands ${formatRelative(queue.nextDueAt)}`
-                : 'Raise your daily new-card limit to keep going'}
-            </Caption>
-          </>
-        )}
-      </Rise>
+      <View style={styles.languages}>
+        <Rise index={3}>
+          <Text style={styles.sectionLabel}>Choose a language</Text>
+        </Rise>
+        {LANGUAGE_CODES.map((code, index) => (
+          <Rise key={code} index={4 + index}>
+            <LanguageRow code={code} started={state.started.has(code)} onPress={() => void open(code)} />
+          </Rise>
+        ))}
+      </View>
 
-      <Rise index={2}>
-        <BigButton
-          label={waiting > 0 ? 'Study now' : 'Study ahead'}
-          {...(waiting > 0 && queue.kindMix ? { hint: describeMix(queue.kindMix) } : {})}
-          onPress={() => router.push('/review')}
-        />
-      </Rise>
-
-      <Rise index={3}>
-        <Row style={styles.stats}>
-          <Stat
-            label={stats.streak.studiedToday ? 'day streak 🔥' : 'day streak'}
-            value={String(stats.streak.current)}
-            color={stats.streak.current > 0 ? theme.colors.secondary : theme.colors.textMuted}
-          />
-          <Stat label="words known" value={String(stats.coverage.entriesKnown)} />
-          <Stat
-            label={profile.examDate ? 'exam ready' : 'syllabus'}
-            value={`${Math.round((profile.examDate ? readiness.score : readiness.coverage) * 100)}%`}
-          />
-        </Row>
-      </Rise>
-
-      <Rise index={4}>
-        <Row style={styles.links}>
-          <TextButton label="Progress" onPress={() => router.push('/stats')} />
-          <TextButton label="Settings" onPress={() => router.push('/settings')} color={theme.colors.textMuted} />
-        </Row>
+      <Rise index={8}>
+        <Caption>
+          Nothing is sent anywhere: your cards, your history and your schedule stay on this device. HSK publishes
+          official word lists, so those targets are exact; JLPT, TOPIK and the Vietnamese framework do not, and the app
+          labels those figures as estimates.
+        </Caption>
       </Rise>
     </Screen>
   );
 }
 
 /**
- * A thin band showing the session's card mix.
+ * One language and its teacher.
  *
- * The one piece of the old session-mix panel worth keeping on this screen: it
- * shows at a glance that the queue is shaped like the exam paper, without a
- * legend, a heading and a box to say so.
+ * Rendered in that language's accent rather than the active theme's, so the list
+ * shows four people rather than one list recoloured four times. The method line
+ * is the teacher's own — it is the thing that makes this a choice rather than a
+ * menu of flags.
  */
-function MixBar({ mix }: { mix: Partial<Record<CardKind, number>> }) {
-  const theme = useTheme();
+function LanguageRow({ code, started, onPress }: { code: LanguageCode; started: boolean; onPress: () => void }) {
   const styles = useThemedStyles(createStyles);
-
-  const entries = Object.entries(mix)
-    .filter((entry): entry is [CardKind, number] => (entry[1] ?? 0) > 0)
-    .sort((a, b) => b[1] - a[1]);
-
-  if (entries.length === 0) return null;
+  const language = getLanguageProfile(code);
+  const teacher = getTeacher(code);
+  const accent = getLanguageTheme(code).colors.accent;
+  const tracks = getExamTracksForLanguage(code).map((track) => track.name);
 
   return (
-    <View style={styles.mixBar}>
-      {entries.map(([kind, count]) => (
-        <View
-          key={kind}
-          style={{ flex: count, backgroundColor: theme.kindColors[kind] ?? theme.colors.accent, height: 6 }}
-        />
-      ))}
-    </View>
+    <Press onPress={onPress} accessibilityRole="button" style={styles.languageRow}>
+      <TeacherAvatar teacher={teacher} size="large" />
+
+      <View style={styles.languageText}>
+        <View style={styles.languageTitleRow}>
+          <Text style={styles.languageName}>{language.name}</Text>
+          <Text style={styles.endonym}>{language.endonym}</Text>
+        </View>
+        <Text style={[styles.teacherName, { color: accent }]}>
+          with {teacher.address}
+          {started ? ' · in progress' : ''}
+        </Text>
+        {/* Capped so four rows stay the same height; the full statement is the
+            teacher's, but the list is a choice, not a reading exercise. */}
+        <Text style={styles.methodLine} numberOfLines={3}>
+          {teacher.method}
+        </Text>
+        <Text style={styles.tracks}>{tracks.join(' · ')}</Text>
+      </View>
+    </Press>
   );
 }
 
-/** "listening, meaning and tones" — the mix as a phrase rather than a legend. */
-function describeMix(mix: Partial<Record<CardKind, number>>): string {
-  const kinds = Object.entries(mix)
-    .filter((entry): entry is [CardKind, number] => (entry[1] ?? 0) > 0)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([kind]) => kindLabel(kind).toLowerCase());
+/** The one shortcut on the page: pick up where the last session left off. */
+function ResumeRow({ code, waiting, onPress }: { code: LanguageCode; waiting: number; onPress: () => void }) {
+  const styles = useThemedStyles(createStyles);
+  const teacher = getTeacher(code);
+  const accent = getLanguageTheme(code).colors.accent;
 
-  if (kinds.length === 0) return '';
-  if (kinds.length === 1) return kinds[0]!;
-  return `${kinds.slice(0, -1).join(', ')} and ${kinds[kinds.length - 1]}`;
+  return (
+    <Press onPress={onPress} accessibilityRole="button" style={[styles.resume, { borderColor: accent }]}>
+      <TeacherAvatar teacher={teacher} size="small" />
+      <View style={styles.resumeText}>
+        <Text style={styles.resumeTitle}>Continue with {teacher.address}</Text>
+        <Text style={styles.resumeMeta}>
+          {waiting > 0 ? `${waiting} card${waiting === 1 ? '' : 's'} waiting` : 'nothing due — study ahead'}
+        </Text>
+      </View>
+      <Text style={[styles.chevron, { color: accent }]}>›</Text>
+    </Press>
+  );
 }
 
-function describeCountdown(days?: number): string {
-  if (days === undefined) return '';
-  if (days < 0) return 'exam passed';
-  if (days === 0) return 'exam today';
-  if (days === 1) return 'exam tomorrow';
-  return `${days} days to go`;
+/**
+ * The teaching claim, in three lines.
+ *
+ * Deliberately about method rather than features: what a learner is agreeing to
+ * when they tap a language, not a list of what the app contains.
+ */
+const TEACHING = [
+  {
+    number: '01',
+    title: 'A teacher, not a word list',
+    body: 'Each language is taught by someone with a position on how it should be learned — components before characters, kana before kanji, the ear before the page.',
+  },
+  {
+    number: '02',
+    title: 'Shaped like the paper',
+    body: 'Sessions are weighted to match the exam you are sitting. A JLPT session contains no handwriting, because the JLPT has no writing section.',
+  },
+  {
+    number: '03',
+    title: 'Timed by forgetting',
+    body: 'Every card comes back on the day before you would have lost it, and the schedule tightens on its own as an exam date approaches.',
+  },
+] as const;
+
+type Engine = ReturnType<typeof useEngine>['engine'];
+
+/** Cards a language has waiting right now, or zero if it has never been opened. */
+function countWaiting(engine: Engine, code: LanguageCode): number {
+  if (!engine.hasProfile(code)) return 0;
+  const queue = engine.getQueue({ code });
+  return queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning;
 }
 
-function formatRelative(at: string): string {
-  const hours = (Date.parse(at) - Date.now()) / 3_600_000;
-  if (hours < 1) return 'within the hour';
-  if (hours < 24) return `in ${Math.round(hours)}h`;
-  return `in ${Math.round(hours / 24)} days`;
+/** Whether a single card of this language has ever been graded. */
+function hasHistory(engine: Engine, code: LanguageCode): boolean {
+  if (!engine.hasProfile(code)) return false;
+  return engine.getAllCards(code).some((card) => card.reps > 0);
 }
 
 const createStyles = (theme: ResolvedTheme) => ({
-  header: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.md },
-  emoji: { fontSize: 34 },
-  headerText: { flex: 1, gap: 1 },
-  chevron: { color: theme.colors.textFaint, fontSize: 28 },
-
-  hero: { alignItems: 'center' as const, gap: spacing.xs, paddingVertical: spacing.xxl },
-  count: {
-    color: theme.colors.accent,
-    fontSize: 92,
-    lineHeight: 100,
-    fontWeight: '800' as const,
-    letterSpacing: -2,
+  masthead: { gap: spacing.md, paddingTop: spacing.lg },
+  wordmark: {
+    color: theme.colors.textFaint,
+    fontSize: typography.micro,
+    fontWeight: '700' as const,
+    letterSpacing: 2,
+    textTransform: 'uppercase' as const,
   },
-  countLabel: { color: theme.colors.text, fontSize: typography.heading, fontWeight: '600' as const },
-  mixBar: {
+  headline: {
+    color: theme.colors.text,
+    fontSize: 38,
+    lineHeight: 44,
+    fontWeight: '600' as const,
+    letterSpacing: -0.8,
+  },
+  standfirst: { color: theme.colors.textMuted, fontSize: typography.body, lineHeight: 23, maxWidth: 460 },
+
+  sectionLabel: {
+    color: theme.colors.textFaint,
+    fontSize: typography.micro,
+    fontWeight: '700' as const,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase' as const,
+  },
+
+  method: { gap: spacing.lg },
+  methodRow: { flexDirection: 'row' as const, gap: spacing.md },
+  methodNumber: {
+    color: theme.colors.textFaint,
+    fontSize: typography.caption,
+    fontWeight: '700' as const,
+    width: 22,
+    paddingTop: 2,
+  },
+  methodText: { flex: 1, gap: 2 },
+  methodTitle: { color: theme.colors.text, fontSize: typography.body, fontWeight: '600' as const },
+  methodBody: { color: theme.colors.textMuted, fontSize: typography.caption, lineHeight: 20 },
+
+  languages: { gap: spacing.md },
+  languageRow: {
     flexDirection: 'row' as const,
-    borderRadius: theme.radius.pill,
-    overflow: 'hidden' as const,
-    width: 160,
-    marginTop: spacing.md,
+    gap: spacing.lg,
+    alignItems: 'flex-start' as const,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.card,
+    padding: spacing.lg,
   },
+  languageText: { flex: 1, gap: 3 },
+  languageTitleRow: { flexDirection: 'row' as const, alignItems: 'baseline' as const, gap: spacing.sm },
+  languageName: { color: theme.colors.text, fontSize: typography.heading, fontWeight: '600' as const },
+  endonym: { color: theme.colors.textFaint, fontSize: typography.caption },
+  teacherName: { fontSize: typography.caption, fontWeight: '600' as const },
+  methodLine: { color: theme.colors.textMuted, fontSize: typography.caption, lineHeight: 19 },
+  tracks: { color: theme.colors.textFaint, fontSize: typography.micro, paddingTop: 2 },
 
-  stats: { justifyContent: 'space-between' as const, paddingHorizontal: spacing.sm },
-  links: { justifyContent: 'center' as const, gap: spacing.xl },
+  resume: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderRadius: theme.radius.card,
+    padding: spacing.md,
+  },
+  resumeText: { flex: 1, gap: 1 },
+  resumeTitle: { color: theme.colors.text, fontSize: typography.body, fontWeight: '600' as const },
+  resumeMeta: { color: theme.colors.textMuted, fontSize: typography.micro },
+  chevron: { fontSize: 26 },
 });

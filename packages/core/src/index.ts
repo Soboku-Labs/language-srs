@@ -119,6 +119,21 @@ export type { CoverageStats, ForecastDay, RetentionStats, StreakInfo } from './s
 export { computeExamReadiness, suggestDailyNewLimit } from './stats/readiness';
 export type { ExamReadiness, ReadinessVerdict } from './stats/readiness';
 
+// Teachers — one character per language, shown on the landing page and in session
+export { TEACHERS, getTeacher, teacherLine } from './teachers';
+export type { Teacher, TeacherLines, TeacherMood } from './teachers';
+
+// Practice — answer checking for the two card kinds that can be answered
+export { checkTonePattern, checkWrittenAnswer } from './practice/check';
+export type { AnswerVerdict, ToneCheck, WrittenCheck } from './practice/check';
+export {
+  TONE_SYSTEMS,
+  describeTonePattern,
+  getToneDescriptor,
+  getToneSystem,
+} from './practice/tones';
+export type { ToneDescriptor } from './practice/tones';
+
 // Themes — one per language, shared by the app and the native widgets
 export {
   LANGUAGE_THEMES,
@@ -152,6 +167,7 @@ export {
   linkToCard,
   linkToGrade,
   linkToHome,
+  linkToLanding,
   linkToReveal,
   linkToReview,
   linkToSettings,

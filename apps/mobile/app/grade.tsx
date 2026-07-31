@@ -47,7 +47,9 @@ export default function GradeFromWidget() {
       }
 
       const remaining = engine.getQueue().cards.length;
-      router.replace(remaining > 0 ? '/review' : '/');
+      // The dashboard, never the landing page: a widget tap comes from someone
+      // who has already chosen a language.
+      router.replace(remaining > 0 ? '/review' : '/home');
     })();
   }, [engine, grade, params.card, params.rating, router]);
 

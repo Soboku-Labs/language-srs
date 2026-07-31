@@ -2,9 +2,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { previewIntervals, type CardWithEntry, type Rating } from '@language-srs/core';
+import {
+  getTeacher,
+  previewIntervals,
+  teacherLine,
+  type CardWithEntry,
+  type Rating,
+} from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { GradeButtons, ReviewCard, speakEntry } from '../src/components/ReviewCard';
+import type { AttemptResult } from '../src/components/Practice';
+import { TeacherNote, TeacherSays } from '../src/components/Teacher';
 import { BigButton, Caption, ProgressBar, Row, Screen, Title } from '../src/components/ui';
 import { DealtCard, PopIn, Rise } from '../src/motion/components';
 import { springBouncy } from '../src/motion/tokens';
@@ -17,10 +25,11 @@ import { spacing, useThemedStyles, type ResolvedTheme } from '../src/theme';
  * and the next thing to press. Running totals used to sit under the buttons and
  * competed with them for attention — the summary at the end is where they belong.
  *
- * The one piece of motion that carries information: after a grade the next card
- * rises from beneath, offset in the direction of the grade you gave. Again leans
- * left, Easy leans right. That is the only signal distinguishing a grade you meant
- * from one you mis-tapped, and it arrives immediately rather than a card later.
+ * Two things carry information rather than decoration. After a grade the next
+ * card rises from beneath, offset in the direction of the grade you gave: Again
+ * leans left, Easy leans right, which is the only signal distinguishing a grade
+ * you meant from one you mis-tapped. And the teacher answers the card you just
+ * finished — one line, in the footer, where a running tally used to be.
  */
 export default function ReviewScreen() {
   const { engine, revision, grade } = useEngine();
@@ -31,12 +40,17 @@ export default function ReviewScreen() {
   const [revealed, setRevealed] = useState(params.reveal === '1');
   const [session, setSession] = useState({ reviewed: 0, recalled: 0 });
   const [lastDirection, setLastDirection] = useState(0);
+  const [attempt, setAttempt] = useState<AttemptResult | undefined>();
+  /** The teacher's response to the card just graded, or nothing at the start. */
+  const [reaction, setReaction] = useState<string | undefined>();
   const shownAt = useRef(Date.now());
 
   const queue = useMemo(() => {
     return engine.getQueue();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, revision]);
+
+  const teacher = getTeacher(engine.activeLanguage);
 
   /**
    * The card on screen.
@@ -69,11 +83,23 @@ export default function ReviewScreen() {
     if (!current) return;
     shownAt.current = Date.now();
     setRevealed(params.reveal === '1');
+    setAttempt(undefined);
     if (current.card.kind === 'listening') {
       speakEntry(current.entry.target, current.entry.languageCode);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.card.id]);
+
+  /**
+   * An answer on a card that can be checked.
+   *
+   * Answering reveals immediately: the learner has committed, and making them
+   * press Reveal afterwards only delays the feedback they just asked for.
+   */
+  const onAttempt = useCallback((result: AttemptResult) => {
+    setAttempt(result);
+    setRevealed(true);
+  }, []);
 
   const onGrade = useCallback(
     async (rating: Rating) => {
@@ -88,6 +114,8 @@ export default function ReviewScreen() {
 
       // Again leans left, Hard slightly left, Good and Easy right.
       setLastDirection(rating <= 2 ? -1 : 1);
+      // Seeded on the card so the line is fixed for the moment it describes.
+      setReaction(teacherLine(teacher, rating > 2 ? 'recalled' : 'lapsed', current.card.id));
 
       await grade(current.card.id, rating, {
         durationMs: Date.now() - shownAt.current,
@@ -99,11 +127,12 @@ export default function ReviewScreen() {
         recalled: previous.recalled + (rating > 1 ? 1 : 0),
       }));
       setRevealed(false);
+      setAttempt(undefined);
 
       // Drop the pinned-card parameter so the queue resumes its own ordering.
       if (params.card) router.setParams({ card: undefined, reveal: undefined });
     },
-    [current, grade, params.card, router],
+    [current, grade, params.card, router, teacher],
   );
 
   if (!current || !previews) {
@@ -112,7 +141,7 @@ export default function ReviewScreen() {
     return (
       <Screen>
         <PopIn style={styles.done} config={springBouncy}>
-          <Title>{session.reviewed > 0 ? 'Done 🎉' : 'Nothing waiting'}</Title>
+          <Title>{session.reviewed > 0 ? 'Session done' : 'Nothing waiting'}</Title>
           <Caption>
             {session.reviewed > 0
               ? `${session.reviewed} card${session.reviewed === 1 ? '' : 's'}, ${accuracy}% recalled.`
@@ -120,7 +149,19 @@ export default function ReviewScreen() {
           </Caption>
         </PopIn>
         <Rise index={1}>
-          <BigButton label="Back home" onPress={() => router.replace('/')} />
+          <TeacherSays
+            teacher={teacher}
+            line={teacherLine(teacher, session.reviewed > 0 ? 'finished' : 'idle', session.reviewed)}
+          />
+        </Rise>
+        <Rise index={2}>
+          {/* Pop back to the dashboard that pushed this session rather than
+              replacing it, which would leave two dashboards in the stack. A
+              session entered from a widget tap has nothing to pop to. */}
+          <BigButton
+            label="Back home"
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/home'))}
+          />
         </Rise>
       </Screen>
     );
@@ -142,13 +183,29 @@ export default function ReviewScreen() {
 
       <View style={styles.cardArea}>
         <DealtCard cardKey={current.card.id} exitDirection={lastDirection}>
-          <ReviewCard pair={current} revealed={revealed} onReveal={() => setRevealed(true)} />
+          <ReviewCard
+            pair={current}
+            revealed={revealed}
+            onReveal={() => setRevealed(true)}
+            onAttempt={onAttempt}
+            {...(attempt ? { attempt } : {})}
+          />
         </DealtCard>
       </View>
 
       <View style={styles.footer}>
+        {reaction && !revealed ? (
+          <View style={styles.reaction}>
+            <TeacherNote align="center">{reaction}</TeacherNote>
+          </View>
+        ) : null}
+
         {revealed ? (
-          <GradeButtons previews={previews} onGrade={onGrade} />
+          <GradeButtons
+            previews={previews}
+            onGrade={onGrade}
+            {...(attempt ? { suggested: suggestGrade(attempt) } : {})}
+          />
         ) : (
           <BigButton label="Reveal" onPress={() => setRevealed(true)} />
         )}
@@ -157,10 +214,24 @@ export default function ReviewScreen() {
   );
 }
 
+/**
+ * The grade an answered card implies.
+ *
+ * Only ever a suggestion — see `GradeButtons`. Correct maps to Good rather than
+ * Easy because getting a card right is the expected case, and Easy should mean
+ * "this was trivial, stop showing it to me so often" rather than "correct".
+ */
+function suggestGrade(attempt: AttemptResult): Rating {
+  if (attempt.verdict === 'correct') return 3;
+  if (attempt.verdict === 'close') return 2;
+  return 1;
+}
+
 const createStyles = (_theme: ResolvedTheme) => ({
   done: { gap: spacing.sm, paddingVertical: spacing.xxl, alignItems: 'center' as const },
   progress: { gap: spacing.sm, paddingHorizontal: spacing.xl, paddingBottom: spacing.lg },
   progressRow: { justifyContent: 'center' as const },
   cardArea: { flex: 1, justifyContent: 'center' as const, paddingHorizontal: spacing.xl },
   footer: { gap: spacing.md, paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
+  reaction: { paddingHorizontal: spacing.md },
 });

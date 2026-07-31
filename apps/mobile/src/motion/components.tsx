@@ -73,29 +73,45 @@ export function Press({
   ...props
 }: PressableProps & {
   children: React.ReactNode;
-  style?: StyleProp<ViewStyle>;
+  /**
+   * Either a plain style or Pressable's `({ pressed }) => style` form.
+   *
+   * The second form has to be resolved here rather than handed to Pressable: the
+   * animated style below is composed into the same prop, and a function reaching
+   * the underlying component means neither survives — which is how the grade
+   * buttons came to be rendering as bare text on a transparent background.
+   */
+  style?: StyleProp<ViewStyle> | ((state: { pressed: boolean }) => StyleProp<ViewStyle>);
   scaleTo?: number;
 }) {
   const reduced = useReducedMotion();
   const pressed = useSharedValue(0);
+  // Only tracked in React state when a caller actually needs it, so the common
+  // case keeps costing zero renders per press.
+  const isDynamic = typeof style === 'function';
+  const [isPressed, setIsPressed] = useState(false);
 
   const animated = useAnimatedStyle(() => ({
     transform: [{ scale: 1 - pressed.value * (1 - scaleTo) }],
     opacity: 1 - pressed.value * 0.15,
   }));
 
+  const resolved = isDynamic ? style({ pressed: isPressed }) : style;
+
   return (
     <AnimatedPressable
       {...props}
       onPressIn={(event) => {
         if (!reduced) pressed.value = withTiming(1, timing(duration.instant));
+        if (isDynamic) setIsPressed(true);
         props.onPressIn?.(event);
       }}
       onPressOut={(event) => {
         pressed.value = withSpring(0, spring);
+        if (isDynamic) setIsPressed(false);
         props.onPressOut?.(event);
       }}
-      style={[style, animated]}
+      style={[resolved, animated]}
     >
       {children}
     </AnimatedPressable>

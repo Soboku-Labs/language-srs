@@ -10,7 +10,7 @@ import {
   type Rating,
 } from '@language-srs/core';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../theme';
-import { Caption, Chip, Panel, Row } from './ui';
+import { Caption, Card, Pill, Row } from './ui';
 import { ToneText } from './ToneText';
 
 /** BCP-47 tags for platform text-to-speech, used by listening cards. */
@@ -54,9 +54,9 @@ export function ReviewCard({
   const accent = theme.kindColors[card.kind] ?? theme.colors.accent;
 
   return (
-    <Panel style={styles.card} accent={accent}>
+    <Card style={styles.card} accent={accent}>
       <Row style={styles.spaceBetween}>
-        <Chip label={kindLabel(card.kind)} color={accent} />
+        <Pill label={kindLabel(card.kind)} color={accent} />
         <Caption>{entry.partOfSpeech ?? ''}</Caption>
       </Row>
 
@@ -64,8 +64,14 @@ export function ReviewCard({
         <CardFront pair={pair} revealed={revealed} />
       </Pressable>
 
-      {revealed ? <Answer pair={pair} /> : <Caption>Tap to reveal</Caption>}
-    </Panel>
+      {revealed ? (
+        <Answer pair={pair} />
+      ) : (
+        <View style={styles.centered}>
+          <Caption>Tap to reveal</Caption>
+        </View>
+      )}
+    </Card>
   );
 }
 
@@ -238,8 +244,8 @@ export function GradeButtons({
           accessibilityLabel={`${RATING_LABELS[rating]}, next in ${previews[rating].display}`}
           style={({ pressed }) => [
             styles.grade,
-            { borderColor: gradeColors[rating] },
-            pressed && !disabled && { backgroundColor: `${gradeColors[rating]}22` },
+            { backgroundColor: `${gradeColors[rating]}22` },
+            pressed && !disabled && { backgroundColor: `${gradeColors[rating]}44` },
             disabled && styles.gradeDisabled,
           ]}
         >
@@ -252,13 +258,15 @@ export function GradeButtons({
 }
 
 const createStyles = (theme: ResolvedTheme) => ({
-  card: { gap: spacing.lg, minHeight: 300, justifyContent: 'space-between' as const },
+  // Sized to its content rather than stretched to a fixed height: an empty card
+  // with the prompt marooned in the middle reads as a loading state.
+  card: { gap: spacing.md },
   spaceBetween: { justifyContent: 'space-between' as const },
   front: {
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    paddingVertical: spacing.xl,
-    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    gap: spacing.md,
   },
   centered: { alignItems: 'center' as const, gap: spacing.sm },
   centeredRow: { justifyContent: 'center' as const },
@@ -318,11 +326,12 @@ const createStyles = (theme: ResolvedTheme) => ({
   grades: { flexDirection: 'row' as const, gap: spacing.sm },
   grade: {
     flex: 1,
-    borderWidth: 1,
-    borderRadius: theme.radius.control,
-    paddingVertical: spacing.md,
+    // Filled tints rather than outlines: four outlined boxes in a row read as a
+    // form, four soft colour chips read as something to tap.
+    borderRadius: theme.radius.pill,
+    paddingVertical: spacing.md + 2,
     alignItems: 'center' as const,
-    gap: 2,
+    gap: 1,
     ...Platform.select({ web: { cursor: 'pointer' as const }, default: {} }),
   },
   gradeDisabled: { opacity: 0.4 },

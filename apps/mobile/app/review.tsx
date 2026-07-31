@@ -5,9 +5,16 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { previewIntervals, type CardWithEntry, type Rating } from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { GradeButtons, ReviewCard, speakEntry } from '../src/components/ReviewCard';
-import { Body, Button, Caption, Panel, ProgressBar, Row, Screen, StatTile } from '../src/components/ui';
-import { spacing, useThemedStyles } from '../src/theme';
+import { BigButton, Caption, ProgressBar, Row, Screen, Title } from '../src/components/ui';
+import { spacing, useThemedStyles, type ResolvedTheme } from '../src/theme';
 
+/**
+ * The review session.
+ *
+ * Nothing on this screen that is not the card, the progress through the session,
+ * and the next thing to press. Running totals used to sit under the buttons and
+ * competed with them for attention — the summary at the end is where they belong.
+ */
 export default function ReviewScreen() {
   const { engine, revision, grade } = useEngine();
   const styles = useThemedStyles(createStyles);
@@ -88,19 +95,19 @@ export default function ReviewScreen() {
   );
 
   if (!current || !previews) {
+    const accuracy = session.reviewed > 0 ? Math.round((session.recalled / session.reviewed) * 100) : 0;
+
     return (
       <Screen>
-        <Panel>
-          <Body>Session complete.</Body>
+        <View style={styles.done}>
+          <Title>{session.reviewed > 0 ? 'Done 🎉' : 'Nothing waiting'}</Title>
           <Caption>
             {session.reviewed > 0
-              ? `${session.reviewed} card${session.reviewed === 1 ? '' : 's'} reviewed, ${Math.round(
-                  (session.recalled / session.reviewed) * 100,
-                )}% recalled.`
-              : 'Nothing was due. Come back when reviews are ready, or raise your daily new-card limit.'}
+              ? `${session.reviewed} card${session.reviewed === 1 ? '' : 's'}, ${accuracy}% recalled.`
+              : 'Come back when reviews are ready, or raise your daily new-card limit.'}
           </Caption>
-        </Panel>
-        <Button label="Back to dashboard" onPress={() => router.replace('/')} />
+        </View>
+        <BigButton label="Back home" onPress={() => router.replace('/')} />
       </Screen>
     );
   }
@@ -109,13 +116,12 @@ export default function ReviewScreen() {
   const total = remaining + session.reviewed;
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} padded={false}>
       <View style={styles.progress}>
         <Row style={styles.progressRow}>
           <Caption>
             {session.reviewed + 1} of {total}
           </Caption>
-          <Caption>{remaining - 1 >= 0 ? `${remaining - 1} left after this` : ''}</Caption>
         </Row>
         <ProgressBar value={total > 0 ? session.reviewed / total : 0} />
       </View>
@@ -128,27 +134,17 @@ export default function ReviewScreen() {
         {revealed ? (
           <GradeButtons previews={previews} onGrade={onGrade} />
         ) : (
-          <Button label="Reveal answer" onPress={() => setRevealed(true)} />
+          <BigButton label="Reveal" onPress={() => setRevealed(true)} />
         )}
-
-        {session.reviewed > 0 ? (
-          <Row style={styles.sessionStats}>
-            <StatTile label="Reviewed" value={String(session.reviewed)} />
-            <StatTile
-              label="Recalled"
-              value={`${Math.round((session.recalled / session.reviewed) * 100)}%`}
-            />
-          </Row>
-        ) : null}
       </View>
     </Screen>
   );
 }
 
-const createStyles = () => ({
-  progress: { gap: spacing.xs, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  progressRow: { justifyContent: 'space-between' as const },
-  cardArea: { flex: 1, justifyContent: 'center' as const, paddingHorizontal: spacing.lg },
-  footer: { gap: spacing.lg, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  sessionStats: { alignItems: 'flex-start' as const },
+const createStyles = (_theme: ResolvedTheme) => ({
+  done: { gap: spacing.sm, paddingVertical: spacing.xxl, alignItems: 'center' as const },
+  progress: { gap: spacing.sm, paddingHorizontal: spacing.xl, paddingBottom: spacing.lg },
+  progressRow: { justifyContent: 'center' as const },
+  cardArea: { flex: 1, justifyContent: 'center' as const, paddingHorizontal: spacing.xl },
+  footer: { gap: spacing.md, paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
 });

@@ -86,6 +86,32 @@ npm run web       # dev server in the browser
 npm run web:build # static export to apps/mobile/dist
 ```
 
+### Deploying the web build
+
+Pushing to `main` builds and publishes to GitHub Pages via
+`.github/workflows/deploy-pages.yml`. To preview a branch before it merges, run
+that workflow manually from the Actions tab with the branch selected.
+
+**One-time setup:** in *Settings ▸ Pages*, set **Source** to **GitHub Actions**.
+Until that is done the workflow runs green but publishes nothing.
+
+Two details the build handles that catch most static exports on Pages:
+
+- A project site is served from `/<repo>/`, not the domain root, so the build sets
+  `EXPO_WEB_BASE_URL=/language-srs` and Expo prefixes every asset and route. It is
+  read from the environment rather than hard-coded so `npm run web` still works at
+  the root locally.
+- Pages runs Jekyll, which drops anything whose name starts with an underscore —
+  including Expo's entire `_expo/` bundle directory. The build writes `.nojekyll`
+  to disable that, plus a `404.html` so unknown URLs land in the app rather than
+  on GitHub's error page.
+
+Build it locally exactly as CI does:
+
+```bash
+npm run web:pages   # writes apps/mobile/dist, ready to serve at /language-srs/
+```
+
 Native builds need a Mac with Xcode (iOS) or Android Studio:
 
 ```bash

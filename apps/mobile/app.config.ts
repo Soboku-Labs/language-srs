@@ -76,6 +76,16 @@ const config: ExpoConfig = {
 
   experiments: {
     typedRoutes: true,
+    /**
+     * Sub-path the web build is served from.
+     *
+     * GitHub Pages serves a project site at `/<repo>/`, not at the domain root,
+     * so every asset URL and every router link has to carry that prefix. Set from
+     * the environment rather than hard-coded, because the same build has to work
+     * at the root for `expo start --web` and for any other host — a baked-in
+     * `/language-srs` would break local development.
+     */
+    baseUrl: process.env.EXPO_WEB_BASE_URL ?? '',
   },
 
   extra: {

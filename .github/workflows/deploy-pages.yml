@@ -1,0 +1,65 @@
+name: Deploy to GitHub Pages
+
+# Runs on pushes to the default branch, and on demand from any branch — the
+# manual trigger is how you preview a feature branch before it merges.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  # Required by actions/deploy-pages to mint a deployment token.
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it half-published, but only
+# keep one queued behind it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # The web build has no tests of its own, but every scheduling decision it
+      # renders comes from the core package. A red core means a broken app, so
+      # this gates the deploy rather than running alongside it.
+      - name: Test core
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Sets the /language-srs sub-path, then writes .nojekyll and 404.html.
+      # Without .nojekyll, Pages' Jekyll step drops the _expo/ bundle directory
+      # and the site serves a blank page.
+      - name: Build web
+        run: npm run web:pages
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/mobile/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

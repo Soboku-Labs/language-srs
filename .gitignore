@@ -18,6 +18,11 @@ expo-env.d.ts
 apps/mobile/ios/
 apps/mobile/android/
 
+# The account API's data file: real accounts, hashed credentials and sessions.
+# Never committed — it is the database.
+.data/
+apps/server/.data/
+
 # Local env / secrets
 .env
 .env.local

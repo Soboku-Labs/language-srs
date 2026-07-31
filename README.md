@@ -52,6 +52,34 @@ The check never grades. FSRS is driven by your own judgement of recall, and an a
 What the check does is reveal the card, say something specific about what happened, and
 outline the grade it would suggest.
 
+## Accounts, and what a session means
+
+Studying works signed out, on the device, as it always has. An account adds three
+things, which are the three meanings of "session tracking" this app cares about:
+
+- **Study sessions.** Every sitting is recorded — when it started and ended, how
+  many cards, how many recalled, on which device — so the account screen can
+  answer "how much have I actually been studying?" with sittings rather than a
+  streak. History from before sessions existed is reconstructed from the review
+  log and labelled as reconstructed.
+- **Auth sessions.** You stay signed in across launches on a sliding thirty-day
+  token; the account screen lists every signed-in device, and any of them can be
+  revoked from any other.
+- **Per-account separation.** Two people sharing a device get separate decks,
+  schedules, streaks and histories. Signing in swaps the storage namespace under
+  the domain rather than filtering it, so nothing bleeds between them — and the
+  signed-out namespace is exactly where the app wrote before accounts existed, so
+  studying first and signing up later loses nothing.
+
+The API is a small service in `apps/server` with no runtime dependencies:
+
+```bash
+npm run server   # http://localhost:4000, accounts in .data/accounts.json
+```
+
+Endpoints, the security decisions behind them, and what sync does and does not
+guarantee: [docs/API.md](docs/API.md).
+
 ## What makes it exam-shaped
 
 Most SRS apps are a word list with a scheduler bolted on. This one is built around the
@@ -110,6 +138,8 @@ packages/core/            @language-srs/core — all the domain logic, no React 
   srs/                    FSRS-4.5 scheduler + exam-date pressure
   session/                queue building, daily caps, exam-weighted card mix
   stats/                  streaks, true retention, coverage, exam readiness
+  sessions/               study sittings: recording, reconstruction, summaries
+  auth/                   the account contract, shared with the server
   teachers/               the four characters, their methods and their lines
   practice/               tone inventories and answer checking
   theme/                  the shared ground and the four inks
@@ -117,10 +147,16 @@ packages/core/            @language-srs/core — all the domain logic, no React 
   data/                   seed decks and the bulk importer
   engine.ts               the single API the app talks to
 
+apps/server/              @language-srs/server — the account API, no runtime deps
+  crypto/                 scrypt password hashing, session tokens
+  services/               accounts, device sessions, state sync, sittings
+  store/                  the storage seam: in-memory and JSON-file
+
 apps/mobile/              Expo app: iOS, Android and web from one codebase
   app/index.tsx           the landing page — languages, teachers, method
   app/home.tsx            the dashboard for the chosen language
   app/                    the rest of the expo-router screens
+  src/auth/               the API client, the session, and the sync loop
   modules/widget-bridge/  native module: shared container + widget reload
   targets/ios-widget/     WidgetKit sources (Swift)
   targets/android-widget/ Glance sources (Kotlin)
@@ -136,12 +172,17 @@ code. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ```bash
 npm install
 
-npm test          # unit tests over the core domain
-npm run typecheck # core + app
+npm test          # unit tests over the core domain and the API server
+npm run typecheck # core + server + app
 
 npm run web       # dev server in the browser
 npm run web:build # static export to apps/mobile/dist
+
+npm run server    # the account API on :4000 — optional, studying works without it
 ```
+
+The app talks to whatever `EXPO_PUBLIC_API_URL` says at build time, defaulting to
+`http://localhost:4000`. Signing in is the only thing that needs it.
 
 ### Deploying the web build
 

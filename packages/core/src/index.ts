@@ -119,6 +119,45 @@ export type { CoverageStats, ForecastDay, RetentionStats, StreakInfo } from './s
 export { computeExamReadiness, suggestDailyNewLimit } from './stats/readiness';
 export type { ExamReadiness, ReadinessVerdict } from './stats/readiness';
 
+// Accounts — the contract the API server and the app both implement
+export {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  SESSION_TTL_DAYS,
+  normaliseEmail,
+  resolveDisplayName,
+  validateEmail,
+  validatePassword,
+} from './auth/types';
+export type {
+  ApiErrorBody,
+  AuthErrorCode,
+  AuthResult,
+  AuthSessionInfo,
+  PublicUser,
+  UserId,
+} from './auth/types';
+export { mergeStudySessions } from './auth/sync';
+export type {
+  AccountState,
+  PutStateRequest,
+  PutStateResponse,
+  StateConflict,
+  StudySessionsResponse,
+} from './auth/sync';
+
+// Study sittings — the grain a person thinks in, above individual gradings
+export {
+  SESSION_GAP_MINUTES,
+  addGradeToSession,
+  finishStudySession,
+  formatDuration,
+  groupLogsIntoSessions,
+  startStudySession,
+  summariseSessions,
+} from './sessions';
+export type { SessionDay, SessionSummary, StudySessionDraft, StudySessionRecord } from './sessions';
+
 // Teachers — one character per language, shown on the landing page and in session
 export { TEACHERS, getTeacher, teacherLine } from './teachers';
 export type { Teacher, TeacherLines, TeacherMood } from './teachers';
@@ -177,7 +216,7 @@ export {
 export type { ParsedDeepLink } from './widget/deeplinks';
 
 // Storage
-export { MemoryStore, MirroringStore, readJson, writeJson } from './storage/port';
+export { MemoryStore, MirroringStore, PrefixedStore, accountPrefix, readJson, writeJson } from './storage/port';
 export type { KeyValueStore } from './storage/port';
 
 // Data
@@ -219,8 +258,8 @@ export {
   toTimestamp,
 } from './utils/date';
 export type { Clock } from './utils/date';
-export { cardId, parseCardId, reviewLogId } from './utils/id';
+export { cardId, parseCardId, reviewLogId, studySessionId } from './utils/id';
 
 // Engine
-export { STORAGE_KEYS, StudyEngine } from './engine';
+export { STORAGE_KEYS, SYNCED_STORAGE_KEYS, StudyEngine } from './engine';
 export type { StudyEngineOptions } from './engine';

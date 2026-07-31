@@ -3,6 +3,13 @@ import { findExamTrack, getExamTrack, getLevelIdsInScope } from './exams';
 import { buildStudyQueue, countTodaysWork, type StudyQueue } from './session/queue';
 import { DEFAULT_SCHEDULER_CONFIG, type SchedulerConfig } from './srs/params';
 import { gradeCard } from './srs/scheduler';
+import {
+  groupLogsIntoSessions,
+  summariseSessions,
+  type SessionSummary,
+  type StudySessionRecord,
+} from './sessions';
+import { mergeStudySessions as mergeSessionRecords } from './auth/sync';
 import { computeCoverage, computeRetention, computeStreak, forecastReviews } from './stats/metrics';
 import { computeExamReadiness, type ExamReadiness } from './stats/readiness';
 import { readJson, writeJson, type KeyValueStore } from './storage/port';
@@ -28,9 +35,26 @@ export const STORAGE_KEYS = {
   logs: `${KEY_PREFIX}:logs`,
   entries: `${KEY_PREFIX}:entries`,
   pending: `${KEY_PREFIX}:pending`,
+  /** Finished sittings, for the account and progress screens. */
+  sessions: `${KEY_PREFIX}:sessions`,
   /** The flattened snapshot the native widget reads. Never read back by the app. */
   widget: `${KEY_PREFIX}:widget`,
 } as const;
+
+/**
+ * Storage keys that make up an account's state.
+ *
+ * The widget snapshot is excluded on purpose: it is derived from the others and
+ * regenerated on every state change, so syncing it would double the payload to
+ * transfer something the receiving device is about to overwrite anyway.
+ */
+export const SYNCED_STORAGE_KEYS: string[] = [
+  STORAGE_KEYS.meta,
+  STORAGE_KEYS.cards,
+  STORAGE_KEYS.logs,
+  STORAGE_KEYS.entries,
+  STORAGE_KEYS.sessions,
+];
 
 /**
  * Cap on retained review logs.
@@ -41,6 +65,15 @@ export const STORAGE_KEYS = {
  * first.
  */
 const MAX_RETAINED_LOGS = 20_000;
+
+/**
+ * Cap on retained study sittings.
+ *
+ * One or two a day for years fits comfortably. Trimmed oldest-first like the
+ * logs, and for the same reason: an account that syncs between devices should
+ * not grow without bound on the smallest one.
+ */
+const MAX_RETAINED_SESSIONS = 5_000;
 
 interface EngineMeta {
   version: number;
@@ -79,6 +112,7 @@ export class StudyEngine {
   private logs: import('./types/review').ReviewLog[];
   private importedEntries: LexicalEntry[];
   private pending: PendingWidgetGrade[];
+  private sessions: StudySessionRecord[];
   private readonly entriesById = new Map<string, LexicalEntry>();
   private readonly clock: Clock;
 
@@ -90,6 +124,7 @@ export class StudyEngine {
       logs: import('./types/review').ReviewLog[];
       importedEntries: LexicalEntry[];
       pending: PendingWidgetGrade[];
+      sessions: StudySessionRecord[];
     },
   ) {
     this.clock = options.clock ?? systemClock;
@@ -98,6 +133,7 @@ export class StudyEngine {
     this.logs = state.logs;
     this.importedEntries = state.importedEntries;
     this.pending = state.pending;
+    this.sessions = state.sessions;
     this.reindexEntries();
   }
 
@@ -118,6 +154,7 @@ export class StudyEngine {
       logs: await readJson<import('./types/review').ReviewLog[]>(store, STORAGE_KEYS.logs, []),
       importedEntries: await readJson<LexicalEntry[]>(store, STORAGE_KEYS.entries, []),
       pending: await readJson<PendingWidgetGrade[]>(store, STORAGE_KEYS.pending, []),
+      sessions: await readJson<StudySessionRecord[]>(store, STORAGE_KEYS.sessions, []),
     });
 
     // A fresh install has no profile and no cards; a returning one may have new
@@ -138,6 +175,17 @@ export class StudyEngine {
 
   get activeLanguage(): LanguageCode {
     return this.meta.activeLanguage;
+  }
+
+  /**
+   * The store this engine was built on.
+   *
+   * Exposed so the app layer can keep its own bookkeeping — sync revisions, for
+   * one — in the same namespace as the account's cards, and have it move,
+   * persist and get cleared along with them. The domain does not read it.
+   */
+  get store(): KeyValueStore {
+    return this.options.store;
   }
 
   get schedulerConfig(): SchedulerConfig {
@@ -349,6 +397,112 @@ export class StudyEngine {
     return computeExamReadiness(this.getAllCards(code), this.getProfile(code), now);
   }
 
+  // ---------------------------------------------------------------- sittings
+
+  /** Every recorded sitting, oldest first. Optionally for one language. */
+  getStudySessions(code?: LanguageCode): StudySessionRecord[] {
+    return code ? this.sessions.filter((session) => session.languageCode === code) : [...this.sessions];
+  }
+
+  /**
+   * Summarise sittings for the account and progress screens.
+   *
+   * Falls back to reconstructing sessions from review logs when nothing has been
+   * recorded — which is every account upgrading from a version before sittings
+   * existed, and any account whose only study has been on the widget.
+   */
+  getSessionSummary(
+    options: { code?: LanguageCode; days?: number; now?: Timestamp; recentLimit?: number } = {},
+  ): SessionSummary {
+    const now = options.now ?? this.now();
+    const profile = this.meta.profiles[options.code ?? this.meta.activeLanguage];
+    const recorded = this.getStudySessions(options.code);
+
+    const records = recorded.length > 0 ? recorded : this.deriveSessions(options.code);
+
+    return summariseSessions(records, {
+      now,
+      ...(options.days !== undefined ? { days: options.days } : {}),
+      ...(options.recentLimit !== undefined ? { recentLimit: options.recentLimit } : {}),
+      dayStartHour: profile?.dayStartHour ?? 4,
+    });
+  }
+
+  /** Store a finished sitting. Ignores one already recorded under this id. */
+  async recordStudySession(record: StudySessionRecord): Promise<void> {
+    if (this.sessions.some((session) => session.id === record.id)) return;
+    this.sessions = mergeSessionRecords(this.sessions, [record]);
+    this.trimSessions();
+    await this.persistSessions();
+    await this.notifyChanged();
+  }
+
+  /** Fold sittings from another device into this one's history. */
+  async mergeStudySessions(incoming: StudySessionRecord[]): Promise<{ added: number }> {
+    const before = this.sessions.length;
+    this.sessions = mergeSessionRecords(this.sessions, incoming);
+    this.trimSessions();
+    await this.persistSessions();
+    await this.notifyChanged();
+    return { added: this.sessions.length - before };
+  }
+
+  private deriveSessions(code?: LanguageCode): StudySessionRecord[] {
+    const cardsById = new Map(this.cards.map((card) => [card.id, card]));
+    return groupLogsIntoSessions(this.logs, {
+      languageOf: (log) => {
+        const language = cardsById.get(log.cardId)?.languageCode;
+        if (code && language !== code) return undefined;
+        return language;
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------- sync
+
+  /**
+   * The account state to upload.
+   *
+   * Read straight out of the store rather than re-serialised from memory, so
+   * what is uploaded is exactly what is on disk — including any key written by a
+   * newer version of the app than the one doing the reading.
+   */
+  async exportState(): Promise<Record<string, string>> {
+    const values: Record<string, string> = {};
+    for (const key of SYNCED_STORAGE_KEYS) {
+      const raw = await this.options.store.get(key);
+      if (raw !== null) values[key] = raw;
+    }
+    return values;
+  }
+
+  /**
+   * Replace local state with a downloaded copy, then reload.
+   *
+   * Deliberately total: partial adoption would leave cards from one device with
+   * the review logs of another, and the streak and retention figures computed
+   * from that pair would be fiction. The caller decides whether adopting is the
+   * right move — see `AccountState` on why this is last-writer-wins.
+   */
+  async importState(values: Record<string, string>): Promise<void> {
+    for (const key of SYNCED_STORAGE_KEYS) {
+      const value = values[key];
+      if (value === undefined) await this.options.store.remove(key);
+      else await this.options.store.set(key, value);
+    }
+
+    this.meta = await readJson<EngineMeta>(this.options.store, STORAGE_KEYS.meta, this.meta);
+    this.cards = await readJson<Card[]>(this.options.store, STORAGE_KEYS.cards, []);
+    this.logs = await readJson<import('./types/review').ReviewLog[]>(this.options.store, STORAGE_KEYS.logs, []);
+    this.importedEntries = await readJson<LexicalEntry[]>(this.options.store, STORAGE_KEYS.entries, []);
+    this.sessions = await readJson<StudySessionRecord[]>(this.options.store, STORAGE_KEYS.sessions, []);
+    this.reindexEntries();
+
+    await this.ensureProfile(this.meta.activeLanguage);
+    await this.syncCards();
+    await this.notifyChanged();
+  }
+
   // ---------------------------------------------------------------- widget
 
   /**
@@ -492,6 +646,15 @@ export class StudyEngine {
     this.logs = this.logs.slice(this.logs.length - MAX_RETAINED_LOGS);
   }
 
+  private trimSessions(): void {
+    if (this.sessions.length <= MAX_RETAINED_SESSIONS) return;
+    this.sessions = this.sessions.slice(this.sessions.length - MAX_RETAINED_SESSIONS);
+  }
+
+  private async persistSessions(): Promise<void> {
+    await writeJson(this.options.store, STORAGE_KEYS.sessions, this.sessions);
+  }
+
   private async persistMeta(): Promise<void> {
     await writeJson(this.options.store, STORAGE_KEYS.meta, this.meta);
   }
@@ -514,6 +677,7 @@ export class StudyEngine {
     this.logs = [];
     this.pending = [];
     this.importedEntries = [];
+    this.sessions = [];
     this.meta = { version: STORAGE_VERSION, activeLanguage: 'zh', profiles: {}, schedulerConfig: {} };
     this.reindexEntries();
 

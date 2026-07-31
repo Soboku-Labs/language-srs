@@ -9,6 +9,7 @@ import {
   getTeacher,
   type LanguageCode,
 } from '@language-srs/core';
+import { useAuth } from '../src/auth/AuthProvider';
 import { useEngine } from '../src/engine/EngineProvider';
 import { Caption, Screen } from '../src/components/ui';
 import { TeacherAvatar } from '../src/components/Teacher';
@@ -30,6 +31,7 @@ import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } fr
  */
 export default function Landing() {
   const { engine, revision, setActiveLanguage } = useEngine();
+  const { user } = useAuth();
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
 
@@ -56,7 +58,14 @@ export default function Landing() {
   return (
     <Screen>
       <Rise index={0} style={styles.masthead}>
-        <Text style={styles.wordmark}>language·srs</Text>
+        <View style={styles.topRow}>
+          <Text style={styles.wordmark}>language·srs</Text>
+          {/* One line, no chrome: signed out it is an offer, signed in it is a
+              name and the way to the account. */}
+          <Press onPress={() => router.push(user ? '/account' : '/sign-in')} accessibilityRole="button">
+            <Text style={styles.accountLink}>{user ? user.displayName : 'Sign in'}</Text>
+          </Press>
+        </View>
         <Text style={styles.headline}>Four languages.{'\n'}Four teachers.</Text>
         <Text style={styles.standfirst}>
           Ten minutes a day of spaced repetition, shaped like the exam you are sitting. Choose a language and meet the
@@ -100,9 +109,9 @@ export default function Landing() {
 
       <Rise index={8}>
         <Caption>
-          Nothing is sent anywhere: your cards, your history and your schedule stay on this device. HSK publishes
-          official word lists, so those targets are exact; JLPT, TOPIK and the Vietnamese framework do not, and the app
-          labels those figures as estimates.
+          Your cards, history and schedule stay on this device unless you sign in, in which case they are kept in step
+          across the devices you use and nowhere else. HSK publishes official word lists, so those targets are exact;
+          JLPT, TOPIK and the Vietnamese framework do not, and the app labels those figures as estimates.
         </Caption>
       </Rise>
     </Screen>
@@ -209,6 +218,12 @@ function hasHistory(engine: Engine, code: LanguageCode): boolean {
 
 const createStyles = (theme: ResolvedTheme) => ({
   masthead: { gap: spacing.md, paddingTop: spacing.lg },
+  topRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+  },
+  accountLink: { color: theme.colors.accent, fontSize: typography.caption, fontWeight: '600' as const },
   wordmark: {
     color: theme.colors.textFaint,
     fontSize: typography.micro,

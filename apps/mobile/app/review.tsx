@@ -3,12 +3,18 @@ import { Platform, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  addGradeToSession,
+  finishStudySession,
   getTeacher,
   previewIntervals,
+  startStudySession,
+  studySessionId,
   teacherLine,
   type CardWithEntry,
   type Rating,
+  type StudySessionDraft,
 } from '@language-srs/core';
+import { useAuth } from '../src/auth/AuthProvider';
 import { useEngine } from '../src/engine/EngineProvider';
 import { GradeButtons, ReviewCard, speakEntry } from '../src/components/ReviewCard';
 import type { AttemptResult } from '../src/components/Practice';
@@ -32,7 +38,8 @@ import { spacing, useThemedStyles, type ResolvedTheme } from '../src/theme';
  * finished — one line, in the footer, where a running tally used to be.
  */
 export default function ReviewScreen() {
-  const { engine, revision, grade } = useEngine();
+  const { engine, revision, grade, mutate } = useEngine();
+  const { deviceName } = useAuth();
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
   const params = useLocalSearchParams<{ card?: string; reveal?: string; language?: string }>();
@@ -51,6 +58,53 @@ export default function ReviewScreen() {
   }, [engine, revision]);
 
   const teacher = getTeacher(engine.activeLanguage);
+
+  /**
+   * The sitting.
+   *
+   * Held in a ref rather than in state: it is written on every grade and read
+   * only when the session ends, so putting it in state would re-render the card
+   * for a number nothing on screen is showing.
+   *
+   * Recorded when the queue runs out or when the screen goes away — a session
+   * abandoned halfway is still a session that happened, and dropping it would
+   * make the history quietly under-report exactly the days somebody was busy.
+   */
+  const sitting = useRef<StudySessionDraft | undefined>(undefined);
+  sitting.current ??= startStudySession({
+    languageCode: engine.activeLanguage,
+    now: engine.now(),
+    id: studySessionId(),
+    device: deviceName,
+  });
+  const recorded = useRef(false);
+
+  const closeSitting = useCallback(async () => {
+    if (recorded.current || !sitting.current) return;
+    const finished = finishStudySession(sitting.current, engine.now());
+    recorded.current = true;
+    if (!finished) return;
+    await mutate((instance) => instance.recordStudySession(finished));
+  }, [engine, mutate]);
+
+  /**
+   * Close the sitting when the screen goes away.
+   *
+   * `closeSitting` is held in a ref and the effect has no dependencies, and that
+   * is load-bearing rather than a style choice. `mutate` is rebuilt on every
+   * state change, so a dependency on the callback re-runs this effect after each
+   * grade — and an effect's cleanup running is indistinguishable from the screen
+   * closing. That recorded a one-card sitting on the first grade and silently
+   * dropped the rest of the session.
+   */
+  const closeRef = useRef(closeSitting);
+  closeRef.current = closeSitting;
+
+  useEffect(() => {
+    return () => {
+      void closeRef.current();
+    };
+  }, []);
 
   /**
    * The card on screen.
@@ -114,6 +168,9 @@ export default function ReviewScreen() {
 
       // Again leans left, Hard slightly left, Good and Easy right.
       setLastDirection(rating <= 2 ? -1 : 1);
+      if (sitting.current) {
+        sitting.current = addGradeToSession(sitting.current, rating, Date.now() - shownAt.current);
+      }
       // Seeded on the card so the line is fixed for the moment it describes.
       setReaction(teacherLine(teacher, rating > 2 ? 'recalled' : 'lapsed', current.card.id));
 
@@ -134,6 +191,13 @@ export default function ReviewScreen() {
     },
     [current, grade, params.card, router, teacher],
   );
+
+  // The queue emptying is the natural end of a sitting, so record it there
+  // rather than waiting for the learner to navigate away — the account screen
+  // and the sync push should both see it while the summary is still on screen.
+  useEffect(() => {
+    if (!current) void closeSitting();
+  }, [current, closeSitting]);
 
   if (!current || !previews) {
     const accuracy = session.reviewed > 0 ? Math.round((session.recalled / session.reviewed) * 100) : 0;

@@ -84,6 +84,53 @@ export class MirroringStore implements KeyValueStore {
   }
 }
 
+/**
+ * A store that lives inside a prefix.
+ *
+ * How two people sharing a device keep separate decks. The engine writes the
+ * same keys it always has — `srs:v1:cards` and the rest — and this puts them
+ * under `acct:<user>:` without the domain knowing accounts exist.
+ *
+ * The empty prefix is meaningful: it is the signed-out learner, whose data sits
+ * exactly where it did before accounts were added. That is not a special case
+ * for tidiness, it is the upgrade path — anyone who studied before signing up
+ * finds their cards where they left them.
+ */
+export class PrefixedStore implements KeyValueStore {
+  constructor(
+    private readonly inner: KeyValueStore,
+    private readonly prefix: string,
+  ) {}
+
+  private full(key: string): string {
+    return `${this.prefix}${key}`;
+  }
+
+  async get(key: string): Promise<string | null> {
+    return this.inner.get(this.full(key));
+  }
+
+  async set(key: string, value: string): Promise<void> {
+    await this.inner.set(this.full(key), value);
+  }
+
+  async remove(key: string): Promise<void> {
+    await this.inner.remove(this.full(key));
+  }
+
+  /** Only this namespace's keys, with the prefix stripped back off. */
+  async keys(): Promise<string[]> {
+    const all = (await this.inner.keys?.()) ?? [];
+    if (this.prefix === '') return all;
+    return all.filter((key) => key.startsWith(this.prefix)).map((key) => key.slice(this.prefix.length));
+  }
+}
+
+/** The storage prefix for an account, or the empty prefix when signed out. */
+export function accountPrefix(userId?: string): string {
+  return userId ? `acct:${userId}:` : '';
+}
+
 export async function readJson<T>(store: KeyValueStore, key: string, fallback: T): Promise<T> {
   const raw = await store.get(key);
   if (raw === null) return fallback;

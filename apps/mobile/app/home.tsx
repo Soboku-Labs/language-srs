@@ -128,6 +128,7 @@ export default function Dashboard() {
       <Rise index={5}>
         <Row style={styles.links}>
           <TextButton label="Progress" onPress={() => router.push('/stats')} />
+          <TextButton label="Account" onPress={() => router.push('/account')} color={theme.colors.textMuted} />
           <TextButton label="Settings" onPress={() => router.push('/settings')} color={theme.colors.textMuted} />
         </Row>
       </Rise>
@@ -218,5 +219,5 @@ const createStyles = (theme: ResolvedTheme) => ({
 
   teacherLine: { alignItems: 'center' as const, paddingBottom: spacing.md },
   stats: { justifyContent: 'space-between' as const, paddingHorizontal: spacing.sm },
-  links: { justifyContent: 'center' as const, gap: spacing.xl },
+  links: { justifyContent: 'center' as const, gap: spacing.lg },
 });

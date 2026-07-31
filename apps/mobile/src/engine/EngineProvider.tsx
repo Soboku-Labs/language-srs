@@ -1,11 +1,27 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import { SEED_ENTRIES, StudyEngine, type LanguageCode, type Rating, type ReviewSource } from '@language-srs/core';
+import {
+  PrefixedStore,
+  SEED_ENTRIES,
+  StudyEngine,
+  accountPrefix,
+  type LanguageCode,
+  type Rating,
+  type ReviewSource,
+} from '@language-srs/core';
+import { useAuth } from '../auth/AuthProvider';
 import { appStore } from '../storage/adapter';
 import { widgetBridge } from '../../modules/widget-bridge';
 
 interface EngineContextValue {
   engine: StudyEngine;
+  /**
+   * The account this engine was built for; undefined when signed out.
+   *
+   * Published so anything that acts on the engine's behalf can check it is
+   * acting for the account it thinks it is — see the guard in `SyncProvider`.
+   */
+  accountId?: string;
   /**
    * Bumped on every mutation.
    *
@@ -23,10 +39,33 @@ interface EngineContextValue {
 const EngineContext = createContext<EngineContextValue | undefined>(undefined);
 
 export function EngineProvider({ children }: { children: React.ReactNode }) {
+  const { status, user } = useAuth();
   const [engine, setEngine] = useState<StudyEngine | undefined>();
+  /**
+   * Which account the current engine belongs to.
+   *
+   * Tracked separately from `engine` so a stale engine can be recognised during
+   * render rather than only in an effect. React runs child effects before parent
+   * ones, so between an account changing and this provider rebuilding, children
+   * would otherwise get one render with the new account and the old engine —
+   * long enough for the sync loop to pull one account's cards into another's
+   * storage, which is exactly what it did before this existed.
+   */
+  const [engineFor, setEngineFor] = useState<string | undefined>(undefined);
   const [error, setError] = useState<Error | undefined>();
   const [revision, setRevision] = useState(0);
   const bump = useCallback(() => setRevision((value) => value + 1), []);
+
+  /**
+   * The storage namespace this engine works in.
+   *
+   * Signing in moves the whole domain to `acct:<id>:`, so two people sharing a
+   * device keep separate decks and neither can see the other's schedule. The
+   * signed-out namespace is the empty prefix — exactly where the app wrote
+   * before accounts existed, so a learner who studied first and signed up later
+   * finds their cards where they left them.
+   */
+  const accountId = status === 'signed-in' ? user?.id : undefined;
 
   // Keeps the change handler stable while still seeing the latest engine.
   const engineRef = useRef<StudyEngine | undefined>(undefined);
@@ -50,10 +89,17 @@ export function EngineProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
+    // Wait for the stored session to be read before touching storage: building
+    // an engine on the signed-out namespace and swapping it a moment later would
+    // show the wrong learner's counts for that moment.
+    if (status === 'loading') return;
+
+    setEngine(undefined);
+
     (async () => {
       try {
         const instance = await StudyEngine.create({
-          store: appStore,
+          store: new PrefixedStore(appStore, accountPrefix(accountId)),
           seedEntries: SEED_ENTRIES,
           onStateChanged: async (self) => {
             bump();
@@ -66,6 +112,7 @@ export function EngineProvider({ children }: { children: React.ReactNode }) {
         await drainWidgetGrades(instance);
         engineRef.current = instance;
         setEngine(instance);
+        setEngineFor(accountId);
         await publishToWidget(instance);
       } catch (cause) {
         if (!cancelled) setError(cause as Error);
@@ -75,7 +122,7 @@ export function EngineProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [bump, publishToWidget]);
+  }, [bump, publishToWidget, accountId, status]);
 
   /**
    * Pick up home-screen gradings whenever the app comes back to the foreground.
@@ -95,11 +142,17 @@ export function EngineProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.remove();
   }, [bump]);
 
+  // Stale means the account has changed and the engine for it is still being
+  // built. Withholding the context is what keeps a screen — or the sync loop —
+  // from acting on the previous account's data for one render.
+  const stale = engineFor !== accountId;
+
   const value = useMemo<EngineContextValue | undefined>(() => {
-    if (!engine) return undefined;
+    if (!engine || stale) return undefined;
 
     return {
       engine,
+      ...(accountId ? { accountId } : {}),
       revision,
       async grade(cardId, rating, options) {
         await engine.grade(cardId, rating, options ?? {});
@@ -115,7 +168,7 @@ export function EngineProvider({ children }: { children: React.ReactNode }) {
         return result;
       },
     };
-  }, [engine, revision, bump]);
+  }, [engine, revision, bump, accountId, stale]);
 
   if (error) throw error;
   if (!value) return null;

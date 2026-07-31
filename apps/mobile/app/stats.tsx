@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { findExamLevel, getExaminedSkills, getLanguageProfile } from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { Caption, DetailRow, Pill, ProgressBar, Row, Screen, Section, Stat, Title } from '../src/components/ui';
+import { Rise } from '../src/motion/components';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
 
 /**
@@ -35,19 +36,22 @@ export default function StatsScreen() {
 
   return (
     <Screen>
-      <View style={styles.headline}>
+      <Rise index={0} style={styles.headline}>
         <Title>{Math.round(readiness.score * 100)}% ready</Title>
         <ProgressBar value={readiness.score} />
         <Caption>{readiness.headline}</Caption>
-      </View>
+      </Rise>
 
-      <Row style={styles.stats}>
+      <Rise index={1}>
+        <Row style={styles.stats}>
         <Stat label="known" value={String(stats.coverage.entriesKnown)} />
         <Stat label="learning" value={String(stats.coverage.learningCards)} color={theme.colors.hard} />
         <Stat label="in review" value={String(stats.coverage.reviewCards)} color={theme.colors.good} />
-        <Stat label="unseen" value={String(stats.coverage.newCards)} color={theme.colors.textMuted} />
-      </Row>
+          <Stat label="unseen" value={String(stats.coverage.newCards)} color={theme.colors.textMuted} />
+        </Row>
+      </Rise>
 
+      <Rise index={2}>
       <Section title="Next two weeks">
         {/* An all-zero chart renders as a row of stubs that look like data. Until
             something is actually scheduled, say so instead of drawing it. */}
@@ -84,7 +88,9 @@ export default function StatsScreen() {
           </>
         )}
       </Section>
+      </Rise>
 
+      <Rise index={3}>
       <Section title="How it is going">
         {stats.retention.reviews === 0 ? (
           <Caption>No graduated reviews yet — these appear once cards start coming back.</Caption>
@@ -108,8 +114,10 @@ export default function StatsScreen() {
           </>
         ) : null}
       </Section>
+      </Rise>
 
       {level ? (
+        <Rise index={4}>
         <Section title={`What ${level.shortName} tests`}>
           <Row style={styles.wrap}>
             {getExaminedSkills(level).map((skill) => (
@@ -134,6 +142,7 @@ export default function StatsScreen() {
           ) : null}
           <Caption>Your sessions are weighted to match this mix.</Caption>
         </Section>
+        </Rise>
       ) : null}
     </Screen>
   );

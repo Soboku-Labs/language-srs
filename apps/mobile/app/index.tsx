@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { findExamLevel, getLanguageProfile, kindLabel, type CardKind } from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { BigButton, Caption, Row, Screen, Stat, TextButton, Title } from '../src/components/ui';
+import { CountUp, Press, Rise } from '../src/motion/components';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
 
 /**
@@ -14,6 +15,10 @@ import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } fr
  * readiness, streak tiles, actions — which meant nothing stood out and the answer
  * took a scroll to find. Everything except the count, the button and a single row
  * of context now lives on the Progress screen, one tap away.
+ *
+ * The screen resolves top to bottom on arrival, and the count rolls up rather than
+ * appearing: it is the number the whole screen exists to deliver, and the motion
+ * puts the eye on it before the button below it.
  */
 export default function Dashboard() {
   const { engine, revision } = useEngine();
@@ -40,25 +45,25 @@ export default function Dashboard() {
   return (
     <Screen>
       {/* Tapping the language is how you switch it — no menu needed. */}
-      <Pressable onPress={() => router.push('/languages')} style={styles.header}>
-        <Text style={styles.emoji}>{language.emoji}</Text>
-        <View style={styles.headerText}>
-          <Title>{language.name}</Title>
-          <Caption>
-            {level?.shortName}
-            {profile.examDate ? ` · ${describeCountdown(readiness.daysToExam)}` : ''}
-          </Caption>
-        </View>
-        <Text style={styles.chevron}>›</Text>
-      </Pressable>
+      <Rise index={0}>
+        <Press onPress={() => router.push('/languages')} style={styles.header}>
+          <Text style={styles.emoji}>{language.emoji}</Text>
+          <View style={styles.headerText}>
+            <Title>{language.name}</Title>
+            <Caption>
+              {level?.shortName}
+              {profile.examDate ? ` · ${describeCountdown(readiness.daysToExam)}` : ''}
+            </Caption>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </Press>
+      </Rise>
 
-      <View style={styles.hero}>
+      <Rise index={1} style={styles.hero}>
         {waiting > 0 ? (
           <>
-            <Text style={styles.count}>{waiting}</Text>
-            <Text style={styles.countLabel}>
-              {waiting === 1 ? 'card waiting' : 'cards waiting'}
-            </Text>
+            <CountUp value={waiting} style={styles.count} />
+            <Text style={styles.countLabel}>{waiting === 1 ? 'card waiting' : 'cards waiting'}</Text>
             <MixBar mix={queue.kindMix} />
           </>
         ) : (
@@ -72,31 +77,37 @@ export default function Dashboard() {
             </Caption>
           </>
         )}
-      </View>
+      </Rise>
 
-      <BigButton
-        label={waiting > 0 ? 'Study now' : 'Study ahead'}
-        {...(waiting > 0 && queue.kindMix ? { hint: describeMix(queue.kindMix) } : {})}
-        onPress={() => router.push('/review')}
-      />
-
-      <Row style={styles.stats}>
-        <Stat
-          label={stats.streak.studiedToday ? 'day streak 🔥' : 'day streak'}
-          value={String(stats.streak.current)}
-          color={stats.streak.current > 0 ? theme.colors.secondary : theme.colors.textMuted}
+      <Rise index={2}>
+        <BigButton
+          label={waiting > 0 ? 'Study now' : 'Study ahead'}
+          {...(waiting > 0 && queue.kindMix ? { hint: describeMix(queue.kindMix) } : {})}
+          onPress={() => router.push('/review')}
         />
-        <Stat label="words known" value={String(stats.coverage.entriesKnown)} />
-        <Stat
-          label={profile.examDate ? 'exam ready' : 'syllabus'}
-          value={`${Math.round((profile.examDate ? readiness.score : readiness.coverage) * 100)}%`}
-        />
-      </Row>
+      </Rise>
 
-      <Row style={styles.links}>
-        <TextButton label="Progress" onPress={() => router.push('/stats')} />
-        <TextButton label="Settings" onPress={() => router.push('/settings')} color={theme.colors.textMuted} />
-      </Row>
+      <Rise index={3}>
+        <Row style={styles.stats}>
+          <Stat
+            label={stats.streak.studiedToday ? 'day streak 🔥' : 'day streak'}
+            value={String(stats.streak.current)}
+            color={stats.streak.current > 0 ? theme.colors.secondary : theme.colors.textMuted}
+          />
+          <Stat label="words known" value={String(stats.coverage.entriesKnown)} />
+          <Stat
+            label={profile.examDate ? 'exam ready' : 'syllabus'}
+            value={`${Math.round((profile.examDate ? readiness.score : readiness.coverage) * 100)}%`}
+          />
+        </Row>
+      </Rise>
+
+      <Rise index={4}>
+        <Row style={styles.links}>
+          <TextButton label="Progress" onPress={() => router.push('/stats')} />
+          <TextButton label="Settings" onPress={() => router.push('/settings')} color={theme.colors.textMuted} />
+        </Row>
+      </Rise>
     </Screen>
   );
 }
@@ -159,11 +170,7 @@ function formatRelative(at: string): string {
 }
 
 const createStyles = (theme: ResolvedTheme) => ({
-  header: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: spacing.md,
-  },
+  header: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.md },
   emoji: { fontSize: 34 },
   headerText: { flex: 1, gap: 1 },
   chevron: { color: theme.colors.textFaint, fontSize: 28 },

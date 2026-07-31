@@ -1,9 +1,11 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { EngineProvider } from '../src/engine/EngineProvider';
 import { ThemeProvider, useTheme } from '../src/theme';
+import { ThemeFade } from '../src/motion/components';
 
 export default function RootLayout() {
   return (
@@ -29,7 +31,10 @@ function ThemedNavigator() {
   const theme = useTheme();
 
   return (
-    <>
+    // Switching language changes every colour at once, and in two of the four
+    // themes it also flips light to dark. An instant swap reads as a glitch; a
+    // short cross-fade reads as the app changing clothes.
+    <ThemeFade themeKey={theme.languageCode} style={styles.fill}>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
@@ -50,6 +55,8 @@ function ThemedNavigator() {
         {/* Entered only from a widget tap; it grades and redirects. */}
         <Stack.Screen name="grade" options={{ headerShown: false, presentation: 'transparentModal' }} />
       </Stack>
-    </>
+    </ThemeFade>
   );
 }
+
+const styles = StyleSheet.create({ fill: { flex: 1 } });

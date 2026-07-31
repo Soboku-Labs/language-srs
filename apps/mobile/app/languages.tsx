@@ -10,6 +10,7 @@ import {
 } from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { Caption, Screen } from '../src/components/ui';
+import { Rise } from '../src/motion/components';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
 
 /**
@@ -40,15 +41,15 @@ export default function LanguagesScreen() {
 
   return (
     <Screen>
-      {LANGUAGE_CODES.map((code) => {
+      {LANGUAGE_CODES.map((code, index) => {
         const languageProfile = getLanguageProfile(code);
         const preview = getLanguageTheme(code);
         const tracks = getExamTracksForLanguage(code);
         const isActive = code === active;
 
         return (
+          <Rise key={code} index={index}>
           <Pressable
-            key={code}
             onPress={() => void choose(code)}
             style={({ pressed }) => [
               styles.row,
@@ -88,6 +89,7 @@ export default function LanguagesScreen() {
               ))}
             </View>
           </Pressable>
+          </Rise>
         );
       })}
 

@@ -7,7 +7,7 @@ import { computeStreak } from '../stats/metrics';
 import { computeExamReadiness } from '../stats/readiness';
 import { DEFAULT_STUDY_PROFILE, type Card, type StudyProfile } from '../types/card';
 import { addDays } from '../utils/date';
-import { linkToGrade, parseDeepLink } from './deeplinks';
+import { linkToGrade, linkToHome, linkToLanding, parseDeepLink } from './deeplinks';
 import { WIDGET_SCHEMA_VERSION, buildWidgetSnapshot, buildWidgetTimeline, pickSpotlight } from './payload';
 import { applyPendingGrades } from './pending';
 
@@ -191,6 +191,17 @@ describe('deep links', () => {
   it('rejects an unknown route and an out-of-range rating', () => {
     expect(parseDeepLink('languagesrs:///nonsense')).toBeUndefined();
     expect(parseDeepLink('languagesrs:///grade?card=c1&rating=9')?.rating).toBeUndefined();
+  });
+
+  /**
+   * The widget's "Open" button must land on the dashboard, not on the landing
+   * page. Anyone with the widget installed has already chosen a language, and
+   * being shown the language picker on every tap would be a step backwards.
+   */
+  it('separates the dashboard from the landing page', () => {
+    expect(parseDeepLink(linkToHome())?.route).toBe('home');
+    expect(linkToHome({ web: true })).toBe('/home');
+    expect(parseDeepLink(linkToLanding())?.route).toBe('landing');
   });
 });
 

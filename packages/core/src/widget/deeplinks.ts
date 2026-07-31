@@ -28,8 +28,19 @@ function build(path: string, params: Record<string, string | number | undefined>
   return options.web ? `/${path}${suffix}` : `${APP_SCHEME}:///${path}${suffix}`;
 }
 
-/** Open the app on the dashboard. */
+/**
+ * Open the app on the dashboard.
+ *
+ * `/home`, not `/` — the root is the landing page, which is where a first-time
+ * learner should arrive and the last place a widget tap should land. Somebody who
+ * has a widget on their home screen has already chosen a language.
+ */
 export function linkToHome(options: DeepLinkOptions = {}): string {
+  return build('home', {}, options);
+}
+
+/** Open the app on the landing page, where the languages and teachers are. */
+export function linkToLanding(options: DeepLinkOptions = {}): string {
   return build('', {}, options);
 }
 
@@ -69,7 +80,7 @@ export function linkToSettings(options: DeepLinkOptions = {}): string {
 }
 
 export interface ParsedDeepLink {
-  route: 'home' | 'review' | 'grade' | 'stats' | 'settings';
+  route: 'landing' | 'home' | 'review' | 'grade' | 'stats' | 'settings';
   cardId?: string;
   languageCode?: string;
   rating?: Rating;
@@ -101,7 +112,7 @@ export function parseDeepLink(url: string): ParsedDeepLink | undefined {
   const parsedRating = rating ? (Number(rating) as Rating) : undefined;
 
   const base: ParsedDeepLink = {
-    route: 'home',
+    route: 'landing',
     ...(params.get('card') ? { cardId: params.get('card') } : {}),
     ...(params.get('language') ? { languageCode: params.get('language') } : {}),
     ...(parsedRating && parsedRating >= 1 && parsedRating <= 4 ? { rating: parsedRating } : {}),
@@ -110,6 +121,8 @@ export function parseDeepLink(url: string): ParsedDeepLink | undefined {
 
   switch (path) {
     case '':
+      return { ...base, route: 'landing' };
+    case 'home':
       return { ...base, route: 'home' };
     case 'review':
       return { ...base, route: 'review' };

@@ -69,20 +69,70 @@ describe('language themes', () => {
     expect(new Set(accents).size).toBe(4);
   });
 
-  it('mixes light and dark rather than shipping four of the same', () => {
-    const modes = new Set(Object.values(LANGUAGE_THEMES).map((theme) => theme.mode));
-    expect(modes).toEqual(new Set(['light', 'dark']));
+  /**
+   * The point of the rewrite. Switching language used to turn the lights off —
+   * two themes were dark — and move every corner radius, which made studying two
+   * languages feel like using two apps. Everything structural is now shared, and
+   * these assertions are what stop it drifting apart again.
+   */
+  it('shares one ground across all four languages', () => {
+    const themes = Object.values(LANGUAGE_THEMES);
+    for (const key of ['background', 'surface', 'surfaceRaised', 'border', 'text', 'textMuted', 'textFaint'] as const) {
+      expect(new Set(themes.map((theme) => theme.colors[key])).size, key).toBe(1);
+    }
+    expect(new Set(themes.map((theme) => theme.mode))).toEqual(new Set(['light']));
   });
 
-  it('varies corner radius between themes', () => {
-    const radii = Object.values(LANGUAGE_THEMES).map((theme) => theme.radius.card);
-    expect(new Set(radii).size).toBeGreaterThan(2);
+  it('shares one geometry and one type treatment', () => {
+    const themes = Object.values(LANGUAGE_THEMES);
+    expect(new Set(themes.map((theme) => theme.radius.card)).size).toBe(1);
+    expect(new Set(themes.map((theme) => theme.radius.control)).size).toBe(1);
+    expect(new Set(themes.map((theme) => theme.headingWeight)).size).toBe(1);
+    expect(new Set(themes.map((theme) => theme.headingLetterSpacing)).size).toBe(1);
   });
 
   it('separates the four grade colours within each theme', () => {
     for (const theme of Object.values(LANGUAGE_THEMES)) {
       const grades = [theme.colors.again, theme.colors.hard, theme.colors.good, theme.colors.easy];
       expect(new Set(grades).size, theme.languageCode).toBe(4);
+    }
+  });
+
+  /**
+   * Again through Easy is a scale, and a scale that changes colour between
+   * languages stops being muscle memory for anyone studying more than one.
+   */
+  it('uses the same grade scale in every language', () => {
+    const scales = Object.values(LANGUAGE_THEMES).map((theme) =>
+      [theme.colors.again, theme.colors.hard, theme.colors.good, theme.colors.easy].join(),
+    );
+    expect(new Set(scales).size).toBe(1);
+  });
+
+  it('keeps grade labels readable on the surface they sit on', () => {
+    for (const theme of Object.values(LANGUAGE_THEMES)) {
+      for (const grade of ['again', 'hard', 'good', 'easy'] as const) {
+        // Grade labels are set in the grade's own colour on a wash of it.
+        expect(contrast(theme.colors[grade], theme.colors.surface), grade).toBeGreaterThan(4.5);
+      }
+    }
+  });
+
+  /**
+   * The accent carries text as well as filled buttons — the secondary actions on
+   * every screen are accent-coloured labels on the ground, so it is held to the
+   * body-text threshold rather than the large-text one.
+   */
+  it('keeps each accent readable as text on the ground', () => {
+    for (const theme of Object.values(LANGUAGE_THEMES)) {
+      expect(contrast(theme.colors.accent, theme.colors.background), theme.languageCode).toBeGreaterThan(4.5);
+      expect(contrast(theme.colors.secondary, theme.colors.background), theme.languageCode).toBeGreaterThan(4.5);
+    }
+  });
+
+  it('keeps the accent wash pale enough to carry text', () => {
+    for (const theme of Object.values(LANGUAGE_THEMES)) {
+      expect(contrast(theme.colors.text, theme.colors.accentSoft), theme.languageCode).toBeGreaterThan(4.5);
     }
   });
 });
@@ -120,6 +170,13 @@ describe('card kind colours', () => {
         ).toBeGreaterThan(3);
       }
     }
+  });
+
+  it('uses the same kind colours in every language', () => {
+    const ramps = Object.values(LANGUAGE_THEMES).map((theme) =>
+      CARD_KINDS.map((kind) => getCardKindColors(theme)[kind]).join(),
+    );
+    expect(new Set(ramps).size).toBe(1);
   });
 
   it('keeps card kind colours legible on the surface they sit on', () => {

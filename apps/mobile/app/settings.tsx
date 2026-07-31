@@ -194,7 +194,9 @@ export default function SettingsScreen() {
       </Section>
 
       <Section title="More">
-        <DetailRow label="Theme" value={theme.name} />
+        {/* The four themes share one ground and differ only in their ink, so this
+            names the accent rather than a whole visual identity. */}
+        <DetailRow label="Accent" value={theme.name} />
         {widgetBridge.isSupported ? (
           <TextButton
             label="Refresh home-screen widget"

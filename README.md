@@ -1,8 +1,56 @@
 # language-srs
 
 Exam-aligned spaced repetition for **Mandarin, Japanese, Korean and Vietnamese**, with
-home-screen widgets. Four themed front ends over one shared core, running natively on
-iOS and Android and as a static web app — from a single codebase.
+home-screen widgets. One quiet interface, four teachers, running natively on iOS and
+Android and as a static web app — from a single codebase.
+
+## The shape of it
+
+The app opens on a **landing page**, every time. It holds the four languages, says how
+each one is taught and by whom, and nothing else. Choosing a language pushes you into
+that language's dashboard; coming back out is one tap on the teacher's portrait. There
+is one front door rather than a picker hidden behind the screen you happened to leave
+open.
+
+Past the door it is a flashcard app: a count, a button, and cards.
+
+## Four teachers
+
+Each language is taught by a named character with a stated method, because "how is this
+taught?" is a better question for a landing page to answer than "which four languages
+are supported?".
+
+| Language | Teacher | Their method |
+| --- | --- | --- |
+| Mandarin | 林墨 · Lín lǎoshī | Components before characters; the tone drilled as part of the word. |
+| Japanese | 森 葵 · Mori-sensei | Kana until invisible, then kanji through the words that use them. |
+| Korean | 서하은 · Seo seonsaengnim | Hangul as a machine — parts, blocks, then the endings that carry meaning. |
+| Vietnamese | Cô Mai | Six tones by ear first, drilled as minimal pairs. |
+
+They live in `@language-srs/core` as data — a portrait glyph, a method, three
+principles and a handful of lines — so the teacher who greets you on the dashboard is
+the same one who closes the session and the same one the landing page introduced. They
+are not decoration: each stands for a real pedagogical position, and that position is
+what the sessions are built around.
+
+## Cards you can answer
+
+Most cards are recall-then-self-grade, which is right for a flashcard and useless for
+catching the two mistakes that matter most in these four languages. So two kinds are
+answered rather than revealed:
+
+- **Tone cards** give you a slot per syllable and the language's own tones as buttons —
+  ā á ǎ à and the neutral for Mandarin, ngang through nặng for Vietnamese. Tap them in
+  order and the card tells you which syllable you missed.
+- **Production cards** are typed. Typing the reading where the characters were asked for
+  gets its own answer rather than being marked wrong, and so does the right word with
+  the wrong diacritics — "close" is a real verdict, because on `hỏi` versus `hoi` it is
+  the truthful one.
+
+The check never grades. FSRS is driven by your own judgement of recall, and an automatic
+"wrong, therefore Again" would mis-schedule every answer that was right but mistyped.
+What the check does is reveal the card, say something specific about what happened, and
+outline the grade it would suggest.
 
 ## What makes it exam-shaped
 
@@ -23,31 +71,36 @@ paper you are actually sitting.
   reviews* — the number tells you what would happen if you stopped today, rather than
   counting scheduled-but-undone work as knowledge.
 
-## Four front ends, one backend
+## One room, four inks
 
-Each language has its own visual identity, drawn from its material culture rather than
-its flag. Two are light, two are dark; corner radii and type weights differ too.
+An earlier version gave each language a complete visual identity: two dark themes, two
+light, four corner radii, four sets of grade colours. It was defensible on paper and
+heavy in the hand — switching from Japanese to Mandarin turned the lights off, and
+anyone studying two languages had to re-learn the room every time they switched.
 
-| Language | Theme | Palette |
+Now the palettes share everything structural: one warm near-white ground, one ink for
+text, one grade scale, one corner radius. What varies is a single accent.
+
+| Language | Ink | Drawn from |
 | --- | --- | --- |
-| Mandarin | Ink and cinnabar | Sumi ink ground, cinnabar seal paste, gold. Dark, near-square corners. |
-| Japanese | Washi and indigo | Washi paper, aizome indigo, vermilion. Light and rectilinear. |
-| Korean | Dancheong on hanji | Dancheong pigments, celadon jade, cobalt. Light, cool, the most rounded. |
-| Vietnamese | Lacquer and gold leaf | Sơn mài lacquer, gold leaf, lotus. Dark and warm. |
+| Mandarin | Cinnabar | The red of a seal, stamped once on a page of black ink. |
+| Japanese | Indigo | Aizome indigo, the working colour of everyday cloth. |
+| Korean | Celadon | The green-blue glaze of Goryeo celadon. |
+| Vietnamese | Gold leaf | Gold leaf laid over sơn mài lacquer. |
 
 The themes live in `@language-srs/core` as data, not in the React layer — so the app,
 the iOS widget and the Android widget all render the same palette without it being
-defined three times. Switching language re-themes the app and its widget together.
+defined three times. Switching language re-tints the app and its widget together.
 
-They share one design language — **Paper & Ink** — in which surfaces are sheets,
-colour is pigment applied only where it means something, and motion explains rather
-than entertains. The full spec, including every motion pattern and the reasoning
-behind each, is in [docs/DESIGN.md](docs/DESIGN.md).
+The design language is **Paper & Ink**: surfaces are sheets, colour is pigment applied
+only where it means something, and motion explains rather than entertains. The full
+spec, including every motion pattern and the reasoning behind each, is in
+[docs/DESIGN.md](docs/DESIGN.md).
 
 Tonal languages get a tone ramp: each syllable of a Mandarin or Vietnamese word is
-coloured by its tone, in that theme's own hues. Colour is the answer on a tone card, so
-the ramps are stated explicitly per theme and tested for distinctness and contrast —
-not derived from the semantic palette, which collides.
+coloured by its tone. Colour is part of the answer on a tone card, so the ramps are
+stated explicitly per language and tested for distinctness and contrast — not derived
+from the semantic palette, which collides.
 
 ## Layout
 
@@ -57,13 +110,17 @@ packages/core/            @language-srs/core — all the domain logic, no React 
   srs/                    FSRS-4.5 scheduler + exam-date pressure
   session/                queue building, daily caps, exam-weighted card mix
   stats/                  streaks, true retention, coverage, exam readiness
-  theme/                  the four palettes
+  teachers/               the four characters, their methods and their lines
+  practice/               tone inventories and answer checking
+  theme/                  the shared ground and the four inks
   widget/                 the widget payload contract and deep links
   data/                   seed decks and the bulk importer
   engine.ts               the single API the app talks to
 
 apps/mobile/              Expo app: iOS, Android and web from one codebase
-  app/                    expo-router screens
+  app/index.tsx           the landing page — languages, teachers, method
+  app/home.tsx            the dashboard for the chosen language
+  app/                    the rest of the expo-router screens
   modules/widget-bridge/  native module: shared container + widget reload
   targets/ios-widget/     WidgetKit sources (Swift)
   targets/android-widget/ Glance sources (Kotlin)

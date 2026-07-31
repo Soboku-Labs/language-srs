@@ -15,8 +15,9 @@ least recently reviewed card you have already met — because passive exposure b
 sessions is the cheapest study there is, and a widget that is empty six days out of seven
 gets removed.
 
-Everything is themed by language: a Mandarin widget is ink and cinnabar, a Japanese one
-washi and indigo, and they sit correctly next to each other on the same home screen.
+Everything is tinted by language — a Mandarin widget is cinnabar, a Japanese one indigo —
+over the same paper ground, so two of them sit correctly next to each other on the same
+home screen instead of looking like widgets from two different apps.
 
 ## The governing rule
 
@@ -133,10 +134,10 @@ shared-preferences metadata in the manifest, and adds the Glance dependency.
 
 Verified in this environment:
 
-- Core domain: unit tests over the scheduler, queue, stats, importer, themes and the
-  widget payload, including JSON round-tripping of the snapshot.
-- The web build: `expo export --platform web` succeeds and all four themes were driven
-  in a real browser.
+- Core domain: unit tests over the scheduler, queue, stats, importer, themes, teachers,
+  answer checking and the widget payload, including JSON round-tripping of the snapshot.
+- The web build: `expo export --platform web` succeeds, and the landing page, dashboard,
+  tone drill, typed answer and end-of-session screens were driven in a real browser.
 
 **Not verified here** — this environment has no Xcode and no Android SDK, so neither
 native project has been compiled. The Swift and Kotlin sources and the config plugin are

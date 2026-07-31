@@ -3,6 +3,7 @@ import { Platform, Pressable, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import {
   RATING_LABELS,
+  describeTonePattern,
   kindLabel,
   type CardWithEntry,
   type IntervalPreview,
@@ -12,6 +13,7 @@ import {
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../theme';
 import { Press, Rise } from '../motion/components';
 import { Caption, Card, Pill, Row } from './ui';
+import { AttemptVerdict, ToneDrill, TypedAnswer, type AttemptResult } from './Practice';
 import { ToneText } from './ToneText';
 
 /** BCP-47 tags for platform text-to-speech, used by listening cards. */
@@ -33,21 +35,28 @@ export function speakEntry(text: string, languageCode: LanguageCode): void {
  * What goes on the front depends on the card kind, and the rules matter:
  *
  *  - `production` shows the English gloss and expects the target word, so the
- *    target must not appear until the answer is revealed.
+ *    target must not appear until the answer is revealed. It is typed rather
+ *    than self-graded, because deciding after the fact that you knew a word you
+ *    could not produce is the easiest mistake in flashcards.
  *  - `listening` leads with audio. The written form is withheld, because a
  *    listening card that shows the word is a reading card.
- *  - `tone` shows the word and asks only for the tone pattern, so the reading —
- *    which spells the tones out — stays hidden.
+ *  - `tone` shows the word and asks only for the tone pattern, tapped out on the
+ *    language's own tones. The reading, which spells the tones out, stays hidden.
  *  - `reading` shows the example sentence with the target blanked out.
  */
 export function ReviewCard({
   pair,
   revealed,
   onReveal,
+  attempt,
+  onAttempt,
 }: {
   pair: CardWithEntry;
   revealed: boolean;
   onReveal: () => void;
+  /** The learner's answer, once they have given one on an answerable card. */
+  attempt?: AttemptResult;
+  onAttempt: (result: AttemptResult) => void;
 }) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -61,14 +70,20 @@ export function ReviewCard({
         <Caption>{entry.partOfSpeech ?? ''}</Caption>
       </Row>
 
-      <Pressable onPress={revealed ? undefined : onReveal} style={styles.front}>
-        <CardFront pair={pair} revealed={revealed} />
+      {/* Tapping the body reveals — except on a card that is being answered,
+          where a stray tap would throw the attempt away. */}
+      <Pressable onPress={revealed || isAnswerable(pair) ? undefined : onReveal} style={styles.front}>
+        <CardFront pair={pair} revealed={revealed} onAttempt={onAttempt} />
       </Pressable>
 
       {revealed ? (
         <Rise>
-          <Answer pair={pair} />
+          <Answer pair={pair} attempt={attempt} />
         </Rise>
+      ) : isAnswerable(pair) ? (
+        // The exercise carries its own instruction; a second one under it would
+        // be two things telling the learner what to do.
+        null
       ) : (
         <View style={styles.centered}>
           <Caption>Tap to reveal</Caption>
@@ -78,14 +93,33 @@ export function ReviewCard({
   );
 }
 
-function CardFront({ pair, revealed }: { pair: CardWithEntry; revealed: boolean }) {
+/** Kinds that can be checked rather than only revealed. */
+function isAnswerable({ card, entry }: CardWithEntry): boolean {
+  if (card.kind === 'production') return true;
+  return card.kind === 'tone' && (entry.tones?.length ?? 0) > 0;
+}
+
+function CardFront({
+  pair,
+  revealed,
+  onAttempt,
+}: {
+  pair: CardWithEntry;
+  revealed: boolean;
+  onAttempt: (result: AttemptResult) => void;
+}) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const { card, entry } = pair;
 
   switch (card.kind) {
     case 'production':
-      return <Text style={styles.glossPrompt}>{entry.meanings.join(', ')}</Text>;
+      return (
+        <View style={styles.centered}>
+          <Text style={styles.glossPrompt}>{entry.meanings.join(', ')}</Text>
+          {revealed ? null : <TypedAnswer entry={entry} onAttempt={onAttempt} />}
+        </View>
+      );
 
     case 'listening':
       return (
@@ -114,7 +148,7 @@ function CardFront({ pair, revealed }: { pair: CardWithEntry; revealed: boolean 
       return (
         <View style={styles.centered}>
           <Text style={styles.target}>{entry.target}</Text>
-          <Caption>Which tones?</Caption>
+          {revealed ? <Caption>Which tones?</Caption> : <ToneDrill entry={entry} onAttempt={onAttempt} />}
         </View>
       );
 
@@ -147,7 +181,7 @@ function TargetText({ pair }: { pair: CardWithEntry }) {
   );
 }
 
-function Answer({ pair }: { pair: CardWithEntry }) {
+function Answer({ pair, attempt }: { pair: CardWithEntry; attempt?: AttemptResult }) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const { card, entry } = pair;
@@ -158,6 +192,9 @@ function Answer({ pair }: { pair: CardWithEntry }) {
 
   return (
     <View style={styles.answer}>
+      {/* First, because on an answered card it is the thing being looked for. */}
+      {attempt ? <AttemptVerdict attempt={attempt} /> : null}
+
       {frontShowedTarget ? null : (
         <ToneText
           text={entry.target}
@@ -181,16 +218,18 @@ function Answer({ pair }: { pair: CardWithEntry }) {
       <Text style={styles.meaning}>{entry.meanings.join(', ')}</Text>
 
       {entry.tones && entry.tones.length > 0 ? (
-        <Row style={styles.toneLegend}>
-          {entry.tones.map((tone, index) => (
-            <View
-              key={`${tone}-${index}`}
-              style={[styles.tonePip, { backgroundColor: theme.toneColor(tone) }]}
-            >
-              <Text style={styles.tonePipLabel}>{tone}</Text>
-            </View>
-          ))}
-        </Row>
+        <View style={styles.centered}>
+          <Row style={styles.toneLegend}>
+            {entry.tones.map((tone, index) => (
+              <View key={`${tone}-${index}`} style={[styles.tonePip, { backgroundColor: theme.toneColor(tone) }]}>
+                <Text style={styles.tonePipLabel}>{tone}</Text>
+              </View>
+            ))}
+          </Row>
+          {/* The numbers are what the data stores; the names are what a teacher
+              would actually say, and what the drill's buttons were labelled with. */}
+          <Caption>{describeTonePattern(entry.languageCode, entry.tones)}</Caption>
+        </View>
       ) : null}
 
       {entry.components && entry.components.length > 0 ? (
@@ -216,15 +255,22 @@ function Answer({ pair }: { pair: CardWithEntry }) {
  * Showing the interval is not decoration — it is how a learner calibrates. "Good"
  * meaning 4 days and "Easy" meaning 11 days is the information that makes the
  * choice between them meaningful.
+ *
+ * `suggested` outlines the grade the check implies on an answered card. It is an
+ * outline and not a preselection on purpose: the learner still presses the
+ * button, because they know things the check does not — a typo, a word they
+ * produced out loud before typing it wrong.
  */
 export function GradeButtons({
   previews,
   onGrade,
   disabled,
+  suggested,
 }: {
   previews: Record<Rating, IntervalPreview>;
   onGrade: (rating: Rating) => void;
   disabled?: boolean;
+  suggested?: Rating;
 }) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -245,9 +291,10 @@ export function GradeButtons({
           disabled={disabled}
           accessibilityRole="button"
           accessibilityLabel={`${RATING_LABELS[rating]}, next in ${previews[rating].display}`}
-          style={({ pressed }) => [
+          style={({ pressed }: { pressed: boolean }) => [
             styles.grade,
             { backgroundColor: `${gradeColors[rating]}22` },
+            rating === suggested && { borderWidth: 1.5, borderColor: gradeColors[rating] },
             pressed && !disabled && { backgroundColor: `${gradeColors[rating]}44` },
             disabled && styles.gradeDisabled,
           ]}

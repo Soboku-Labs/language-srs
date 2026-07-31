@@ -103,27 +103,41 @@ rather than papered over in the UI.
 
 ## Themes
 
-Four palettes in `core/theme/palettes.ts`, one per language, as data.
+Four palettes in `core/theme/palettes.ts`, one per language, as data — but they share
+one ground, one grade scale and one geometry, and differ only in a single accent. The
+earlier per-language rooms (two dark, two light, four radii) are gone: they made
+switching language feel like switching apps.
 
 They are in core rather than the app because the widgets render in their own processes
 in Swift and Kotlin. Defining palettes there as well would mean each theme existing three
 times and drifting in two of them. Instead the theme travels in the widget payload and
 the native code renders what it is given.
 
-Two things are stated explicitly per theme rather than derived from the semantic colours,
-and both were bugs before they were rules:
+Two things are stated explicitly rather than derived from the semantic colours, and both
+were bugs before they were rules:
 
-- **Tone ramps.** On a tone card the colour *is* the answer, so two tones sharing a hue
-  is a broken exercise. Deriving from semantic roles collided, because a palette
+- **Tone ramps.** On a tone card the colour *is* part of the answer, so two tones sharing
+  a hue is a broken exercise. Deriving from semantic roles collided, because a palette
   legitimately reuses a hue across roles.
-- **Card-kind colours.** The dashboard legend shows kinds side by side with a coloured
-  dot to tell them apart. The derived mapping rendered "Meaning" and "Listening" in the
-  same indigo in the washi theme.
+- **Card-kind colours.** The dashboard's mix bar shows kinds side by side with nothing
+  but colour to tell them apart. The derived mapping rendered two kinds in the same hue.
 
-`palettes.test.ts` asserts WCAG contrast for body text, muted text, tone ramps and kind
-colours against each theme's own background and surface, and asserts distinctness within
-each ramp. Four hand-picked palettes is exactly the situation where one quietly ends up
-with grey-on-grey text, and the type system cannot catch it.
+`palettes.test.ts` asserts WCAG contrast for body text, muted text, accents, grade
+labels, tone ramps and kind colours, asserts distinctness within each ramp, and asserts
+that the ground, the grade scale and the geometry are identical across the four. That
+last group is what stops the heavy version growing back one palette at a time.
+
+## Teachers and practice
+
+`core/teachers/` holds four characters — portrait glyph, method, principles, lines — and
+`core/practice/` holds the tone inventories and the two answer checks (`checkWrittenAnswer`,
+`checkTonePattern`).
+
+Both are in core for the same reason as everything else here: they are statements about
+the language rather than about the screen, they need testing against real entries, and
+the web build and the two native builds must not disagree about whether an answer was
+right. The checks deliberately do not grade — see `check.ts` for why an automatic
+"wrong, therefore Again" would corrupt the schedule.
 
 ## The widget boundary
 

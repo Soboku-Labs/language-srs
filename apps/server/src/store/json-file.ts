@@ -59,6 +59,24 @@ export class JsonFileServerStore implements ServerStore {
       }
     }
 
+    /**
+     * Prove the directory is writable before accepting traffic.
+     *
+     * Found by deploying it: a container running as an unprivileged user with a
+     * volume mounted root-owned starts perfectly, answers the health check, and
+     * then fails on the first sign-up with a 500. A server that cannot store an
+     * account is not healthy, and the honest place to say so is startup — where
+     * a deployment log will show it — rather than in a stranger's face.
+     */
+    try {
+      await store.flush();
+    } catch (error) {
+      throw new Error(
+        `Could not write ${path}: ${(error as Error).message}. ` +
+          'Check that DATA_DIR exists and is writable by the user this process runs as.',
+      );
+    }
+
     return store;
   }
 

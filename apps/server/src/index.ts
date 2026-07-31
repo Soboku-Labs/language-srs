@@ -18,8 +18,24 @@ const port = Number(process.env.PORT ?? 4000);
 const dataDir = process.env.DATA_DIR ?? '.data';
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '*').split(',').map((origin) => origin.trim());
 
-const store: ServerStore =
-  dataDir === 'memory' ? new MemoryServerStore() : await JsonFileServerStore.open(JsonFileServerStore.pathFor(dataDir));
+/**
+ * Open the store, or refuse to start.
+ *
+ * Deliberately fatal. A server that cannot persist accounts can still answer a
+ * health check, which means a platform will happily route traffic to it and
+ * every sign-up will fail one at a time. Failing here puts the reason in the
+ * deployment log, which is where somebody is looking.
+ */
+let store: ServerStore;
+try {
+  store =
+    dataDir === 'memory'
+      ? new MemoryServerStore()
+      : await JsonFileServerStore.open(JsonFileServerStore.pathFor(dataDir));
+} catch (error) {
+  console.error(`[api] cannot start: ${(error as Error).message}`);
+  process.exit(1);
+}
 
 const app = createApp({ store, allowedOrigins });
 

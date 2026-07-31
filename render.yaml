@@ -1,0 +1,41 @@
+# Render blueprint for the account API.
+#
+# Render's free web service is the least-friction host for this: it builds the
+# Dockerfile straight from the repository, needs no credit card, and gives a
+# stable HTTPS URL — which is the part the app actually needs, since a browser
+# on an https:// page will not call an http:// API.
+#
+# Two properties of the free plan that this file cannot change, and that decide
+# how the app behaves against it:
+#
+#   1. The disk is ephemeral. Accounts live in /data inside the container, so a
+#      deploy or a restart starts them over. Fine for trying accounts out; not
+#      fine for anything anyone would be upset to lose. Attaching a persistent
+#      disk (a paid plan) or moving `ServerStore` to Postgres both fix it — see
+#      docs/API.md.
+#   2. It sleeps after about fifteen minutes idle, and the next request pays a
+#      cold start of up to a minute. The app handles this rather than pretending
+#      otherwise: sign-in retries once with a longer timeout and says it is
+#      waking the server.
+#
+# The same Dockerfile runs on Fly, Koyeb and Railway; nothing here is Render's
+# except the file name.
+services:
+  - type: web
+    name: language-srs-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./apps/server/Dockerfile
+    # The repository root: the server imports @language-srs/core from the
+    # workspace, so a context of apps/server alone would not resolve it.
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      # Set this to the origin the app is served from. GitHub Pages serves this
+      # project at https://soboku-labs.github.io/language-srs/, whose *origin*
+      # is the host alone — no path.
+      - key: ALLOWED_ORIGINS
+        value: https://soboku-labs.github.io
+      # Render provides PORT; the server reads it and binds every interface.

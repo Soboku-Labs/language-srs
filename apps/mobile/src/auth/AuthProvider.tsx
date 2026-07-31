@@ -38,8 +38,17 @@ interface AuthContextValue {
   offline: boolean;
   api: ApiClient;
   deviceName: string;
-  signIn(input: { email: string; password: string }): Promise<void>;
-  register(input: { email: string; password: string; displayName?: string }): Promise<void>;
+  /**
+   * `onWaking` fires when the first attempt timed out and a longer one has
+   * started — a free host cold-starting rather than anything being wrong. The
+   * sign-in screen turns it into a sentence rather than leaving somebody
+   * watching a button that appears stuck.
+   */
+  signIn(input: { email: string; password: string }, onWaking?: () => void): Promise<void>;
+  register(
+    input: { email: string; password: string; displayName?: string },
+    onWaking?: () => void,
+  ): Promise<void>;
   signOut(): Promise<void>;
   signOutOthers(): Promise<number>;
   listSessions(): Promise<AuthSessionInfo[]>;
@@ -121,18 +130,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       api,
       deviceName,
 
-      async signIn({ email, password }) {
-        await adopt(await api.signIn({ email, password, device: deviceName }));
+      async signIn({ email, password }, onWaking) {
+        await adopt(await api.signIn({ email, password, device: deviceName }, onWaking));
       },
 
-      async register({ email, password, displayName }) {
+      async register({ email, password, displayName }, onWaking) {
         await adopt(
-          await api.register({
-            email,
-            password,
-            device: deviceName,
-            ...(displayName ? { displayName } : {}),
-          }),
+          await api.register(
+            {
+              email,
+              password,
+              device: deviceName,
+              ...(displayName ? { displayName } : {}),
+            },
+            onWaking,
+          ),
         );
       },
 

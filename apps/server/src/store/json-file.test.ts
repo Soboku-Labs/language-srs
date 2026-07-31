@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -129,4 +129,29 @@ describe('the JSON file store', () => {
     expect(await store.listSessionsForUser('user-1')).toHaveLength(1);
     expect(await store.listSessionsForUser('user-2')).toHaveLength(1);
   });
+  /**
+   * Found by deploying it. A container running as an unprivileged user with a
+   * root-owned volume starts fine, passes its health check, and then fails on
+   * the first sign-up. Refusing to open is how that becomes a deployment log
+   * line instead of a stranger's 500.
+   *
+   * Skipped when the suite runs as root, because root ignores the permission
+   * bits this test sets — which would make it pass by not testing anything.
+   * CI runs unprivileged, so it runs there.
+   */
+  it.runIf(typeof process.getuid === 'function' && process.getuid?.() !== 0)(
+    'refuses to open a directory it cannot write to',
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), 'srs-store-'));
+      directories.push(directory);
+      await chmod(directory, 0o500);
+
+      await expect(JsonFileServerStore.open(JsonFileServerStore.pathFor(directory))).rejects.toThrow(
+        /Could not write .*writable/s,
+      );
+
+      // Restored so the temporary directory can be cleaned up afterwards.
+      await chmod(directory, 0o700);
+    },
+  );
 });

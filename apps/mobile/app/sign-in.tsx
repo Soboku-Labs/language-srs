@@ -32,6 +32,8 @@ export default function SignInScreen() {
   const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
+  /** Shown when the API is cold-starting rather than failing. */
+  const [waking, setWaking] = useState(false);
 
   const registering = mode === 'register';
 
@@ -58,12 +60,14 @@ export default function SignInScreen() {
 
     setBusy(true);
     setProblem(undefined);
+    setWaking(false);
 
     try {
+      const onWaking = () => setWaking(true);
       if (registering) {
-        await register({ email, password, ...(displayName.trim() ? { displayName } : {}) });
+        await register({ email, password, ...(displayName.trim() ? { displayName } : {}) }, onWaking);
       } else {
-        await signIn({ email, password });
+        await signIn({ email, password }, onWaking);
       }
       // Back to wherever the learner was; the tree re-mounts around the new
       // account on its own.
@@ -73,6 +77,7 @@ export default function SignInScreen() {
       setProblem(describe(error));
     } finally {
       setBusy(false);
+      setWaking(false);
     }
   };
 
@@ -121,11 +126,17 @@ export default function SignInScreen() {
         />
 
         {problem ? <Text style={styles.problem}>{problem}</Text> : null}
+        {waking ? (
+          <Caption>
+            Waking the server. It sleeps when nobody has used it for a while, so the first sign-in of the day can take
+            up to a minute.
+          </Caption>
+        ) : null}
       </Rise>
 
       <Rise index={2}>
         <BigButton
-          label={busy ? 'One moment…' : registering ? 'Create account' : 'Sign in'}
+          label={waking ? 'Waking the server…' : busy ? 'One moment…' : registering ? 'Create account' : 'Sign in'}
           onPress={submit}
           disabled={busy}
         />

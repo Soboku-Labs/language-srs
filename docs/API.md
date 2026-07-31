@@ -110,16 +110,68 @@ there are two processes, because there is no locking between them.
 `index.ts`; nothing above it knows which is in use, which is why the whole API
 test suite runs against the in-memory one.
 
-## Running it somewhere real
+## Hosting it for free
 
-Three things before this faces the internet:
+`apps/server/Dockerfile` builds an image that runs anywhere that takes a
+Dockerfile — Render, Fly, Koyeb, Railway. It is built from the repository root,
+because the server imports `@language-srs/core` from the workspace:
+
+```bash
+docker build -f apps/server/Dockerfile -t language-srs-api .
+docker run -p 4000:4000 -v srs-data:/data language-srs-api
+```
+
+Use a **named volume**, as above, rather than a bind mount to a directory you
+own. The container runs as an unprivileged user, and a root-owned host directory
+is not writable by it. The server refuses to start rather than accepting traffic
+it cannot store anything for, so the failure is one line in the log rather than a
+500 for whoever signs up first.
+
+### Render, which is the shortest path
+
+`render.yaml` in the repository root is a blueprint for Render's free web
+service. It needs no credit card and gives a stable HTTPS URL, which matters: a
+browser on an `https://` page will not call an `http://` API.
+
+1. **New ▸ Blueprint** on Render, point it at this repository, apply.
+2. Wait for the first build, then check `https://<name>.onrender.com/health`.
+3. Put that base URL in the repository's Actions **variables** as `API_URL`
+   (Settings ▸ Secrets and variables ▸ Actions ▸ Variables). The Pages workflow
+   passes it to the build as `EXPO_PUBLIC_API_URL`. It is a variable rather than
+   a secret because it is inlined into a public bundle — calling it a secret
+   would be theatre.
+4. Re-run the Pages workflow. Sign-in now works on the deployed site.
+
+Set `ALLOWED_ORIGINS` to the origin serving the app —
+`https://<owner>.github.io` for a Pages project site, the host with no path.
+
+### What the free tier costs you
+
+Both of these are properties of free hosting rather than of this service, and the
+app is built to behave sensibly under them rather than to pretend otherwise:
+
+- **The disk is ephemeral.** Accounts live in the container's filesystem, so a
+  deploy or a restart starts them over. That is acceptable for trying accounts
+  out and not acceptable for anything anybody would mind losing. Two ways out: a
+  persistent disk on a paid plan, or a Postgres implementation of `ServerStore` —
+  the interface exists for exactly this, and the whole API test suite runs
+  against an in-memory implementation to prove it.
+- **It sleeps when idle**, and the request that wakes it can take the better part
+  of a minute. Sign-in and sign-up retry once with a long timeout and say
+  "waking the server"; everything else fails quietly and syncs later, which is
+  what the offline path already did.
+
+### Anywhere else
+
+Three things before this faces the internet on any host:
 
 1. **Terminate TLS in front of it.** Tokens are bearer credentials, and this
-   process speaks plain HTTP.
-2. **Set `ALLOWED_ORIGINS`** to your app's origin. `*` is defensible for a bearer
-   API that never uses cookies, but defence in depth costs one variable.
+   process speaks plain HTTP. Every platform above does this for you.
+2. **Set `ALLOWED_ORIGINS`.** `*` is defensible for a bearer API that never uses
+   cookies, but defence in depth costs one variable.
 3. **Back up `DATA_DIR`.** It is one JSON file, and it is the accounts.
 
 The service has no runtime dependencies — `node:http`, `node:crypto`,
 `node:fs` and `@language-srs/core`. `tsx` is a development dependency used to run
-TypeScript directly; a production image can compile ahead of time instead.
+TypeScript directly; a production image could compile ahead of time instead, at
+the cost of no longer running exactly the source that was tested.

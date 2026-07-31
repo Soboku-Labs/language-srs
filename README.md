@@ -77,8 +77,15 @@ The API is a small service in `apps/server` with no runtime dependencies:
 npm run server   # http://localhost:4000, accounts in .data/accounts.json
 ```
 
-Endpoints, the security decisions behind them, and what sync does and does not
-guarantee: [docs/API.md](docs/API.md).
+It ships with a Dockerfile and a `render.yaml` blueprint, so hosting it on a free
+tier is a repository-connect and one repository variable — `API_URL`, which the
+Pages workflow passes to the web build. Free tiers sleep when idle and keep no
+disk between deploys, and the app is built to behave sensibly under both: sign-in
+retries once with a long timeout and says it is waking the server, and studying
+never waits for the network at all.
+
+Endpoints, the security decisions behind them, the hosting steps, and what sync
+does and does not guarantee: [docs/API.md](docs/API.md).
 
 ## What makes it exam-shaped
 

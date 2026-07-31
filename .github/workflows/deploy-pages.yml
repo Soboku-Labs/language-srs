@@ -34,9 +34,10 @@ jobs:
         run: npm ci
 
       # The web build has no tests of its own, but every scheduling decision it
-      # renders comes from the core package. A red core means a broken app, so
-      # this gates the deploy rather than running alongside it.
-      - name: Test core
+      # renders comes from the core package, and every account it creates goes
+      # through the API server. A red suite means a broken app, so this gates the
+      # deploy rather than running alongside it.
+      - name: Test
         run: npm test
 
       - name: Typecheck
@@ -45,7 +46,15 @@ jobs:
       # Sets the /language-srs sub-path, then writes .nojekyll and 404.html.
       # Without .nojekyll, Pages' Jekyll step drops the _expo/ bundle directory
       # and the site serves a blank page.
+      #
+      # API_URL is a repository *variable* (Settings ▸ Secrets and variables ▸
+      # Actions ▸ Variables), not a secret: it is inlined into a public bundle,
+      # so calling it a secret would only be theatre. Leave it unset and the
+      # build still succeeds — the app simply has no API to sign in against and
+      # says so, which is the right behaviour for a fork with no server.
       - name: Build web
+        env:
+          EXPO_PUBLIC_API_URL: ${{ vars.API_URL }}
         run: npm run web:pages
 
       - uses: actions/configure-pages@v5

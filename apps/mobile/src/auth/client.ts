@@ -26,10 +26,23 @@ import type {
  * fallback is the port `npm run server` uses — on Android the emulator reaches
  * the host machine through 10.0.2.2 rather than localhost, which is the kind of
  * thing that costs an afternoon if it is not written down somewhere.
+ *
+ * Empty is treated as unset, not as a base URL. A CI build with the variable
+ * declared but not filled in inlines an empty string, which would turn every
+ * call into a relative URL against whatever host is serving the app — a 404
+ * from the static site, reported to the learner as a broken sign-in.
  */
+const CONFIGURED_URL = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, '');
+
 export const API_URL: string =
-  process.env.EXPO_PUBLIC_API_URL ??
-  (Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000');
+  CONFIGURED_URL && CONFIGURED_URL.length > 0
+    ? CONFIGURED_URL
+    : Platform.OS === 'android'
+      ? 'http://10.0.2.2:4000'
+      : 'http://localhost:4000';
+
+/** How long the second attempt waits when the first looks like a cold start. */
+const WAKE_TIMEOUT_MS = 60_000;
 
 /** A failure that carries the server's own words, so the UI can show them. */
 export class ApiRequestError extends Error {
@@ -69,12 +82,20 @@ export class ApiClient {
 
   // ---------------------------------------------------------------- accounts
 
-  register(input: { email: string; password: string; displayName?: string; device: string }): Promise<AuthResult> {
-    return this.request('POST', '/auth/register', { body: input });
+  register(
+    input: { email: string; password: string; displayName?: string; device: string },
+    onWaking?: () => void,
+  ): Promise<AuthResult> {
+    return this.withWake(onWaking, (timeoutMs) =>
+      this.request('POST', '/auth/register', { body: input, timeoutMs }),
+    );
   }
 
-  signIn(input: { email: string; password: string; device: string }): Promise<AuthResult> {
-    return this.request('POST', '/auth/login', { body: input });
+  signIn(
+    input: { email: string; password: string; device: string },
+    onWaking?: () => void,
+  ): Promise<AuthResult> {
+    return this.withWake(onWaking, (timeoutMs) => this.request('POST', '/auth/login', { body: input, timeoutMs }));
   }
 
   me(token: string): Promise<{ user: PublicUser; sessionId: string; expiresAt: string }> {
@@ -134,15 +155,39 @@ export class ApiClient {
 
   // ---------------------------------------------------------------- plumbing
 
+  /**
+   * Try, and if the server appears to be asleep, wait longer and try again.
+   *
+   * Free hosting stops the container when nothing has called it for a quarter of
+   * an hour, and the request that wakes it can take the better part of a minute
+   * — far past the timeout that is right for every other call. Retrying once
+   * with a long window is what makes a free deployment usable; making the normal
+   * timeout that long instead would mean a phone with no signal sits on a spinner
+   * for a minute before admitting it is offline.
+   *
+   * Only sign-in and sign-up do this. They are the calls a person is waiting on,
+   * and everything else happens in the background where being told to try again
+   * later costs nothing.
+   */
+  private async withWake<T>(onWaking: (() => void) | undefined, attempt: (timeoutMs: number) => Promise<T>): Promise<T> {
+    try {
+      return await attempt(this.timeoutMs);
+    } catch (error) {
+      if (!(error instanceof ApiRequestError) || error.code !== 'offline') throw error;
+      onWaking?.();
+      return attempt(WAKE_TIMEOUT_MS);
+    }
+  }
+
   private async request<T>(
     method: string,
     path: string,
-    options: { token?: string; body?: unknown } = {},
+    options: { token?: string; body?: unknown; timeoutMs?: number } = {},
   ): Promise<T> {
     // Without a timeout an unreachable host hangs until the platform gives up,
     // which on a phone with no signal is long enough to look like a freeze.
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? this.timeoutMs);
 
     let response: Response;
     try {

@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../theme';
+import { AnimatedFill, Press } from '../motion/components';
 
 /**
  * The shared primitives.
@@ -76,12 +77,9 @@ export function Card({
 
   if (onPress) {
     return (
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [styles.card, accented, style, pressed && styles.pressed]}
-      >
+      <Press onPress={onPress} style={[styles.card, accented, style]}>
         {children}
-      </Pressable>
+      </Press>
     );
   }
 
@@ -166,18 +164,18 @@ export function BigButton({
   const styles = useThemedStyles(createStyles);
 
   return (
-    <Pressable
+    <Press
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ disabled: Boolean(disabled) }}
-      style={({ pressed }) => [styles.bigButton, pressed && !disabled && styles.pressed, disabled && styles.faded]}
+      style={[styles.bigButton, disabled && styles.faded]}
     >
       <Text style={[styles.bigButtonLabel, { color: onAccentColor(theme) }]}>{label}</Text>
       {hint ? (
         <Text style={[styles.bigButtonHint, { color: onAccentColor(theme) }]}>{hint}</Text>
       ) : null}
-    </Pressable>
+    </Press>
   );
 }
 
@@ -195,9 +193,9 @@ export function TextButton({
   const styles = useThemedStyles(createStyles);
 
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.textButton, pressed && styles.pressed]}>
+    <Press onPress={onPress} accessibilityRole="button" style={styles.textButton}>
       <Text style={[styles.textButtonLabel, { color: color ?? theme.colors.accent }]}>{label}</Text>
-    </Pressable>
+    </Press>
   );
 }
 
@@ -222,13 +220,9 @@ function luminance(hex: string): number {
 export function ProgressBar({ value, color }: { value: number; color?: string }) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
-  const clamped = Math.max(0, Math.min(1, value));
-
   return (
     <View style={styles.progressTrack}>
-      <View
-        style={[styles.progressFill, { width: `${clamped * 100}%`, backgroundColor: color ?? theme.colors.accent }]}
-      />
+      <AnimatedFill value={value} color={color ?? theme.colors.accent} style={styles.progressFill} />
     </View>
   );
 }

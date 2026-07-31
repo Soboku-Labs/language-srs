@@ -39,6 +39,11 @@ The themes live in `@language-srs/core` as data, not in the React layer — so t
 the iOS widget and the Android widget all render the same palette without it being
 defined three times. Switching language re-themes the app and its widget together.
 
+They share one design language — **Paper & Ink** — in which surfaces are sheets,
+colour is pigment applied only where it means something, and motion explains rather
+than entertains. The full spec, including every motion pattern and the reasoning
+behind each, is in [docs/DESIGN.md](docs/DESIGN.md).
+
 Tonal languages get a tone ramp: each syllable of a Mandarin or Vietnamese word is
 coloured by its tone, in that theme's own hues. Colour is the answer on a tone card, so
 the ramps are stated explicitly per theme and tested for distinctness and contrast —

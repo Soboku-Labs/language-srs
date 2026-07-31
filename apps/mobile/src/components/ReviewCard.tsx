@@ -10,6 +10,7 @@ import {
   type Rating,
 } from '@language-srs/core';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../theme';
+import { Press, Rise } from '../motion/components';
 import { Caption, Card, Pill, Row } from './ui';
 import { ToneText } from './ToneText';
 
@@ -65,7 +66,9 @@ export function ReviewCard({
       </Pressable>
 
       {revealed ? (
-        <Answer pair={pair} />
+        <Rise>
+          <Answer pair={pair} />
+        </Rise>
       ) : (
         <View style={styles.centered}>
           <Caption>Tap to reveal</Caption>
@@ -236,7 +239,7 @@ export function GradeButtons({
   return (
     <View style={styles.grades}>
       {ratings.map((rating) => (
-        <Pressable
+        <Press
           key={rating}
           onPress={() => onGrade(rating)}
           disabled={disabled}
@@ -251,7 +254,7 @@ export function GradeButtons({
         >
           <Text style={[styles.gradeLabel, { color: gradeColors[rating] }]}>{RATING_LABELS[rating]}</Text>
           <Text style={styles.gradeInterval}>{previews[rating].display}</Text>
-        </Pressable>
+        </Press>
       ))}
     </View>
   );

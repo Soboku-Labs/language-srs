@@ -6,6 +6,8 @@ import { previewIntervals, type CardWithEntry, type Rating } from '@language-srs
 import { useEngine } from '../src/engine/EngineProvider';
 import { GradeButtons, ReviewCard, speakEntry } from '../src/components/ReviewCard';
 import { BigButton, Caption, ProgressBar, Row, Screen, Title } from '../src/components/ui';
+import { DealtCard, PopIn, Rise } from '../src/motion/components';
+import { springBouncy } from '../src/motion/tokens';
 import { spacing, useThemedStyles, type ResolvedTheme } from '../src/theme';
 
 /**
@@ -14,6 +16,11 @@ import { spacing, useThemedStyles, type ResolvedTheme } from '../src/theme';
  * Nothing on this screen that is not the card, the progress through the session,
  * and the next thing to press. Running totals used to sit under the buttons and
  * competed with them for attention — the summary at the end is where they belong.
+ *
+ * The one piece of motion that carries information: after a grade the next card
+ * rises from beneath, offset in the direction of the grade you gave. Again leans
+ * left, Easy leans right. That is the only signal distinguishing a grade you meant
+ * from one you mis-tapped, and it arrives immediately rather than a card later.
  */
 export default function ReviewScreen() {
   const { engine, revision, grade } = useEngine();
@@ -23,6 +30,7 @@ export default function ReviewScreen() {
 
   const [revealed, setRevealed] = useState(params.reveal === '1');
   const [session, setSession] = useState({ reviewed: 0, recalled: 0 });
+  const [lastDirection, setLastDirection] = useState(0);
   const shownAt = useRef(Date.now());
 
   const queue = useMemo(() => {
@@ -71,11 +79,15 @@ export default function ReviewScreen() {
     async (rating: Rating) => {
       if (!current) return;
 
+      // Haptic lands with the card leaving, not after the next one has rendered.
       if (Platform.OS !== 'web') {
         void Haptics.impactAsync(
           rating === 1 ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Light,
         );
       }
+
+      // Again leans left, Hard slightly left, Good and Easy right.
+      setLastDirection(rating <= 2 ? -1 : 1);
 
       await grade(current.card.id, rating, {
         durationMs: Date.now() - shownAt.current,
@@ -99,15 +111,17 @@ export default function ReviewScreen() {
 
     return (
       <Screen>
-        <View style={styles.done}>
+        <PopIn style={styles.done} config={springBouncy}>
           <Title>{session.reviewed > 0 ? 'Done 🎉' : 'Nothing waiting'}</Title>
           <Caption>
             {session.reviewed > 0
               ? `${session.reviewed} card${session.reviewed === 1 ? '' : 's'}, ${accuracy}% recalled.`
               : 'Come back when reviews are ready, or raise your daily new-card limit.'}
           </Caption>
-        </View>
-        <BigButton label="Back home" onPress={() => router.replace('/')} />
+        </PopIn>
+        <Rise index={1}>
+          <BigButton label="Back home" onPress={() => router.replace('/')} />
+        </Rise>
       </Screen>
     );
   }
@@ -127,7 +141,9 @@ export default function ReviewScreen() {
       </View>
 
       <View style={styles.cardArea}>
-        <ReviewCard pair={current} revealed={revealed} onReveal={() => setRevealed(true)} />
+        <DealtCard cardKey={current.card.id} exitDirection={lastDirection}>
+          <ReviewCard pair={current} revealed={revealed} onReveal={() => setRevealed(true)} />
+        </DealtCard>
       </View>
 
       <View style={styles.footer}>

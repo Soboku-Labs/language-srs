@@ -19,7 +19,8 @@
     "web:build": "npm run build:web --workspace @language-srs/mobile",
     "ios": "npm run ios --workspace @language-srs/mobile",
     "android": "npm run android --workspace @language-srs/mobile",
-    "prebuild": "npm run prebuild --workspace @language-srs/mobile"
+    "prebuild": "npm run prebuild --workspace @language-srs/mobile",
+    "web:pages": "npm run build:pages --workspace @language-srs/mobile"
   },
   "devDependencies": {
     "typescript": "~5.9.2"

@@ -4,12 +4,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../theme';
 
 /**
- * The shared primitives, all of them theme-driven.
+ * The shared primitives.
  *
- * Nothing here holds a colour of its own. Every surface, border and label reads
- * from the active language's theme, which is what lets the same component tree
- * render as ink-on-dark for Mandarin and washi-on-light for Japanese without a
- * single conditional in a screen.
+ * Two rules keep the screens from getting dense again:
+ *
+ * 1. **Whitespace before borders.** An earlier version boxed every group in a
+ *    bordered panel, which turned each screen into a stack of six rectangles with
+ *    no hierarchy — everything equally important is the same as nothing being
+ *    important. Surfaces are now flat tints, and `Card` is reserved for the one
+ *    thing on a screen you are meant to act on.
+ * 2. **One primary action per screen.** Everything else is a quiet text link.
+ *
+ * Nothing here holds a colour of its own; all of it reads from the active
+ * language's theme.
  */
 
 /** Screen shell: themed background, safe area, and scrolling when content overflows. */
@@ -26,9 +33,9 @@ export function Screen({
   const styles = useThemedStyles(createStyles);
 
   const inset: ViewStyle = {
-    paddingTop: insets.top + spacing.md,
+    paddingTop: insets.top + spacing.lg,
     paddingBottom: insets.bottom + spacing.xl,
-    paddingHorizontal: padded ? spacing.lg : 0,
+    paddingHorizontal: padded ? spacing.xl : 0,
   };
 
   if (!scroll) {
@@ -46,7 +53,13 @@ export function Screen({
   );
 }
 
-export function Panel({
+/**
+ * A raised surface, for the one thing on a screen that matters.
+ *
+ * Borderless by default — a tint against the background is enough separation, and
+ * outlines on every group are what made the old layout read as a form.
+ */
+export function Card({
   children,
   style,
   onPress,
@@ -55,34 +68,59 @@ export function Panel({
   children: React.ReactNode;
   style?: ViewStyle;
   onPress?: () => void;
-  /** Border colour override, for highlighting the selected item in a list. */
+  /** Tints the left edge, for the review card's kind colour. */
   accent?: string;
 }) {
   const styles = useThemedStyles(createStyles);
-  const accented = accent ? { borderColor: accent } : undefined;
+  const accented = accent ? { borderLeftWidth: 3, borderLeftColor: accent } : undefined;
 
   if (onPress) {
     return (
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [styles.panel, accented, style, pressed && styles.panelPressed]}
+        style={({ pressed }) => [styles.card, accented, style, pressed && styles.pressed]}
       >
         {children}
       </Pressable>
     );
   }
 
-  return <View style={[styles.panel, accented, style]}>{children}</View>;
+  return <View style={[styles.card, accented, style]}>{children}</View>;
 }
 
-export function Heading({ children }: { children: React.ReactNode }) {
+/** A group of related content, separated by space rather than by a box. */
+export function Section({
+  title,
+  children,
+  action,
+}: {
+  title?: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
   const styles = useThemedStyles(createStyles);
-  return <Text style={styles.heading}>{children}</Text>;
+
+  return (
+    <View style={styles.section}>
+      {title || action ? (
+        <View style={styles.sectionHeader}>
+          {title ? <Text style={styles.sectionTitle}>{title}</Text> : <View />}
+          {action}
+        </View>
+      ) : null}
+      {children}
+    </View>
+  );
 }
 
 export function Title({ children }: { children: React.ReactNode }) {
   const styles = useThemedStyles(createStyles);
   return <Text style={styles.title}>{children}</Text>;
+}
+
+export function Heading({ children }: { children: React.ReactNode }) {
+  const styles = useThemedStyles(createStyles);
+  return <Text style={styles.heading}>{children}</Text>;
 }
 
 export function Body({ children, muted }: { children: React.ReactNode; muted?: boolean }) {
@@ -95,27 +133,33 @@ export function Caption({ children, muted = true }: { children: React.ReactNode;
   return <Text style={[styles.caption, muted && styles.muted]}>{children}</Text>;
 }
 
-export function Chip({ label, color }: { label: string; color?: string }) {
+export function Pill({ label, color }: { label: string; color?: string }) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const tint = color ?? theme.colors.accent;
 
   return (
-    <View style={[styles.chip, { borderColor: tint }]}>
-      <Text style={[styles.chipLabel, { color: tint }]}>{label}</Text>
+    <View style={[styles.pill, { backgroundColor: `${tint}1F` }]}>
+      <Text style={[styles.pillLabel, { color: tint }]}>{label}</Text>
     </View>
   );
 }
 
-export function Button({
+/**
+ * The primary action.
+ *
+ * Deliberately large and round. It is the only filled control on a screen, so
+ * "what do I do here" never needs a second look.
+ */
+export function BigButton({
   label,
+  hint,
   onPress,
-  tone = 'primary',
   disabled,
 }: {
   label: string;
+  hint?: string;
   onPress: () => void;
-  tone?: 'primary' | 'ghost';
   disabled?: boolean;
 }) {
   const theme = useTheme();
@@ -127,22 +171,32 @@ export function Button({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ disabled: Boolean(disabled) }}
-      style={({ pressed }) => [
-        styles.button,
-        tone === 'primary' ? styles.buttonPrimary : styles.buttonGhost,
-        pressed && !disabled && styles.buttonPressed,
-        disabled && styles.buttonDisabled,
-      ]}
+      style={({ pressed }) => [styles.bigButton, pressed && !disabled && styles.pressed, disabled && styles.faded]}
     >
-      <Text
-        style={[
-          styles.buttonLabel,
-          // Light themes need dark text on their accent; dark themes need light.
-          { color: tone === 'ghost' ? theme.colors.textMuted : onAccentColor(theme) },
-        ]}
-      >
-        {label}
-      </Text>
+      <Text style={[styles.bigButtonLabel, { color: onAccentColor(theme) }]}>{label}</Text>
+      {hint ? (
+        <Text style={[styles.bigButtonHint, { color: onAccentColor(theme) }]}>{hint}</Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
+/** A quiet secondary action. Text and a tap target, no box. */
+export function TextButton({
+  label,
+  onPress,
+  color,
+}: {
+  label: string;
+  onPress: () => void;
+  color?: string;
+}) {
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
+
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.textButton, pressed && styles.pressed]}>
+      <Text style={[styles.textButtonLabel, { color: color ?? theme.colors.accent }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -151,8 +205,7 @@ export function Button({
  * Readable text colour on top of the theme's accent.
  *
  * The four accents run from a light gold to a deep indigo, so a fixed white label
- * is unreadable on at least one of them. Picking by the accent's own luminance
- * keeps the primary button legible in every theme without a per-theme override.
+ * is unreadable on at least one of them.
  */
 function onAccentColor(theme: ResolvedTheme): string {
   return luminance(theme.colors.accent) > 0.5 ? '#12100E' : '#FFFFFF';
@@ -174,34 +227,46 @@ export function ProgressBar({ value, color }: { value: number; color?: string })
   return (
     <View style={styles.progressTrack}>
       <View
-        style={[
-          styles.progressFill,
-          { width: `${clamped * 100}%`, backgroundColor: color ?? theme.colors.accent },
-        ]}
+        style={[styles.progressFill, { width: `${clamped * 100}%`, backgroundColor: color ?? theme.colors.accent }]}
       />
     </View>
   );
 }
 
-export function StatTile({
+/**
+ * One number and its label, inline.
+ *
+ * Replaces the old tile-in-a-panel: three of these on a row read as a sentence
+ * about your progress, where three bordered tiles read as a dashboard.
+ */
+export function Stat({
   label,
   value,
-  hint,
   color,
 }: {
   label: string;
   value: string;
-  hint?: string;
   color?: string;
 }) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
 
   return (
-    <View style={styles.statTile}>
+    <View style={styles.stat}>
       <Text style={[styles.statValue, { color: color ?? theme.colors.text }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-      {hint ? <Text style={styles.statHint}>{hint}</Text> : null}
+    </View>
+  );
+}
+
+/** A label and value on one line, for lists of facts. */
+export function DetailRow({ label, value }: { label: string; value: string }) {
+  const styles = useThemedStyles(createStyles);
+
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
     </View>
   );
 }
@@ -211,24 +276,34 @@ export function Row({ children, style }: { children: React.ReactNode; style?: Vi
   return <View style={[styles.row, style]}>{children}</View>;
 }
 
-export function Divider() {
-  const styles = useThemedStyles(createStyles);
-  return <View style={styles.divider} />;
-}
-
 const createStyles = (theme: ResolvedTheme) => ({
   screen: { flex: 1, backgroundColor: theme.colors.background },
   fill: { flex: 1 },
-  scrollContent: { gap: spacing.lg },
-  panel: {
+  scrollContent: { gap: spacing.xl },
+
+  card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
     padding: spacing.lg,
-    gap: spacing.sm,
+    gap: spacing.md,
   },
-  panelPressed: { backgroundColor: theme.colors.surfaceRaised },
+  pressed: { opacity: 0.75 },
+  faded: { opacity: 0.4 },
+
+  section: { gap: spacing.md },
+  sectionHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+  },
+  sectionTitle: {
+    color: theme.colors.textMuted,
+    fontSize: typography.micro,
+    fontWeight: '700' as const,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase' as const,
+  },
+
   title: {
     color: theme.colors.text,
     fontSize: typography.title,
@@ -242,38 +317,52 @@ const createStyles = (theme: ResolvedTheme) => ({
     letterSpacing: theme.headingLetterSpacing,
   },
   body: { color: theme.colors.text, fontSize: typography.body, lineHeight: 22 },
-  caption: { color: theme.colors.text, fontSize: typography.caption, lineHeight: 18 },
+  caption: { color: theme.colors.text, fontSize: typography.caption, lineHeight: 19 },
   muted: { color: theme.colors.textMuted },
-  chip: {
-    borderWidth: 1,
+
+  pill: {
     borderRadius: theme.radius.pill,
     paddingHorizontal: spacing.md,
-    paddingVertical: 3,
+    paddingVertical: 4,
     alignSelf: 'flex-start' as const,
   },
-  chipLabel: { fontSize: typography.micro, fontWeight: '700' as const, letterSpacing: 0.4 },
-  button: {
-    borderRadius: theme.radius.control,
-    paddingVertical: spacing.md + 2,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center' as const,
-  },
-  buttonPrimary: { backgroundColor: theme.colors.accent },
-  buttonGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.colors.border },
-  buttonPressed: { opacity: 0.8 },
-  buttonDisabled: { opacity: 0.4 },
-  buttonLabel: { fontSize: typography.body, fontWeight: '600' as const },
-  progressTrack: {
-    height: 6,
+  pillLabel: { fontSize: typography.micro, fontWeight: '700' as const, letterSpacing: 0.4 },
+
+  bigButton: {
+    backgroundColor: theme.colors.accent,
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.border,
+    paddingVertical: spacing.lg + 2,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center' as const,
+    gap: 2,
+  },
+  bigButtonLabel: { fontSize: typography.heading, fontWeight: '700' as const },
+  bigButtonHint: { fontSize: typography.micro, opacity: 0.75 },
+
+  textButton: { paddingVertical: spacing.sm, paddingHorizontal: 2 },
+  textButtonLabel: { fontSize: typography.body, fontWeight: '600' as const },
+
+  progressTrack: {
+    height: 5,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surfaceRaised,
     overflow: 'hidden' as const,
   },
   progressFill: { height: '100%' as const, borderRadius: theme.radius.pill },
-  statTile: { flex: 1, gap: 2 },
-  statValue: { fontSize: 26, fontWeight: '700' as const },
-  statLabel: { color: theme.colors.textMuted, fontSize: typography.caption },
-  statHint: { color: theme.colors.textFaint, fontSize: typography.micro },
-  row: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.md },
-  divider: { height: 1, backgroundColor: theme.colors.border },
+
+  stat: { gap: 1 },
+  statValue: { fontSize: 22, fontWeight: '700' as const },
+  statLabel: { color: theme.colors.textMuted, fontSize: typography.micro },
+
+  detailRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    paddingVertical: spacing.sm,
+    gap: spacing.md,
+  },
+  detailLabel: { color: theme.colors.textMuted, fontSize: typography.caption, flex: 1 },
+  detailValue: { color: theme.colors.text, fontSize: typography.caption, fontWeight: '600' as const },
+
+  row: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.lg },
 });

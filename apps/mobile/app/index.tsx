@@ -1,42 +1,31 @@
 import React, { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import {
-  findExamLevel,
-  findExamTrack,
-  getLanguageProfile,
-  kindLabel,
-  type CardKind,
-} from '@language-srs/core';
+import { findExamLevel, getLanguageProfile, kindLabel, type CardKind } from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
-import {
-  Body,
-  Button,
-  Caption,
-  Chip,
-  Heading,
-  Panel,
-  ProgressBar,
-  Row,
-  Screen,
-  StatTile,
-  Title,
-} from '../src/components/ui';
+import { BigButton, Caption, Row, Screen, Stat, TextButton, Title } from '../src/components/ui';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
 
+/**
+ * The dashboard.
+ *
+ * One question, answered immediately: is there anything to study, and how much.
+ * An earlier version stacked six bordered panels here — today, session mix,
+ * readiness, streak tiles, actions — which meant nothing stood out and the answer
+ * took a scroll to find. Everything except the count, the button and a single row
+ * of context now lives on the Progress screen, one tap away.
+ */
 export default function Dashboard() {
   const { engine, revision } = useEngine();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
 
-  // Recomputed whenever the engine reports a change; see EngineProvider.
   const view = useMemo(() => {
     const profile = engine.getProfile();
     return {
       profile,
       language: getLanguageProfile(profile.languageCode),
-      track: findExamTrack(profile.examTrackId),
       level: findExamLevel(profile.targetLevelId),
       queue: engine.getQueue(),
       stats: engine.getStats(),
@@ -45,137 +34,81 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, revision]);
 
-  const { profile, language, track, level, queue, stats, readiness } = view;
-  const dueTotal = queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning;
-
-  const verdictColors: Record<string, string> = {
-    ready: theme.colors.success,
-    'on-track': theme.colors.accent,
-    behind: theme.colors.warning,
-    'not-started': theme.colors.textMuted,
-    'no-exam-set': theme.colors.textMuted,
-    'exam-passed': theme.colors.textMuted,
-  };
-  const verdictColor = verdictColors[readiness.verdict] ?? theme.colors.accent;
+  const { profile, language, level, queue, stats, readiness } = view;
+  const waiting = queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning;
 
   return (
     <Screen>
-      <View style={styles.headerRow}>
+      {/* Tapping the language is how you switch it — no menu needed. */}
+      <Pressable onPress={() => router.push('/languages')} style={styles.header}>
+        <Text style={styles.emoji}>{language.emoji}</Text>
         <View style={styles.headerText}>
-          <Caption>{track?.name ?? profile.examTrackId}</Caption>
-          <Title>
-            {language.emoji} {language.name}
-          </Title>
-          <Caption>{level?.name}</Caption>
+          <Title>{language.name}</Title>
+          <Caption>
+            {level?.shortName}
+            {profile.examDate ? ` · ${describeCountdown(readiness.daysToExam)}` : ''}
+          </Caption>
         </View>
-        <Chip label={language.badge} />
+        <Text style={styles.chevron}>›</Text>
+      </Pressable>
+
+      <View style={styles.hero}>
+        {waiting > 0 ? (
+          <>
+            <Text style={styles.count}>{waiting}</Text>
+            <Text style={styles.countLabel}>
+              {waiting === 1 ? 'card waiting' : 'cards waiting'}
+            </Text>
+            <MixBar mix={queue.kindMix} />
+          </>
+        ) : (
+          <>
+            <Text style={styles.count}>✨</Text>
+            <Text style={styles.countLabel}>All caught up</Text>
+            <Caption>
+              {queue.nextDueAt
+                ? `More lands ${formatRelative(queue.nextDueAt)}`
+                : 'Raise your daily new-card limit to keep going'}
+            </Caption>
+          </>
+        )}
       </View>
 
-      <Panel>
-        <Row style={styles.spaceBetween}>
-          <Heading>Today</Heading>
-          <Caption>
-            {stats.today.newCards}/{profile.dailyNewLimit} new · {stats.today.reviews}/
-            {profile.dailyReviewLimit} reviews
-          </Caption>
-        </Row>
+      <BigButton
+        label={waiting > 0 ? 'Study now' : 'Study ahead'}
+        {...(waiting > 0 && queue.kindMix ? { hint: describeMix(queue.kindMix) } : {})}
+        onPress={() => router.push('/review')}
+      />
 
-        <Row style={styles.tiles}>
-          <StatTile label="Due" value={String(queue.breakdown.due)} color={theme.colors.accent} />
-          <StatTile label="New" value={String(queue.breakdown.fresh)} color={theme.colors.good} />
-          <StatTile label="Learning" value={String(queue.breakdown.learning)} color={theme.colors.hard} />
-        </Row>
-
-        {queue.breakdown.heldByCap > 0 ? (
-          <Caption>{queue.breakdown.heldByCap} more due, held back by your daily review cap.</Caption>
-        ) : null}
-
-        {dueTotal > 0 ? (
-          <Button
-            label={`Review ${dueTotal} card${dueTotal === 1 ? '' : 's'}`}
-            onPress={() => router.push('/review')}
-          />
-        ) : (
-          <View style={styles.emptyState}>
-            <Body muted>
-              {queue.nextDueAt
-                ? `Nothing due. Next review ${formatRelative(queue.nextDueAt)}.`
-                : 'Nothing due. Raise your daily new-card limit to keep going.'}
-            </Body>
-            <Button label="Study ahead anyway" tone="ghost" onPress={() => router.push('/review')} />
-          </View>
-        )}
-      </Panel>
-
-      {queue.cards.length > 0 ? <SessionMix mix={queue.kindMix} /> : null}
-
-      <Panel onPress={() => router.push('/stats')}>
-        <Row style={styles.spaceBetween}>
-          <Heading>Exam readiness</Heading>
-          <Text style={[styles.readinessPercent, { color: verdictColor }]}>
-            {Math.round(readiness.score * 100)}%
-          </Text>
-        </Row>
-        <ProgressBar value={readiness.score} color={verdictColor} />
-        <Caption>{readiness.headline}</Caption>
-
-        <Row style={styles.tiles}>
-          <StatTile
-            label="Syllabus known"
-            value={`${Math.round(readiness.coverage * 100)}%`}
-            hint={`${stats.coverage.entriesKnown} of ${stats.coverage.target} words`}
-          />
-          <StatTile
-            label="Recall on exam day"
-            value={readiness.examDate ? `${Math.round(readiness.projectedRecall * 100)}%` : '—'}
-            hint={readiness.examDate ? 'if you stopped now' : 'set an exam date'}
-          />
-        </Row>
-      </Panel>
-
-      <Panel>
-        <Row style={styles.tiles}>
-          <StatTile
-            label="Day streak"
-            value={String(stats.streak.current)}
-            hint={stats.streak.studiedToday ? 'studied today' : 'not yet today'}
-            color={stats.streak.current > 0 ? theme.colors.secondary : theme.colors.textMuted}
-          />
-          <StatTile
-            label="Retention"
-            value={stats.retention.reviews > 0 ? `${Math.round(stats.retention.trueRetention * 100)}%` : '—'}
-            hint={stats.retention.reviews > 0 ? `${stats.retention.reviews} reviews, 30d` : 'no reviews yet'}
-          />
-          <StatTile
-            label="In review"
-            value={String(stats.coverage.reviewCards)}
-            hint={`${stats.coverage.newCards} unseen`}
-          />
-        </Row>
-      </Panel>
-
-      <Row style={styles.actions}>
-        <View style={styles.action}>
-          <Button label="Languages" tone="ghost" onPress={() => router.push('/languages')} />
-        </View>
-        <View style={styles.action}>
-          <Button label="Settings" tone="ghost" onPress={() => router.push('/settings')} />
-        </View>
+      <Row style={styles.stats}>
+        <Stat
+          label={stats.streak.studiedToday ? 'day streak 🔥' : 'day streak'}
+          value={String(stats.streak.current)}
+          color={stats.streak.current > 0 ? theme.colors.secondary : theme.colors.textMuted}
+        />
+        <Stat label="words known" value={String(stats.coverage.entriesKnown)} />
+        <Stat
+          label={profile.examDate ? 'exam ready' : 'syllabus'}
+          value={`${Math.round((profile.examDate ? readiness.score : readiness.coverage) * 100)}%`}
+        />
       </Row>
 
-      <Caption>Theme: {theme.name}. {theme.inspiration}</Caption>
+      <Row style={styles.links}>
+        <TextButton label="Progress" onPress={() => router.push('/stats')} />
+        <TextButton label="Settings" onPress={() => router.push('/settings')} color={theme.colors.textMuted} />
+      </Row>
     </Screen>
   );
 }
 
 /**
- * The kind mix of the queued session.
+ * A thin band showing the session's card mix.
  *
- * Surfaced because it is the clearest signal that the app is exam-shaped rather
- * than a generic word list: a TOPIK II session visibly contains writing cards, a
- * JLPT session visibly contains none.
+ * The one piece of the old session-mix panel worth keeping on this screen: it
+ * shows at a glance that the queue is shaped like the exam paper, without a
+ * legend, a heading and a box to say so.
  */
-function SessionMix({ mix }: { mix: Partial<Record<CardKind, number>> }) {
+function MixBar({ mix }: { mix: Partial<Record<CardKind, number>> }) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
 
@@ -183,67 +116,75 @@ function SessionMix({ mix }: { mix: Partial<Record<CardKind, number>> }) {
     .filter((entry): entry is [CardKind, number] => (entry[1] ?? 0) > 0)
     .sort((a, b) => b[1] - a[1]);
 
-  const total = entries.reduce((sum, [, count]) => sum + count, 0);
-  if (total === 0) return null;
+  if (entries.length === 0) return null;
 
   return (
-    <Panel>
-      <Heading>This session mirrors your paper</Heading>
-      <View style={styles.mixBar}>
-        {entries.map(([kind, count]) => (
-          <View
-            key={kind}
-            style={{
-              flex: count,
-              backgroundColor: theme.kindColors[kind] ?? theme.colors.accent,
-              height: 10,
-            }}
-          />
-        ))}
-      </View>
-      <View style={styles.legend}>
-        {entries.map(([kind, count]) => (
-          <Row key={kind} style={styles.legendItem}>
-            <View
-              style={[styles.legendDot, { backgroundColor: theme.kindColors[kind] ?? theme.colors.accent }]}
-            />
-            <Caption>
-              {kindLabel(kind)} {count}
-            </Caption>
-          </Row>
-        ))}
-      </View>
-    </Panel>
+    <View style={styles.mixBar}>
+      {entries.map(([kind, count]) => (
+        <View
+          key={kind}
+          style={{ flex: count, backgroundColor: theme.kindColors[kind] ?? theme.colors.accent, height: 6 }}
+        />
+      ))}
+    </View>
   );
+}
+
+/** "listening, meaning and tones" — the mix as a phrase rather than a legend. */
+function describeMix(mix: Partial<Record<CardKind, number>>): string {
+  const kinds = Object.entries(mix)
+    .filter((entry): entry is [CardKind, number] => (entry[1] ?? 0) > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([kind]) => kindLabel(kind).toLowerCase());
+
+  if (kinds.length === 0) return '';
+  if (kinds.length === 1) return kinds[0]!;
+  return `${kinds.slice(0, -1).join(', ')} and ${kinds[kinds.length - 1]}`;
+}
+
+function describeCountdown(days?: number): string {
+  if (days === undefined) return '';
+  if (days < 0) return 'exam passed';
+  if (days === 0) return 'exam today';
+  if (days === 1) return 'exam tomorrow';
+  return `${days} days to go`;
 }
 
 function formatRelative(at: string): string {
   const hours = (Date.parse(at) - Date.now()) / 3_600_000;
   if (hours < 1) return 'within the hour';
   if (hours < 24) return `in ${Math.round(hours)}h`;
-  return `in ${Math.round(hours / 24)}d`;
+  return `in ${Math.round(hours / 24)} days`;
 }
 
 const createStyles = (theme: ResolvedTheme) => ({
-  headerRow: {
+  header: {
     flexDirection: 'row' as const,
-    alignItems: 'flex-start' as const,
-    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    gap: spacing.md,
   },
-  headerText: { gap: 2, flex: 1 },
-  spaceBetween: { justifyContent: 'space-between' as const },
-  tiles: { alignItems: 'flex-start' as const, marginTop: spacing.sm },
-  emptyState: { gap: spacing.md },
-  readinessPercent: { fontSize: typography.title, fontWeight: '700' as const },
+  emoji: { fontSize: 34 },
+  headerText: { flex: 1, gap: 1 },
+  chevron: { color: theme.colors.textFaint, fontSize: 28 },
+
+  hero: { alignItems: 'center' as const, gap: spacing.xs, paddingVertical: spacing.xxl },
+  count: {
+    color: theme.colors.accent,
+    fontSize: 92,
+    lineHeight: 100,
+    fontWeight: '800' as const,
+    letterSpacing: -2,
+  },
+  countLabel: { color: theme.colors.text, fontSize: typography.heading, fontWeight: '600' as const },
   mixBar: {
     flexDirection: 'row' as const,
     borderRadius: theme.radius.pill,
     overflow: 'hidden' as const,
-    marginTop: spacing.xs,
+    width: 160,
+    marginTop: spacing.md,
   },
-  legend: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: spacing.md, marginTop: spacing.xs },
-  legendItem: { gap: spacing.xs },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  actions: { gap: spacing.md },
-  action: { flex: 1 },
+
+  stats: { justifyContent: 'space-between' as const, paddingHorizontal: spacing.sm },
+  links: { justifyContent: 'center' as const, gap: spacing.xl },
 });

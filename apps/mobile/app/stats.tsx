@@ -1,10 +1,17 @@
 import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
-import { findExamLevel, getExaminedSkills, getLanguageProfile, getWeightedCardKinds, kindLabel } from '@language-srs/core';
+import { findExamLevel, getExaminedSkills, getLanguageProfile } from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
-import { Body, Caption, Chip, Heading, Panel, ProgressBar, Row, Screen, StatTile } from '../src/components/ui';
+import { Caption, DetailRow, Pill, ProgressBar, Row, Screen, Section, Stat, Title } from '../src/components/ui';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
 
+/**
+ * Progress.
+ *
+ * The detail the dashboard deliberately does not carry. Grouped by the question
+ * each part answers — how ready am I, what is coming, how am I doing — with space
+ * between the groups instead of a border around each one.
+ */
 export default function StatsScreen() {
   const { engine, revision } = useEngine();
   const theme = useTheme();
@@ -22,159 +29,111 @@ export default function StatsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, revision]);
 
-  const { profile, language, level, stats, readiness } = view;
-  const peakForecast = Math.max(1, ...stats.forecast.map((day) => day.due));
+  const { profile, level, stats, readiness } = view;
+  const peak = Math.max(1, ...stats.forecast.map((day) => day.due));
+  const scheduled = stats.forecast.reduce((total, day) => total + day.due, 0);
 
   return (
     <Screen>
-      <Panel>
-        <Heading>
-          {language.emoji} {level?.name}
-        </Heading>
-        <Caption>{readiness.headline}</Caption>
+      <View style={styles.headline}>
+        <Title>{Math.round(readiness.score * 100)}% ready</Title>
         <ProgressBar value={readiness.score} />
+        <Caption>{readiness.headline}</Caption>
+      </View>
 
-        <Row style={styles.tiles}>
-          <StatTile label="Readiness" value={`${Math.round(readiness.score * 100)}%`} />
-          <StatTile
-            label="Words known"
-            value={String(stats.coverage.entriesKnown)}
-            hint={`of ${stats.coverage.target.toLocaleString()} target`}
-          />
-          <StatTile
-            label="Days to exam"
-            value={readiness.daysToExam !== undefined ? String(Math.max(0, readiness.daysToExam)) : '—'}
-            hint={profile.examDate ?? 'no date set'}
-          />
-        </Row>
-      </Panel>
+      <Row style={styles.stats}>
+        <Stat label="known" value={String(stats.coverage.entriesKnown)} />
+        <Stat label="learning" value={String(stats.coverage.learningCards)} color={theme.colors.hard} />
+        <Stat label="in review" value={String(stats.coverage.reviewCards)} color={theme.colors.good} />
+        <Stat label="unseen" value={String(stats.coverage.newCards)} color={theme.colors.textMuted} />
+      </Row>
 
-      <Panel>
-        <Heading>Retention</Heading>
-        {stats.retention.reviews === 0 ? (
-          <Body muted>No graduated reviews yet. These figures appear once cards start coming back.</Body>
+      <Section title="Next two weeks">
+        {/* An all-zero chart renders as a row of stubs that look like data. Until
+            something is actually scheduled, say so instead of drawing it. */}
+        {scheduled === 0 ? (
+          <Caption>Nothing scheduled yet — reviews appear here once today&apos;s cards graduate.</Caption>
         ) : (
           <>
-            <Row style={styles.tiles}>
-              <StatTile
-                label="Actual"
-                value={`${Math.round(stats.retention.trueRetention * 100)}%`}
-                hint={`${stats.retention.reviews} reviews, 30d`}
-              />
-              <StatTile
-                label="Predicted"
-                value={`${Math.round(stats.retention.predictedRetention * 100)}%`}
-                hint="what the model expected"
-              />
-              <StatTile
-                label="Per card"
-                value={`${stats.retention.averageSecondsPerCard.toFixed(1)}s`}
-                hint="average"
-              />
-            </Row>
+            <View style={styles.chart}>
+              {stats.forecast.map((day) => (
+                <View key={day.day} style={styles.chartColumn}>
+                  <View style={styles.chartBarArea}>
+                    {day.due > 0 ? (
+                      <View
+                        style={[
+                          styles.chartBar,
+                          {
+                            height: `${(day.due / peak) * 100}%`,
+                            backgroundColor:
+                              day.due > profile.dailyReviewLimit ? theme.colors.warning : theme.colors.accent,
+                          },
+                        ]}
+                      />
+                    ) : null}
+                  </View>
+                  <Text style={styles.chartLabel}>{day.day.slice(8)}</Text>
+                </View>
+              ))}
+            </View>
+            <Caption>
+              {stats.forecast.some((day) => day.due > profile.dailyReviewLimit)
+                ? `Amber days exceed your ${profile.dailyReviewLimit}-review cap; the overflow rolls forward.`
+                : 'Reviews already scheduled. New cards are governed by your daily limit.'}
+            </Caption>
+          </>
+        )}
+      </Section>
+
+      <Section title="How it is going">
+        {stats.retention.reviews === 0 ? (
+          <Caption>No graduated reviews yet — these appear once cards start coming back.</Caption>
+        ) : (
+          <>
+            <DetailRow label="Recalled" value={`${Math.round(stats.retention.trueRetention * 100)}%`} />
+            <DetailRow label="Model predicted" value={`${Math.round(stats.retention.predictedRetention * 100)}%`} />
+            <DetailRow label="Seconds per card" value={stats.retention.averageSecondsPerCard.toFixed(1)} />
             <Caption>{describeCalibration(stats.retention.calibrationGap)}</Caption>
           </>
         )}
-      </Panel>
-
-      <Panel>
-        <Heading>Next two weeks</Heading>
-        <Caption>Reviews already scheduled. New cards are governed by your daily limit and are not counted here.</Caption>
-
-        <View style={styles.chart}>
-          {stats.forecast.map((day) => (
-            <View key={day.day} style={styles.chartColumn}>
-              <View style={styles.chartBarArea}>
-                <View
-                  style={[
-                    styles.chartBar,
-                    {
-                      height: `${(day.due / peakForecast) * 100}%`,
-                      backgroundColor: day.due > profile.dailyReviewLimit ? theme.colors.warning : theme.colors.accent,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={styles.chartLabel}>{day.day.slice(8)}</Text>
-            </View>
-          ))}
-        </View>
-
-        {stats.forecast.some((day) => day.due > profile.dailyReviewLimit) ? (
-          <Caption>
-            Days in amber exceed your {profile.dailyReviewLimit}-review cap; the overflow rolls forward.
-          </Caption>
-        ) : null}
-      </Panel>
-
-      <Panel>
-        <Heading>Card pipeline</Heading>
-        <Row style={styles.tiles}>
-          <StatTile label="Unseen" value={String(stats.coverage.newCards)} color={theme.colors.textMuted} />
-          <StatTile label="Learning" value={String(stats.coverage.learningCards)} color={theme.colors.hard} />
-          <StatTile label="In review" value={String(stats.coverage.reviewCards)} color={theme.colors.good} />
-          <StatTile
-            label="Leeches"
-            value={String(stats.coverage.leeches)}
-            color={stats.coverage.leeches > 0 ? theme.colors.danger : theme.colors.textMuted}
-          />
-        </Row>
+        <DetailRow label="Current streak" value={`${stats.streak.current} days`} />
+        <DetailRow label="Longest streak" value={`${stats.streak.longest} days`} />
         {stats.coverage.leeches > 0 ? (
-          <Caption>
-            Leeches have lapsed repeatedly. They are usually a sign the card is badly worded rather than the word being
-            hard — rewriting the gloss or adding a mnemonic works better than grinding them.
-          </Caption>
+          <>
+            <DetailRow label="Leeches" value={String(stats.coverage.leeches)} />
+            <Caption>
+              Leeches have lapsed repeatedly. Usually the card is badly worded rather than the word being hard —
+              rewriting the gloss beats grinding them.
+            </Caption>
+          </>
         ) : null}
-      </Panel>
-
-      <Panel>
-        <Heading>Streak</Heading>
-        <Row style={styles.tiles}>
-          <StatTile label="Current" value={String(stats.streak.current)} color={theme.colors.warning} />
-          <StatTile label="Longest" value={String(stats.streak.longest)} />
-          <StatTile label="Days studied" value={String(stats.streak.totalDays)} />
-        </Row>
-        <Caption>The study day rolls over at {profile.dayStartHour}:00, so a late-night session counts for the day it started.</Caption>
-      </Panel>
+      </Section>
 
       {level ? (
-        <Panel>
-          <Heading>What {level.shortName} actually tests</Heading>
+        <Section title={`What ${level.shortName} tests`}>
           <Row style={styles.wrap}>
             {getExaminedSkills(level).map((skill) => (
-              <Chip key={skill} label={skill.toUpperCase()} />
+              <Pill key={skill} label={skill} />
             ))}
           </Row>
-
-          <View style={styles.sections}>
-            {level.sections.map((section) => (
-              <Row key={section.id} style={styles.sectionRow}>
-                <Text style={styles.sectionName}>{section.name}</Text>
-                <Caption>
-                  {[
-                    section.questionCount ? `${section.questionCount} q` : undefined,
-                    section.maxScore ? `${section.maxScore} pts` : undefined,
-                    section.durationMinutes ? `${section.durationMinutes} min` : undefined,
-                    section.minimumScore ? `min ${section.minimumScore}` : undefined,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Caption>
-              </Row>
-            ))}
-          </View>
-
-          <Caption>Your sessions are weighted to match:</Caption>
-          <Row style={styles.wrap}>
-            {getWeightedCardKinds(level).map(({ kind, weight }) => (
-              <View key={kind} style={[styles.weightPill, { borderColor: theme.kindColors[kind] ?? theme.colors.accent }]}>
-                <Text style={[styles.weightLabel, { color: theme.kindColors[kind] ?? theme.colors.accent }]}>
-                  {kindLabel(kind)} ×{weight}
-                </Text>
-              </View>
-            ))}
-          </Row>
-        </Panel>
+          {level.sections.map((section) => (
+            <DetailRow
+              key={section.id}
+              label={section.name}
+              value={[
+                section.questionCount ? `${section.questionCount} q` : undefined,
+                section.maxScore ? `${section.maxScore} pts` : undefined,
+                section.durationMinutes ? `${section.durationMinutes} min` : undefined,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            />
+          ))}
+          {level.passingScore && level.totalScore ? (
+            <DetailRow label="Pass mark" value={`${level.passingScore} of ${level.totalScore}`} />
+          ) : null}
+          <Caption>Your sessions are weighted to match this mix.</Caption>
+        </Section>
       ) : null}
     </Screen>
   );
@@ -183,40 +142,25 @@ export default function StatsScreen() {
 /**
  * Turn the calibration gap into advice.
  *
- * The gap is what the model predicted minus what actually happened. Positive
- * means intervals are too long for this learner; sharply negative means they are
- * paying for retention they are not asking for.
+ * The gap is what the model predicted minus what actually happened. Positive means
+ * intervals are too long for this learner; sharply negative means they are paying
+ * for retention they are not asking for.
  */
 function describeCalibration(gap: number): string {
-  if (Math.abs(gap) < 0.05) return 'The scheduler is well calibrated to you — predictions match your results.';
+  if (Math.abs(gap) < 0.05) return 'The scheduler is well calibrated to you.';
   if (gap > 0) {
-    return `The scheduler is ${Math.round(gap * 100)} points optimistic. Raising target retention will shorten intervals.`;
+    return `The scheduler is ${Math.round(gap * 100)} points optimistic. Raising target retention shortens intervals.`;
   }
   return `You are recalling ${Math.round(-gap * 100)} points better than predicted. Lowering target retention would cut your daily load.`;
 }
 
 const createStyles = (theme: ResolvedTheme) => ({
-  tiles: { alignItems: 'flex-start' as const, marginTop: spacing.sm },
+  headline: { gap: spacing.sm },
+  stats: { justifyContent: 'space-between' as const },
   wrap: { flexWrap: 'wrap' as const, gap: spacing.sm },
-  chart: {
-    flexDirection: 'row' as const,
-    gap: 4,
-    height: 110,
-    alignItems: 'flex-end' as const,
-    marginTop: spacing.sm,
-  },
+  chart: { flexDirection: 'row' as const, gap: 4, height: 96, alignItems: 'flex-end' as const },
   chartColumn: { flex: 1, alignItems: 'center' as const, gap: 4, height: '100%' as const },
   chartBarArea: { flex: 1, width: '100%' as const, justifyContent: 'flex-end' as const },
-  chartBar: { width: '100%' as const, borderRadius: theme.radius.control, minHeight: 2 },
+  chartBar: { width: '100%' as const, borderRadius: theme.radius.pill, minHeight: 3 },
   chartLabel: { color: theme.colors.textFaint, fontSize: typography.micro },
-  sections: { gap: spacing.sm, marginTop: spacing.sm },
-  sectionRow: { justifyContent: 'space-between' as const },
-  sectionName: { color: theme.colors.text, fontSize: typography.body },
-  weightPill: {
-    borderWidth: 1,
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 3,
-  },
-  weightLabel: { fontSize: typography.micro, fontWeight: '700' as const },
 });

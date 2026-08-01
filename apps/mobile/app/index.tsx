@@ -3,15 +3,18 @@ import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   LANGUAGE_CODES,
+  getCulture,
   getExamTracksForLanguage,
   getLanguageProfile,
   getLanguageTheme,
+  getLevelSizes,
   getTeacher,
   type LanguageCode,
 } from '@language-srs/core';
 import { useAuth } from '../src/auth/AuthProvider';
 import { useEngine } from '../src/engine/EngineProvider';
 import { Caption, Screen } from '../src/components/ui';
+import { LanguageArt } from '../src/components/LanguageArt';
 import { TeacherAvatar } from '../src/components/Teacher';
 import { Press, Rise } from '../src/motion/components';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
@@ -130,28 +133,41 @@ function LanguageRow({ code, started, onPress }: { code: LanguageCode; started: 
   const styles = useThemedStyles(createStyles);
   const language = getLanguageProfile(code);
   const teacher = getTeacher(code);
+  const culture = getCulture(code);
   const accent = getLanguageTheme(code).colors.accent;
   const tracks = getExamTracksForLanguage(code).map((track) => track.name);
+  const words = Object.values(getLevelSizes(code)).reduce((total, count) => total + count, 0);
 
   return (
     <Press onPress={onPress} accessibilityRole="button" style={styles.languageRow}>
-      <TeacherAvatar teacher={teacher} size="large" />
+      {/* The place, drawn in that language's own ink. It sits above the text
+          rather than beside it because a strip of sky is what makes the row feel
+          like somewhere rather than an option in a list. */}
+      <View style={[styles.art, { backgroundColor: `${accent}0A` }]}>
+        <LanguageArt code={code} width={320} height={104} />
+      </View>
 
-      <View style={styles.languageText}>
-        <View style={styles.languageTitleRow}>
-          <Text style={styles.languageName}>{language.name}</Text>
-          <Text style={styles.endonym}>{language.endonym}</Text>
+      <View style={styles.languageBody}>
+        <TeacherAvatar teacher={teacher} size="large" />
+
+        <View style={styles.languageText}>
+          <View style={styles.languageTitleRow}>
+            <Text style={styles.languageName}>{language.name}</Text>
+            <Text style={styles.endonym}>{language.endonym}</Text>
+          </View>
+          <Text style={[styles.teacherName, { color: accent }]}>
+            {culture.cityLocal} · {culture.countryLocal}
+            {started ? ' · in progress' : ''}
+          </Text>
+          {/* Capped so four rows stay the same height; the full statement is the
+              teacher's, but the list is a choice, not a reading exercise. */}
+          <Text style={styles.methodLine} numberOfLines={3}>
+            {teacher.method}
+          </Text>
+          <Text style={styles.tracks}>
+            with {teacher.address} · {tracks.join(' / ')} · {words.toLocaleString()} words
+          </Text>
         </View>
-        <Text style={[styles.teacherName, { color: accent }]}>
-          with {teacher.address}
-          {started ? ' · in progress' : ''}
-        </Text>
-        {/* Capped so four rows stay the same height; the full statement is the
-            teacher's, but the list is a choice, not a reading exercise. */}
-        <Text style={styles.methodLine} numberOfLines={3}>
-          {teacher.method}
-        </Text>
-        <Text style={styles.tracks}>{tracks.join(' · ')}</Text>
       </View>
     </Press>
   );
@@ -263,11 +279,15 @@ const createStyles = (theme: ResolvedTheme) => ({
 
   languages: { gap: spacing.md },
   languageRow: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.card,
+    overflow: 'hidden' as const,
+  },
+  art: { alignItems: 'center' as const, justifyContent: 'flex-end' as const },
+  languageBody: {
     flexDirection: 'row' as const,
     gap: spacing.lg,
     alignItems: 'flex-start' as const,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.card,
     padding: spacing.lg,
   },
   languageText: { flex: 1, gap: 3 },

@@ -1,13 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import {
+  VOCABULARY_SOURCES,
   addDays,
   findExamTrack,
   getExamTracksForLanguage,
   getLanguageProfile,
+  getLevelSizes,
   suggestDailyNewLimit,
   toDateOnly,
 } from '@language-srs/core';
+import { useAuth } from '../src/auth/AuthProvider';
+import { useSync } from '../src/auth/SyncProvider';
 import { useEngine } from '../src/engine/EngineProvider';
 import { widgetBridge } from '../modules/widget-bridge';
 import { Caption, DetailRow, Row, Screen, Section, TextButton } from '../src/components/ui';
@@ -25,6 +29,8 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  */
 export default function SettingsScreen() {
   const { engine, revision, mutate } = useEngine();
+  const { status } = useAuth();
+  const { state: syncState } = useSync();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const code = engine.activeLanguage;
@@ -35,6 +41,8 @@ export default function SettingsScreen() {
   }, [engine, revision, code]);
 
   const language = getLanguageProfile(code);
+  const levelSizes = getLevelSizes(code);
+  const source = VOCABULARY_SOURCES[code];
   const tracks = getExamTracksForLanguage(code);
   const track = findExamTrack(profile.examTrackId);
 
@@ -67,6 +75,12 @@ export default function SettingsScreen() {
   return (
     <Screen>
       <Caption>Settings apply to {language.name}. Each language keeps its own.</Caption>
+
+      {/* Persistence made visible. Every control here writes to storage as it is
+          touched — there is no save button and never was — but a screen that
+          gives no sign of having kept anything invites people to wonder, and to
+          set the same thing twice. */}
+      <Caption>{describeStorage(status === 'signed-in', syncState)}</Caption>
 
       {tracks.length > 1 ? (
         <Section title="Exam">
@@ -107,6 +121,10 @@ export default function SettingsScreen() {
                   level.characterTarget ? ` · ${level.characterTarget.toLocaleString()} characters` : ''
                 }`}
               />
+              {/* What the app actually ships for this level, which is not the
+                  same number as the syllabus target and should not pretend to
+                  be. Cards are made from these words. */}
+              <DetailRow label="Words in the app" value={`${(levelSizes[level.id] ?? 0).toLocaleString()}`} />
               {track && !track.targetsAreOfficial ? (
                 <Caption>{track.authority} publishes no word list, so this is an estimate.</Caption>
               ) : null}
@@ -197,6 +215,12 @@ export default function SettingsScreen() {
         {/* The four themes share one ground and differ only in their ink, so this
             names the accent rather than a whole visual identity. */}
         <DetailRow label="Accent" value={theme.name} />
+        <DetailRow label="Word list" value={source.name} />
+        <Caption>
+          {source.official
+            ? `${source.licence}. Published by the examining body, so the levels here are exact.`
+            : `${source.licence}. No official list is published for this exam, so levels are derived and coverage is an estimate.`}
+        </Caption>
         {widgetBridge.isSupported ? (
           <TextButton
             label="Refresh home-screen widget"
@@ -213,6 +237,21 @@ export default function SettingsScreen() {
       </Section>
     </Screen>
   );
+}
+
+/** Where the settings on this screen have been written. */
+function describeStorage(signedIn: boolean, syncState: string): string {
+  if (!signedIn) return 'Saved on this device as you change them.';
+  switch (syncState) {
+    case 'syncing':
+      return 'Saved on this device · syncing to your account…';
+    case 'synced':
+      return 'Saved on this device and in your account.';
+    case 'offline':
+      return 'Saved on this device · your account will catch up when you are back online.';
+    default:
+      return 'Saved on this device as you change them.';
+  }
 }
 
 function Choice({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {

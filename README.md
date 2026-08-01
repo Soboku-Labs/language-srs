@@ -52,6 +52,25 @@ The check never grades. FSRS is driven by your own judgement of recall, and an a
 What the check does is reveal the card, say something specific about what happened, and
 outline the grade it would suggest.
 
+## The words are the syllabus
+
+Every level carries the examining body's own vocabulary, not a sample deck: **14,093
+words**, generated from the published lists by `tools/vocab/build.mjs` and committed.
+HSK's list is official and exact. The JLPT stopped publishing in 2010, so Japanese uses
+the community reconstruction everybody uses. TOPIK has never published one, so Korean
+levels are derived from the TOPIK and National Institute bands. Vietnamese has no list to
+derive from at all, so its levels are frequency bands — which is what the app already
+said it was doing.
+
+Tones are read off the spelling rather than trusted to a source: numeric pinyin for
+Mandarin, and the diacritics for Vietnamese, decomposed and read mark by mark. The tone
+drill is the one exercise where missing data teaches the opposite of the truth.
+
+Cards are made for a sliding window of about two hundred words ahead of you rather than
+for the whole syllabus at once — HSK 6 in scope is three thousand words, and nobody needs
+ten thousand cards in their pocket to study fifteen a day. Sources, licences and the
+derivations are in [docs/DATA.md](docs/DATA.md).
+
 ## Accounts, and what a session means
 
 Studying works signed out, on the device, as it always has. An account adds three
@@ -131,6 +150,12 @@ The design language is **Paper & Ink**: surfaces are sheets, colour is pigment a
 only where it means something, and motion explains rather than entertains. The full
 spec, including every motion pattern and the reasoning behind each, is in
 [docs/DESIGN.md](docs/DESIGN.md).
+
+Each language also gets a place and a drawing of it: a pagoda over Beijing rooftops, a
+torii with the mountain behind, hanok eaves under Seoul's towers, a junk under the karsts
+of Hạ Long. Line art rather than photographs, in that language's own ink, arriving in
+three strokes — sky, buildings, then the sun or the moon or the seal. Nobody learns
+Vietnamese because it is ISO 639-1 `vi`, and the interface should know that.
 
 Tonal languages get a tone ramp: each syllable of a Mandarin or Vietnamese word is
 coloured by its tone. Colour is part of the answer on a tone card, so the ramps are

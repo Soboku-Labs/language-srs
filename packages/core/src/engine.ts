@@ -1,4 +1,5 @@
 import { generateCards } from './cards/factory';
+import { getVocabularyEntries } from './data/vocab';
 import { findExamTrack, getExamTrack, getLevelIdsInScope } from './exams';
 import { buildStudyQueue, countTodaysWork, type StudyQueue } from './session/queue';
 import { DEFAULT_SCHEDULER_CONFIG, type SchedulerConfig } from './srs/params';
@@ -75,6 +76,29 @@ const MAX_RETAINED_LOGS = 20_000;
  */
 const MAX_RETAINED_SESSIONS = 5_000;
 
+/**
+ * How far ahead of the learner to make cards.
+ *
+ * Two hundred words is a fortnight of new material at the default of fifteen a
+ * day, and the window slides forward as words are started — so there is always
+ * more, and never ten thousand cards sitting in storage waiting to be synced.
+ */
+const ENTRY_WINDOW = 200;
+
+/**
+ * The bundled syllabuses, gathered once.
+ *
+ * A function rather than a constant so the four dataset files are only walked
+ * when an engine is actually built — a test driving the engine with three
+ * hand-written entries should not pay to expand eleven thousand.
+ */
+let bundled: LexicalEntry[] | undefined;
+
+function BUNDLED_VOCABULARY(): LexicalEntry[] {
+  bundled ??= LANGUAGE_CODES.flatMap((code) => getVocabularyEntries(code));
+  return bundled;
+}
+
 interface EngineMeta {
   version: number;
   activeLanguage: LanguageCode;
@@ -85,9 +109,12 @@ interface EngineMeta {
 export interface StudyEngineOptions {
   store: KeyValueStore;
   /**
-   * Vocabulary shipped with the app. Kept out of storage — it is the same on
-   * every device and would only bloat the blob — and merged with imported
-   * entries on load.
+   * Vocabulary shipped with the app.
+   *
+   * Defaults to the bundled per-level datasets — the actual syllabuses, eleven
+   * thousand words — and is overridable so a test can drive the engine with
+   * three. Kept out of storage either way: it is identical on every device and
+   * would only bloat the blob and the sync payload.
    */
   seedEntries?: LexicalEntry[];
   clock?: Clock;
@@ -304,8 +331,7 @@ export class StudyEngine {
       if (!profile) continue;
 
       const scope = getLevelIdsInScope(profile.targetLevelId);
-      const entries = [...this.entriesById.values()].filter((entry) => entry.languageCode === code);
-      const generated = generateCards(entries, scope, {
+      const generated = generateCards(this.entriesInBudget(code, scope), scope, {
         now: this.now(),
         existing: this.cards,
         ...(profile.enabledCardKinds ? { enabledCardKinds: profile.enabledCardKinds } : {}),
@@ -320,6 +346,40 @@ export class StudyEngine {
       this.cards = [...next.values()];
       await this.persistCards();
     }
+  }
+
+  /**
+   * The words to have cards for right now.
+   *
+   * Levels used to hold thirty hand-written words, so generating a card for
+   * every word in scope was free. They now hold five hundred, and HSK 6 has six
+   * levels beneath it — three thousand words, ten thousand cards, several
+   * megabytes of state to store and to sync, so that somebody can study fifteen
+   * words a day.
+   *
+   * So cards are made for a *window* of the syllabus rather than all of it:
+   * enough to always have new material, extended as the learner works through
+   * it. Nothing is lost by waiting — a card that does not exist yet has no
+   * memory state to keep — and the window is generous enough that a heavy day
+   * cannot exhaust it.
+   *
+   * Order is the syllabus's own: level by level, most frequent word first, which
+   * is the order anyone would choose to meet them in.
+   */
+  private entriesInBudget(code: LanguageCode, scope: string[]): LexicalEntry[] {
+    const inScope = scope.flatMap((levelId) =>
+      [...this.entriesById.values()]
+        .filter((entry) => entry.languageCode === code && entry.levelIds.includes(levelId))
+        .sort(
+          (a, b) => (a.frequencyRank ?? Number.MAX_SAFE_INTEGER) - (b.frequencyRank ?? Number.MAX_SAFE_INTEGER),
+        ),
+    );
+
+    const started = new Set(
+      this.cards.filter((card) => card.languageCode === code && card.reps > 0).map((card) => card.entryId),
+    );
+
+    return inScope.slice(0, ENTRY_WINDOW + started.size);
   }
 
   // ---------------------------------------------------------------- studying
@@ -611,7 +671,7 @@ export class StudyEngine {
    * words that were already there.
    */
   async importEntries(entries: LexicalEntry[]): Promise<{ added: number; replaced: number }> {
-    const bySeedId = new Set((this.options.seedEntries ?? []).map((entry) => entry.id));
+    const bySeedId = new Set((this.options.seedEntries ?? BUNDLED_VOCABULARY()).map((entry) => entry.id));
     const existing = new Map(this.importedEntries.map((entry) => [entry.id, entry]));
 
     let added = 0;
@@ -636,7 +696,9 @@ export class StudyEngine {
 
   private reindexEntries(): void {
     this.entriesById.clear();
-    for (const entry of this.options.seedEntries ?? []) this.entriesById.set(entry.id, entry);
+    for (const entry of this.options.seedEntries ?? BUNDLED_VOCABULARY()) {
+      this.entriesById.set(entry.id, entry);
+    }
     // Imported entries win, so a learner can correct a shipped definition.
     for (const entry of this.importedEntries) this.entriesById.set(entry.id, entry);
   }

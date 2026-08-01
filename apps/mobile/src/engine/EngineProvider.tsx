@@ -2,7 +2,6 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { AppState, type AppStateStatus } from 'react-native';
 import {
   PrefixedStore,
-  SEED_ENTRIES,
   StudyEngine,
   accountPrefix,
   type LanguageCode,
@@ -99,8 +98,10 @@ export function EngineProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const instance = await StudyEngine.create({
+          // No `seedEntries`: the engine defaults to the bundled syllabuses —
+          // the real HSK, JLPT, TOPIK and frequency lists — rather than the
+          // thirty hand-written words the app started with.
           store: new PrefixedStore(appStore, accountPrefix(accountId)),
-          seedEntries: SEED_ENTRIES,
           onStateChanged: async (self) => {
             bump();
             await publishToWidget(self);

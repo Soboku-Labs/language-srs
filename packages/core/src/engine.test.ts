@@ -10,6 +10,8 @@ import { DEFAULT_STUDY_PROFILE, type StudyProfile } from './types/card';
 import type { ReviewLog } from './types/review';
 import { addDays, fixedClock } from './utils/date';
 import { generateCards } from './cards/factory';
+import { getLevelIdsInScope } from './exams';
+import { getLevelEntries } from './data/vocab';
 import { MANDARIN_SEED } from './data/seed/mandarin';
 
 const NOW = '2026-03-01T09:00:00.000Z';
@@ -21,6 +23,13 @@ async function makeEngine(now = NOW) {
     seedEntries: SEED_ENTRIES,
     clock: fixedClock(now),
   });
+  return { engine, store };
+}
+
+/** An engine on the vocabulary the app actually ships, rather than the seeds. */
+async function makeShippedEngine(now = NOW) {
+  const store = new MemoryStore();
+  const engine = await StudyEngine.create({ store, clock: fixedClock(now) });
   return { engine, store };
 }
 
@@ -597,5 +606,60 @@ describe('per-account storage', () => {
 
     const scoped = new PrefixedStore(device, accountPrefix('user-1'));
     expect(await scoped.keys()).toEqual(['srs:v1:meta']);
+  });
+});
+
+describe('the card window', () => {
+  /**
+   * Levels hold five hundred words now rather than thirty, and HSK 6 has five
+   * levels beneath it. Generating a card for every word in scope would put ten
+   * thousand cards into storage — and into every sync — so that somebody can
+   * study fifteen a day.
+   */
+  it('makes cards for a window of the syllabus rather than all of it', async () => {
+    const { engine } = await makeShippedEngine();
+    await engine.updateProfile('zh', { targetLevelId: 'hsk3-6' });
+
+    const inScope = getLevelIdsInScope('hsk3-6').reduce(
+      (total, levelId) => total + getLevelEntries(levelId).length,
+      0,
+    );
+    const entriesWithCards = new Set(engine.getAllCards('zh').map((card) => card.entryId));
+
+    expect(inScope).toBeGreaterThan(2_000);
+    expect(entriesWithCards.size).toBeLessThan(inScope);
+    expect(entriesWithCards.size).toBeGreaterThan(100);
+  });
+
+  it('starts at the front of the syllabus, most frequent word first', async () => {
+    const { engine } = await makeShippedEngine();
+    const entryIds = new Set(engine.getAllCards('zh').map((card) => card.entryId));
+    const level = getLevelEntries('hsk3-1');
+
+    expect(entryIds.has(level[0]!.id)).toBe(true);
+    expect(entryIds.has(level[level.length - 1]!.id)).toBe(false);
+  });
+
+  /**
+   * The window has to move, or a learner who works through it finds the app
+   * empty with four hundred words of the level left unstudied.
+   */
+  it('extends as words are studied', async () => {
+    const { engine } = await makeShippedEngine();
+    const before = new Set(engine.getAllCards('zh').map((card) => card.entryId)).size;
+
+    for (const pair of engine.getQueue({ sessionLimit: 40 }).cards.slice(0, 30)) {
+      await engine.grade(pair.card.id, 3, {});
+    }
+    await engine.syncCards();
+
+    const after = new Set(engine.getAllCards('zh').map((card) => card.entryId)).size;
+    expect(after).toBeGreaterThan(before);
+  });
+
+  it('keeps the whole level available to the queue as the window advances', async () => {
+    const { engine } = await makeShippedEngine();
+    expect(engine.getQueue().cards.length).toBeGreaterThan(0);
+    expect(engine.getStats().coverage.newCards).toBeGreaterThan(0);
   });
 });

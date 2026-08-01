@@ -35,3 +35,4 @@ apps/server/.data/
 *.log
 npm-debug.log*
 yarn-error.log*
+tools/vocab/.cache/

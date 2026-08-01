@@ -1,4 +1,5 @@
 import { createApp } from './app.ts';
+import { VocabularyService } from './services/vocabulary.ts';
 import { JsonFileServerStore } from './store/json-file.ts';
 import { MemoryServerStore } from './store/memory.ts';
 import type { ServerStore } from './store/types.ts';
@@ -12,11 +13,13 @@ import type { ServerStore } from './store/types.ts';
  *
  *   PORT              4000
  *   DATA_DIR          .data            — set to "memory" for a disposable server
+ *   VOCAB_DIR         data/vocab       — the word lists this server hands out
  *   ALLOWED_ORIGINS   *                — comma-separated, e.g. https://example.com
  */
 const port = Number(process.env.PORT ?? 4000);
 const dataDir = process.env.DATA_DIR ?? '.data';
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '*').split(',').map((origin) => origin.trim());
+const vocabDir = process.env.VOCAB_DIR ?? 'data/vocab';
 
 /**
  * Open the store, or refuse to start.
@@ -37,11 +40,22 @@ try {
   process.exit(1);
 }
 
-const app = createApp({ store, allowedOrigins });
+/**
+ * The word lists, read once into memory.
+ *
+ * 1.7MB of read-only data that every client wants and nothing ever writes —
+ * the one shape where holding it in memory is simply correct. Missing files are
+ * survivable and logged: this server's other job is accounts, and refusing to
+ * start over a word list would take sign-in down with it.
+ */
+const vocabulary = await VocabularyService.load(vocabDir);
+
+const app = createApp({ store, vocabulary, allowedOrigins });
 
 app.listen(port, () => {
   console.log(`[api] listening on http://localhost:${port}`);
   console.log(`[api] accounts in ${dataDir === 'memory' ? 'memory (nothing is kept)' : dataDir}`);
+  console.log(`[api] vocabulary from ${vocabDir}`);
 });
 
 // A container stop should close connections rather than have them cut.

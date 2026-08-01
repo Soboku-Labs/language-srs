@@ -30,6 +30,11 @@ RUN npm install --global tsx@4.23.1
 COPY packages/core packages/core
 COPY apps/server apps/server
 
+# The word lists this server hands out. They are the reason the app bundle is
+# half the size it was: 1.7MB that used to ship to every phone now sits here and
+# is fetched a level at a time.
+COPY data/vocab data/vocab
+
 # What `npm install` would have created for the workspace, made explicitly.
 # Without it `@language-srs/core` resolves to nothing: Node walks up from the
 # importing file looking for node_modules, and in this image there is none.
@@ -42,6 +47,7 @@ ENV PORT=4000
 # lives in the container's writable layer and goes when the container does —
 # see docs/API.md, which says so in the place somebody deploying will read.
 ENV DATA_DIR=/data
+ENV VOCAB_DIR=/app/data/vocab
 
 EXPOSE 4000
 

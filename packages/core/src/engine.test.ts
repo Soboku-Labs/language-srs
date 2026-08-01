@@ -10,8 +10,8 @@ import { DEFAULT_STUDY_PROFILE, type StudyProfile } from './types/card';
 import type { ReviewLog } from './types/review';
 import { addDays, fixedClock } from './utils/date';
 import { generateCards } from './cards/factory';
+import { makeEntry } from './data/helpers';
 import { getLevelIdsInScope } from './exams';
-import { getLevelEntries } from './data/vocab';
 import { MANDARIN_SEED } from './data/seed/mandarin';
 
 const NOW = '2026-03-01T09:00:00.000Z';
@@ -26,12 +26,7 @@ async function makeEngine(now = NOW) {
   return { engine, store };
 }
 
-/** An engine on the vocabulary the app actually ships, rather than the seeds. */
-async function makeShippedEngine(now = NOW) {
-  const store = new MemoryStore();
-  const engine = await StudyEngine.create({ store, clock: fixedClock(now) });
-  return { engine, store };
-}
+
 
 describe('engine lifecycle', () => {
   it('creates a default profile and cards on first run', async () => {
@@ -609,6 +604,29 @@ describe('per-account storage', () => {
   });
 });
 
+/**
+ * A level's worth of generated words.
+ *
+ * The window tests used to lean on the bundled datasets. Those now live on the
+ * server, and a domain test reaching for a file the domain no longer ships would
+ * be testing the wrong layer — so the fixture states its own shape: five hundred
+ * words a level, ranked by frequency, exactly as the API serves them.
+ */
+function levelVocabulary(levelId: string, code: 'zh' = 'zh', size = 500) {
+  return Array.from({ length: size }, (_, index) =>
+    makeEntry({
+      id: `${levelId}-${index}`,
+      lang: code,
+      target: `词${levelId}${index}`,
+      reading: `ci${index}`,
+      meanings: [`word ${index}`],
+      levels: [levelId],
+      tones: [2],
+      rank: index + 1,
+    }),
+  );
+}
+
 describe('the card window', () => {
   /**
    * Levels hold five hundred words now rather than thirty, and HSK 6 has five
@@ -617,25 +635,25 @@ describe('the card window', () => {
    * study fifteen a day.
    */
   it('makes cards for a window of the syllabus rather than all of it', async () => {
-    const { engine } = await makeShippedEngine();
+    const { engine } = await makeEngine();
+    const inScope = getLevelIdsInScope('hsk3-6').flatMap((levelId) => levelVocabulary(levelId));
+
+    await engine.setVocabulary(inScope);
     await engine.updateProfile('zh', { targetLevelId: 'hsk3-6' });
 
-    const inScope = getLevelIdsInScope('hsk3-6').reduce(
-      (total, levelId) => total + getLevelEntries(levelId).length,
-      0,
-    );
     const entriesWithCards = new Set(engine.getAllCards('zh').map((card) => card.entryId));
 
-    expect(inScope).toBeGreaterThan(2_000);
-    expect(entriesWithCards.size).toBeLessThan(inScope);
+    expect(inScope.length).toBeGreaterThan(2_000);
+    expect(entriesWithCards.size).toBeLessThan(inScope.length);
     expect(entriesWithCards.size).toBeGreaterThan(100);
   });
 
   it('starts at the front of the syllabus, most frequent word first', async () => {
-    const { engine } = await makeShippedEngine();
-    const entryIds = new Set(engine.getAllCards('zh').map((card) => card.entryId));
-    const level = getLevelEntries('hsk3-1');
+    const { engine } = await makeEngine();
+    const level = levelVocabulary('hsk3-1');
+    await engine.setVocabulary(level);
 
+    const entryIds = new Set(engine.getAllCards('zh').map((card) => card.entryId));
     expect(entryIds.has(level[0]!.id)).toBe(true);
     expect(entryIds.has(level[level.length - 1]!.id)).toBe(false);
   });
@@ -645,7 +663,8 @@ describe('the card window', () => {
    * empty with four hundred words of the level left unstudied.
    */
   it('extends as words are studied', async () => {
-    const { engine } = await makeShippedEngine();
+    const { engine } = await makeEngine();
+    await engine.setVocabulary(levelVocabulary('hsk3-1'));
     const before = new Set(engine.getAllCards('zh').map((card) => card.entryId)).size;
 
     for (const pair of engine.getQueue({ sessionLimit: 40 }).cards.slice(0, 30)) {
@@ -657,9 +676,26 @@ describe('the card window', () => {
     expect(after).toBeGreaterThan(before);
   });
 
-  it('keeps the whole level available to the queue as the window advances', async () => {
-    const { engine } = await makeShippedEngine();
+  /**
+   * The starter deck is what a first launch studies from while the real
+   * syllabus is still downloading, so it has to produce a usable queue on its
+   * own.
+   */
+  it('has something to study before any vocabulary has been downloaded', async () => {
+    const { engine } = await makeEngine();
     expect(engine.getQueue().cards.length).toBeGreaterThan(0);
-    expect(engine.getStats().coverage.newCards).toBeGreaterThan(0);
+  });
+
+  it('replaces the starter deck with the downloaded level, keeping history', async () => {
+    const { engine } = await makeEngine();
+    const pair = engine.getQueue().cards[0]!;
+    await engine.grade(pair.card.id, 3, {});
+
+    await engine.setVocabulary(levelVocabulary('hsk3-1'));
+
+    // The graded card survives the swap: cards are keyed by entry, and
+    // `syncCards` only ever adds.
+    expect(engine.getAllCards('zh').find((card) => card.id === pair.card.id)?.reps).toBe(1);
+    expect(engine.getQueue().cards.length).toBeGreaterThan(0);
   });
 });

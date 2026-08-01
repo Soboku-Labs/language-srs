@@ -5,10 +5,19 @@ import { ApiError } from './http/errors.ts';
 import { Router, readJsonBody, type RouteContext, type RouteResult } from './http/router.ts';
 import { AuthService, toPublicUser } from './services/auth.ts';
 import { StateConflictError, StateService } from './services/state.ts';
+import type { VocabularyService } from './services/vocabulary.ts';
 import type { ServerStore, SessionRecord, UserRecord } from './store/types.ts';
 
 export interface AppOptions {
   store: ServerStore;
+  /**
+   * The word lists.
+   *
+   * Optional: an API with no vocabulary still serves accounts, and clients fall
+   * back to the starter deck they carry. Tests that only care about auth leave
+   * it out.
+   */
+  vocabulary?: VocabularyService;
   now?: () => Date;
   /**
    * Origins allowed to call this API from a browser.
@@ -153,6 +162,59 @@ export function createApp(options: AppOptions): Server {
     return { status: 200, body: { sessions: merged } };
   });
 
+  // ------------------------------------------------------------- vocabulary
+  //
+  // Public and unauthenticated on purpose: a published word list is the same for
+  // everybody, and requiring a token to read it would mean a learner cannot see
+  // the syllabus until they have an account.
+
+  const vocabulary = options.vocabulary;
+
+  const requireVocabulary = (): VocabularyService => {
+    if (!vocabulary) throw new ApiError(404, 'not_found', 'This server has no vocabulary loaded.');
+    return vocabulary;
+  };
+
+  router.get('/vocabulary', async () => ({
+    status: 200,
+    body: requireVocabulary().manifest,
+    cache: 'short' as const,
+  }));
+
+  router.get('/vocabulary/:levelId', async (context) => {
+    const service = requireVocabulary();
+    const levelId = context.params.levelId!;
+    const { languageCode, entries } = service.level(levelId);
+
+    return {
+      status: 200,
+      body: { levelId, languageCode, version: service.version, entries },
+      // Immutable for a given version, and the version is a hash of the content,
+      // so a rebuilt dataset invalidates every cached copy without a manual bump.
+      cache: 'immutable' as const,
+      etag: `"${service.version}-${levelId}"`,
+    };
+  });
+
+  /**
+   * Several levels in one request.
+   *
+   * A learner targeting HSK 4 needs four levels, and four separate requests to a
+   * sleeping free-tier server is four chances for one of them to be the slow one.
+   */
+  router.get('/vocabulary-levels', async (context) => {
+    const service = requireVocabulary();
+    const requested = (context.query.get('ids') ?? '').split(',').filter(Boolean);
+    if (requested.length === 0) throw new ApiError(400, 'bad_request', 'Pass ?ids=level-1,level-2.');
+
+    return {
+      status: 200,
+      body: { version: service.version, levels: service.levels(requested) },
+      cache: 'immutable' as const,
+      etag: `"${service.version}-${requested.join('-')}"`,
+    };
+  });
+
   return createServer((request, response) => {
     void handle(request, response, router, limits, allowedOrigins);
   });
@@ -176,9 +238,11 @@ async function handle(
     response.setHeader('Access-Control-Allow-Origin', allowOrigin);
     response.setHeader('Vary', 'Origin');
   }
-  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, If-None-Match');
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  // Tokens and account state: never anybody's to cache.
+  response.setHeader('Access-Control-Expose-Headers', 'ETag');
+  // Tokens and account state are never anybody's to cache. The routes that serve
+  // public reference data say otherwise for themselves, below.
   response.setHeader('Cache-Control', 'no-store');
 
   if (request.method === 'OPTIONS') {
@@ -211,6 +275,22 @@ async function handle(
       query: url.searchParams,
       body,
     });
+
+    if (result.cache === 'immutable') {
+      response.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+    } else if (result.cache === 'short') {
+      response.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+
+    if (result.etag) {
+      response.setHeader('ETag', result.etag);
+      // A device that already holds this level asks with the tag it has and gets
+      // a few bytes back instead of half a megabyte.
+      if (request.headers['if-none-match'] === result.etag) {
+        response.writeHead(304).end();
+        return;
+      }
+    }
 
     if (result.status === 204 || result.body === undefined) {
       response.writeHead(result.status).end();

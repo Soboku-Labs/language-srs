@@ -66,6 +66,13 @@ Tones are read off the spelling rather than trusted to a source: numeric pinyin 
 Mandarin, and the diacritics for Vietnamese, decomposed and read mark by mark. The tone
 drill is the one exercise where missing data teaches the opposite of the truth.
 
+**The words are served, not shipped.** They used to be compiled into the app — 1.7MB sent
+to a phone on install and again on every update — which was most of a 4.1MB bundle. The
+API serves them a level at a time now, cached on the device against a version that is a
+hash of the dataset, and the bundle is 2.2MB. A learner on HSK 2 downloads two levels,
+not nine; a device that already has them asks and gets a 304. With no server reachable
+the app falls back to a bundled starter deck and still works.
+
 Cards are made for a sliding window of about two hundred words ahead of you rather than
 for the whole syllabus at once — HSK 6 in scope is three thousand words, and nobody needs
 ten thousand cards in their pocket to study fifteen a day. Sources, licences and the

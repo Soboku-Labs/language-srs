@@ -26,6 +26,16 @@ export interface RouteContext {
 export interface RouteResult {
   status: number;
   body?: unknown;
+  /**
+   * How long this response may be kept.
+   *
+   * Everything about an account is `no-store`, and that is the default. Only the
+   * published word lists opt out: they are public, identical for everybody, and
+   * change when a commit lands rather than while somebody is studying.
+   */
+  cache?: 'immutable' | 'short';
+  /** Strong validator, so a repeat request costs a 304 rather than the payload. */
+  etag?: string;
 }
 
 export type RouteHandler = (context: RouteContext) => Promise<RouteResult>;

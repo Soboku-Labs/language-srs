@@ -1,5 +1,5 @@
 import { generateCards } from './cards/factory';
-import { getVocabularyEntries } from './data/vocab';
+import { SEED_ENTRIES } from './data/seed';
 import { findExamTrack, getExamTrack, getLevelIdsInScope } from './exams';
 import { buildStudyQueue, countTodaysWork, type StudyQueue } from './session/queue';
 import { DEFAULT_SCHEDULER_CONFIG, type SchedulerConfig } from './srs/params';
@@ -85,19 +85,7 @@ const MAX_RETAINED_SESSIONS = 5_000;
  */
 const ENTRY_WINDOW = 200;
 
-/**
- * The bundled syllabuses, gathered once.
- *
- * A function rather than a constant so the four dataset files are only walked
- * when an engine is actually built — a test driving the engine with three
- * hand-written entries should not pay to expand eleven thousand.
- */
-let bundled: LexicalEntry[] | undefined;
 
-function BUNDLED_VOCABULARY(): LexicalEntry[] {
-  bundled ??= LANGUAGE_CODES.flatMap((code) => getVocabularyEntries(code));
-  return bundled;
-}
 
 interface EngineMeta {
   version: number;
@@ -109,12 +97,16 @@ interface EngineMeta {
 export interface StudyEngineOptions {
   store: KeyValueStore;
   /**
-   * Vocabulary shipped with the app.
+   * Vocabulary to start with.
    *
-   * Defaults to the bundled per-level datasets — the actual syllabuses, eleven
-   * thousand words — and is overridable so a test can drive the engine with
-   * three. Kept out of storage either way: it is identical on every device and
-   * would only bloat the blob and the sync payload.
+   * Defaults to the starter decks — about thirty words per language, bundled, so
+   * a first launch with no network still has something to study. The real
+   * syllabuses arrive from the API a level at a time and are handed over with
+   * `setVocabulary`.
+   *
+   * Kept out of storage either way: it is the same on every device, and putting
+   * it in the blob would mean syncing fourteen thousand words between two phones
+   * that both already have them.
    */
   seedEntries?: LexicalEntry[];
   clock?: Clock;
@@ -140,6 +132,15 @@ export class StudyEngine {
   private importedEntries: LexicalEntry[];
   private pending: PendingWidgetGrade[];
   private sessions: StudySessionRecord[];
+  /**
+   * Vocabulary handed in at runtime, from the API.
+   *
+   * Deliberately not persisted. It is public reference data that every device
+   * can fetch and cache for itself; writing it into the account blob would sync
+   * the syllabus between two phones that both already have it, and grow the
+   * payload by a megabyte to say nothing new.
+   */
+  private vocabulary: LexicalEntry[] = [];
   private readonly entriesById = new Map<string, LexicalEntry>();
   private readonly clock: Clock;
 
@@ -245,6 +246,26 @@ export class StudyEngine {
 
   get entries(): Map<string, LexicalEntry> {
     return this.entriesById;
+  }
+
+  /**
+   * Supply the downloaded syllabus.
+   *
+   * Called by the app once the levels in scope have been fetched or read from
+   * its cache. Replaces rather than merges, so a level going out of scope stops
+   * generating cards — the cards already made for it keep their history, because
+   * `syncCards` only ever adds.
+   */
+  async setVocabulary(entries: LexicalEntry[]): Promise<void> {
+    this.vocabulary = entries;
+    this.reindexEntries();
+    await this.syncCards();
+    await this.notifyChanged();
+  }
+
+  /** How many words the engine currently knows about, for the settings screen. */
+  get vocabularySize(): number {
+    return this.entriesById.size;
   }
 
   // ---------------------------------------------------------------- profiles
@@ -671,7 +692,7 @@ export class StudyEngine {
    * words that were already there.
    */
   async importEntries(entries: LexicalEntry[]): Promise<{ added: number; replaced: number }> {
-    const bySeedId = new Set((this.options.seedEntries ?? BUNDLED_VOCABULARY()).map((entry) => entry.id));
+    const bySeedId = new Set((this.options.seedEntries ?? SEED_ENTRIES).map((entry) => entry.id));
     const existing = new Map(this.importedEntries.map((entry) => [entry.id, entry]));
 
     let added = 0;
@@ -696,9 +717,9 @@ export class StudyEngine {
 
   private reindexEntries(): void {
     this.entriesById.clear();
-    for (const entry of this.options.seedEntries ?? BUNDLED_VOCABULARY()) {
-      this.entriesById.set(entry.id, entry);
-    }
+    for (const entry of this.options.seedEntries ?? SEED_ENTRIES) this.entriesById.set(entry.id, entry);
+    // Downloaded levels win over the starter deck: same words, better data.
+    for (const entry of this.vocabulary) this.entriesById.set(entry.id, entry);
     // Imported entries win, so a learner can correct a shipped definition.
     for (const entry of this.importedEntries) this.entriesById.set(entry.id, entry);
   }

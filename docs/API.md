@@ -17,6 +17,7 @@ npm run server:test   # 60 tests over auth, storage and the HTTP surface
 | --- | --- | --- |
 | `PORT` | `4000` | |
 | `DATA_DIR` | `.data` | `memory` for a disposable server that keeps nothing |
+| `VOCAB_DIR` | `data/vocab` | The word lists to serve; missing is survivable |
 | `ALLOWED_ORIGINS` | `*` | Comma-separated; set it to your app's origin in production |
 
 The app finds the API through `EXPO_PUBLIC_API_URL`, inlined at build time:
@@ -46,6 +47,9 @@ All bodies are JSON. Authenticated routes take `Authorization: Bearer <token>`.
 | `PUT` | `/state` | `{ baseRevision, device, values }` → `{ revision, updatedAt }`, or 409 |
 | `GET` | `/study-sessions` | Every recorded sitting |
 | `POST` | `/study-sessions` | One sitting or `{ sessions: [...] }`; merged by id |
+| `GET` | `/vocabulary` | Manifest: dataset version, level sizes, sources. **No auth** |
+| `GET` | `/vocabulary/:levelId` | One level's words. **No auth**, immutable, ETagged |
+| `GET` | `/vocabulary-levels?ids=a,b` | Up to twelve levels at once. **No auth** |
 
 Errors are `{ error, message }` with a code from `AuthErrorCode` in
 `@language-srs/core`. The message is written for a learner and the app shows it
@@ -82,6 +86,32 @@ a locked-out learner their evening.
 strings. Teaching the API about cards and FSRS stability would mean every change
 to the domain needing a matching migration in a service that has no opinion about
 any of it.
+
+## The word lists
+
+The three vocabulary routes are the only unauthenticated ones besides `/health`,
+and the only ones that may be cached. Both follow from what they serve: a
+published word list is public, identical for everybody, and changes when a
+scraper runs and a commit lands rather than while somebody is studying.
+
+- **Unauthenticated**, because requiring a token to read a syllabus would mean a
+  learner cannot see what they would be studying until they have an account.
+- **`public, max-age=604800, immutable`**, with a strong ETag. The version in the
+  tag is a SHA-256 of the dataset files, so rebuilding them invalidates every
+  cached copy on every device without anybody remembering to bump a number — and
+  a device that already holds HSK 1 gets a 304 rather than 70KB.
+- **Held in memory** by the server: 1.7MB of read-only data that every client
+  wants and nothing ever writes is the one shape where a cache is simply correct.
+
+This is what took the app bundle from 4.1MB to 2.2MB. The words used to be
+compiled in — every level of every language, shipped to a phone on install and
+again on every update, so that somebody could study fifteen a day. The client
+now fetches the levels in scope, caches them keyed by dataset version, and falls
+back to a bundled starter deck when there is no server to ask.
+
+A server with no `VOCAB_DIR` still runs: it serves accounts, answers the
+vocabulary routes with 404, and clients keep the starter deck. Accounts and
+syllabuses are separate jobs and one should not take the other down.
 
 ## What sync guarantees, and what it does not
 

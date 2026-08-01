@@ -13,6 +13,8 @@ import {
 import { useEngine } from '../src/engine/EngineProvider';
 import { BigButton, Caption, Row, Screen, Stat, TextButton, Title } from '../src/components/ui';
 import { LanguageArt } from '../src/components/LanguageArt';
+import { CountSkeleton } from '../src/components/Skeleton';
+import { useVocabulary } from '../src/vocabulary/VocabularyProvider';
 import { TeacherAvatar, TeacherNote } from '../src/components/Teacher';
 import { CountUp, Press, Rise } from '../src/motion/components';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
@@ -30,6 +32,7 @@ import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } fr
  */
 export default function Dashboard() {
   const { engine, revision } = useEngine();
+  const { loading: loadingLanguages } = useVocabulary();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
@@ -84,8 +87,14 @@ export default function Dashboard() {
         <LanguageArt code={profile.languageCode} width={320} height={110} />
       </Rise>
 
+      {/* The count is the answer this screen exists to give, and until the
+          level has arrived it would be the starter deck's answer rather than
+          the syllabus's. A skeleton of the same size says "this number is
+          coming" without showing a number that is about to change. */}
       <Rise index={2} style={styles.hero}>
-        {waiting > 0 ? (
+        {loadingLanguages.has(profile.languageCode) ? (
+          <CountSkeleton />
+        ) : waiting > 0 ? (
           <>
             <CountUp value={waiting} style={styles.count} />
             <Text style={styles.countLabel}>{waiting === 1 ? 'card waiting' : 'cards waiting'}</Text>

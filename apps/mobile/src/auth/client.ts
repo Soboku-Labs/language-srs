@@ -7,6 +7,8 @@ import type {
   AuthSessionInfo,
   PublicUser,
   StudySessionRecord,
+  VocabularyLevel,
+  VocabularyManifest,
 } from '@language-srs/core';
 
 /**
@@ -151,6 +153,21 @@ export class ApiClient {
 
   pushStudySessions(token: string, sessions: StudySessionRecord[]): Promise<{ sessions: StudySessionRecord[] }> {
     return this.request('POST', '/study-sessions', { token, body: { sessions } });
+  }
+
+  // ---------------------------------------------------------------- vocabulary
+  //
+  // Unauthenticated, because the word lists are public — and cached hard by the
+  // server, so the second device to ask this week gets a 304.
+
+  getVocabularyManifest(): Promise<VocabularyManifest> {
+    return this.request('GET', '/vocabulary');
+  }
+
+  getVocabularyLevel(levelId: string): Promise<VocabularyLevel> {
+    // A level is half a megabyte at worst and arrives over whatever connection a
+    // phone has, so it gets longer than the default.
+    return this.request('GET', `/vocabulary/${encodeURIComponent(levelId)}`, { timeoutMs: 30_000 });
   }
 
   // ---------------------------------------------------------------- plumbing

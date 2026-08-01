@@ -7,7 +7,6 @@ import {
   getExamTracksForLanguage,
   getLanguageProfile,
   getLanguageTheme,
-  getLevelSizes,
   getTeacher,
   type LanguageCode,
 } from '@language-srs/core';
@@ -15,6 +14,8 @@ import { useAuth } from '../src/auth/AuthProvider';
 import { useEngine } from '../src/engine/EngineProvider';
 import { Caption, Screen } from '../src/components/ui';
 import { LanguageArt } from '../src/components/LanguageArt';
+import { Spinner } from '../src/components/Skeleton';
+import { useVocabulary } from '../src/vocabulary/VocabularyProvider';
 import { TeacherAvatar } from '../src/components/Teacher';
 import { Press, Rise } from '../src/motion/components';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
@@ -35,6 +36,7 @@ import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } fr
 export default function Landing() {
   const { engine, revision, setActiveLanguage } = useEngine();
   const { user } = useAuth();
+  const vocabulary = useVocabulary();
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
 
@@ -105,7 +107,14 @@ export default function Landing() {
         </Rise>
         {LANGUAGE_CODES.map((code, index) => (
           <Rise key={code} index={4 + index}>
-            <LanguageRow code={code} started={state.started.has(code)} onPress={() => void open(code)} />
+            <LanguageRow
+              code={code}
+              started={state.started.has(code)}
+              words={vocabulary.wordCount(code)}
+              loading={vocabulary.loading.has(code)}
+              offline={vocabulary.unavailable.has(code)}
+              onPress={() => void open(code)}
+            />
           </Rise>
         ))}
       </View>
@@ -129,14 +138,28 @@ export default function Landing() {
  * is the teacher's own — it is the thing that makes this a choice rather than a
  * menu of flags.
  */
-function LanguageRow({ code, started, onPress }: { code: LanguageCode; started: boolean; onPress: () => void }) {
+function LanguageRow({
+  code,
+  started,
+  words,
+  loading,
+  offline,
+  onPress,
+}: {
+  code: LanguageCode;
+  started: boolean;
+  /** Words the server says this language has, once the manifest has arrived. */
+  words?: number;
+  loading: boolean;
+  offline: boolean;
+  onPress: () => void;
+}) {
   const styles = useThemedStyles(createStyles);
   const language = getLanguageProfile(code);
   const teacher = getTeacher(code);
   const culture = getCulture(code);
   const accent = getLanguageTheme(code).colors.accent;
   const tracks = getExamTracksForLanguage(code).map((track) => track.name);
-  const words = Object.values(getLevelSizes(code)).reduce((total, count) => total + count, 0);
 
   return (
     <Press onPress={onPress} accessibilityRole="button" style={styles.languageRow}>
@@ -164,9 +187,24 @@ function LanguageRow({ code, started, onPress }: { code: LanguageCode; started: 
           <Text style={styles.methodLine} numberOfLines={3}>
             {teacher.method}
           </Text>
-          <Text style={styles.tracks}>
-            with {teacher.address} · {tracks.join(' / ')} · {words.toLocaleString()} words
-          </Text>
+
+          {/* The word count is the one thing on this row that comes from the
+              server, so it is the one thing that can be pending. A spinner in
+              its place rather than a jumping number: the row is otherwise
+              complete, and replacing the whole thing with a skeleton would be
+              furniture for a fact that fits in six characters. */}
+          <View style={styles.trackRow}>
+            <Text style={styles.tracks}>
+              with {teacher.address} · {tracks.join(' / ')}
+            </Text>
+            {loading ? (
+              <Spinner color={accent} size={12} />
+            ) : (
+              <Text style={styles.tracks}>
+                {offline ? '· starter deck' : words ? `· ${words.toLocaleString()} words` : ''}
+              </Text>
+            )}
+          </View>
         </View>
       </View>
     </Press>
@@ -297,6 +335,7 @@ const createStyles = (theme: ResolvedTheme) => ({
   teacherName: { fontSize: typography.caption, fontWeight: '600' as const },
   methodLine: { color: theme.colors.textMuted, fontSize: typography.caption, lineHeight: 19 },
   tracks: { color: theme.colors.textFaint, fontSize: typography.micro, paddingTop: 2 },
+  trackRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.sm },
 
   resume: {
     flexDirection: 'row' as const,

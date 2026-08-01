@@ -2,8 +2,12 @@
 
 The app ships **14,093 words** across four languages, keyed by exam level. They are
 not hand-written: they come from the published word lists, normalised by a scraper in
-`tools/vocab/` whose output is committed — so a clone studies without touching the
-network, and a syllabus change arrives as a diff somebody can review.
+`tools/vocab/` whose output is committed to `data/vocab/` — so a syllabus change arrives
+as a diff somebody can review.
+
+They are **served by the API rather than bundled into the app**: `data/vocab/` is read by
+the server at startup and handed out a level at a time. That is what took the app bundle
+from 4.1MB to 2.2MB. See [API.md](API.md) for the routes and their caching.
 
 ```bash
 node tools/vocab/build.mjs         # rebuild everything

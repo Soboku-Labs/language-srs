@@ -33,6 +33,10 @@ services:
     envVars:
       - key: DATA_DIR
         value: /data
+      # The word lists, baked into the image. Read-only, so the ephemeral disk
+      # is not a problem for them the way it is for accounts.
+      - key: VOCAB_DIR
+        value: /app/data/vocab
       # Set this to the origin the app is served from. GitHub Pages serves this
       # project at https://soboku-labs.github.io/language-srs/, whose *origin*
       # is the host alone — no path.

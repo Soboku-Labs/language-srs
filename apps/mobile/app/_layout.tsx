@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/auth/AuthProvider';
 import { SyncProvider } from '../src/auth/SyncProvider';
 import { EngineProvider } from '../src/engine/EngineProvider';
+import { VocabularyProvider } from '../src/vocabulary/VocabularyProvider';
 import { ThemeProvider, useTheme } from '../src/theme';
 import { ThemeFade } from '../src/motion/components';
 
@@ -17,17 +18,24 @@ import { ThemeFade } from '../src/motion/components';
  * filtering it. Sync sits inside both because it needs the token from one and
  * the state from the other, and theme inside the engine because the palette
  * follows the active language.
+ *
+ * Vocabulary sits inside the engine because it feeds it: the word lists come
+ * from the API a level at a time and are handed over as they arrive. The engine
+ * never waits for them — it starts on the bundled starter deck, so a first
+ * launch with no network is a smaller app rather than a broken one.
  */
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <EngineProvider>
-          <SyncProvider>
-            <ThemeProvider>
-              <ThemedNavigator />
-            </ThemeProvider>
-          </SyncProvider>
+          <VocabularyProvider>
+            <SyncProvider>
+              <ThemeProvider>
+                <ThemedNavigator />
+              </ThemeProvider>
+            </SyncProvider>
+          </VocabularyProvider>
         </EngineProvider>
       </AuthProvider>
     </SafeAreaProvider>

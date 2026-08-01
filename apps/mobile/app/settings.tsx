@@ -6,12 +6,12 @@ import {
   findExamTrack,
   getExamTracksForLanguage,
   getLanguageProfile,
-  getLevelSizes,
   suggestDailyNewLimit,
   toDateOnly,
 } from '@language-srs/core';
 import { useAuth } from '../src/auth/AuthProvider';
 import { useSync } from '../src/auth/SyncProvider';
+import { useVocabulary } from '../src/vocabulary/VocabularyProvider';
 import { useEngine } from '../src/engine/EngineProvider';
 import { widgetBridge } from '../modules/widget-bridge';
 import { Caption, DetailRow, Row, Screen, Section, TextButton } from '../src/components/ui';
@@ -31,6 +31,7 @@ export default function SettingsScreen() {
   const { engine, revision, mutate } = useEngine();
   const { status } = useAuth();
   const { state: syncState } = useSync();
+  const { manifest, loading } = useVocabulary();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const code = engine.activeLanguage;
@@ -41,7 +42,9 @@ export default function SettingsScreen() {
   }, [engine, revision, code]);
 
   const language = getLanguageProfile(code);
-  const levelSizes = getLevelSizes(code);
+  // Level sizes come from the server's manifest now rather than from a bundled
+  // dataset, so they are absent until it has been reached once and cached.
+  const levelSizes = manifest?.languages[code]?.levels ?? {};
   const source = VOCABULARY_SOURCES[code];
   const tracks = getExamTracksForLanguage(code);
   const track = findExamTrack(profile.examTrackId);
@@ -124,7 +127,16 @@ export default function SettingsScreen() {
               {/* What the app actually ships for this level, which is not the
                   same number as the syllabus target and should not pretend to
                   be. Cards are made from these words. */}
-              <DetailRow label="Words in the app" value={`${(levelSizes[level.id] ?? 0).toLocaleString()}`} />
+              <DetailRow
+                label="Words in this level"
+                value={
+                  loading.has(code)
+                    ? 'downloading…'
+                    : levelSizes[level.id]
+                      ? levelSizes[level.id]!.toLocaleString()
+                      : 'starter deck only'
+                }
+              />
               {track && !track.targetsAreOfficial ? (
                 <Caption>{track.authority} publishes no word list, so this is an estimate.</Caption>
               ) : null}

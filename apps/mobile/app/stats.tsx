@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { findExamLevel, getExaminedSkills, getLanguageProfile } from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
-import { Caption, DetailRow, Pill, ProgressBar, Row, Screen, Section, Stat, Title } from '../src/components/ui';
+import { Caption, DetailRow, Pill, ProgressBar, Row, Screen, Section, Stat, TextButton, Title } from '../src/components/ui';
 import { Rise } from '../src/motion/components';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
 
@@ -17,6 +18,7 @@ export default function StatsScreen() {
   const { engine, revision } = useEngine();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
+  const router = useRouter();
 
   const view = useMemo(() => {
     const profile = engine.getProfile();
@@ -42,6 +44,8 @@ export default function StatsScreen() {
         <Caption>{readiness.headline}</Caption>
       </Rise>
 
+      {/* These four numbers are the vocabulary summarised. Somebody who reads
+          them and wants to know *which* words has one tap to go and look. */}
       <Rise index={1}>
         <Row style={styles.stats}>
         <Stat label="known" value={String(stats.coverage.entriesKnown)} />
@@ -49,6 +53,7 @@ export default function StatsScreen() {
         <Stat label="in review" value={String(stats.coverage.reviewCards)} color={theme.colors.good} />
           <Stat label="unseen" value={String(stats.coverage.newCards)} color={theme.colors.textMuted} />
         </Row>
+        <TextButton label="See every word →" onPress={() => router.push('/words')} />
       </Rise>
 
       <Rise index={2}>

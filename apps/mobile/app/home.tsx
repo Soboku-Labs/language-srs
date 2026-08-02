@@ -146,6 +146,7 @@ export default function Dashboard() {
 
       <Rise index={6}>
         <Row style={styles.links}>
+          <TextButton label="Words" onPress={() => router.push('/words')} />
           <TextButton label="Progress" onPress={() => router.push('/stats')} />
           <TextButton label="Account" onPress={() => router.push('/account')} color={theme.colors.textMuted} />
           <TextButton label="Settings" onPress={() => router.push('/settings')} color={theme.colors.textMuted} />
@@ -239,5 +240,7 @@ const createStyles = (theme: ResolvedTheme) => ({
 
   teacherLine: { alignItems: 'center' as const, paddingBottom: spacing.md },
   stats: { justifyContent: 'space-between' as const, paddingHorizontal: spacing.sm },
-  links: { justifyContent: 'center' as const, gap: spacing.lg },
+  // Four links no longer fit on a narrow phone at the old spacing, and a row
+  // that overflows silently loses the last one.
+  links: { justifyContent: 'center' as const, flexWrap: 'wrap' as const, gap: spacing.md },
 });

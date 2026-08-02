@@ -77,6 +77,7 @@ function ThemedNavigator() {
         <Stack.Screen name="home" options={{ headerShown: false }} />
         <Stack.Screen name="review" options={{ title: 'Review' }} />
         <Stack.Screen name="stats" options={{ title: 'Progress' }} />
+        <Stack.Screen name="words" options={{ title: 'Vocabulary' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="account" options={{ title: 'Account' }} />
         <Stack.Screen name="sign-in" options={{ title: '' }} />

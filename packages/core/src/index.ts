@@ -119,6 +119,20 @@ export type { CoverageStats, ForecastDay, RetentionStats, StreakInfo } from './s
 export { computeExamReadiness, suggestDailyNewLimit } from './stats/readiness';
 export type { ExamReadiness, ReadinessVerdict } from './stats/readiness';
 
+// Per-word progress — the grain the vocabulary views show, above cards
+export {
+  MATURE_DAYS,
+  STRUGGLING_LAPSES,
+  byWeakestFirst,
+  countBands,
+  levelProgress,
+  meanStrength,
+  summariseWord,
+  summariseWords,
+  wordsAtRisk,
+} from './stats/words';
+export type { BandCounts, WordBand, WordProgress } from './stats/words';
+
 // Accounts — the contract the API server and the app both implement
 export {
   PASSWORD_MAX_LENGTH,

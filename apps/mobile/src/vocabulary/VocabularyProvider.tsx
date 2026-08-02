@@ -1,5 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { LANGUAGE_CODES, getLevelIdsInScope, type LanguageCode, type VocabularyManifest } from '@language-srs/core';
+import {
+  LANGUAGE_CODES,
+  getLevelIdsInScope,
+  type LanguageCode,
+  type LexicalEntry,
+  type VocabularyManifest,
+} from '@language-srs/core';
 import { useEngine } from '../engine/EngineProvider';
 import { appStore } from '../storage/adapter';
 import { VocabularyRepository } from './repository';
@@ -28,6 +34,16 @@ interface VocabularyContextValue {
   wordCount(code: LanguageCode): number | undefined;
   /** Pull a language's levels down now — used when one is chosen. */
   prefetch(code: LanguageCode, levelId: string): void;
+  /**
+   * One level's words, whether or not it is in the learner's scope.
+   *
+   * The engine only ever holds the levels being studied, which is the whole
+   * point of fetching a level at a time. Browsing the syllabus is the one thing
+   * that legitimately wants to look further ahead, so it gets its own door —
+   * and pointedly does *not* hand what it finds to the engine, because looking
+   * at HSK 5 should not start scheduling it.
+   */
+  loadLevel(levelId: string): Promise<LexicalEntry[]>;
 }
 
 const VocabularyContext = createContext<VocabularyContextValue | undefined>(undefined);
@@ -125,6 +141,12 @@ export function VocabularyProvider({ children }: { children: React.ReactNode }) 
       prefetch(code, levelId) {
         void repository.ensure(getLevelIdsInScope(levelId));
         void code;
+      },
+      loadLevel(levelId) {
+        // Just this level, not its scope: the syllabus browser shows one level
+        // at a time and asking for nine to display one is the bundle mistake in
+        // miniature.
+        return repository.ensure([levelId]);
       },
     }),
     [manifest, loading, unavailable, repository],

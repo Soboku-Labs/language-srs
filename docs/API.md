@@ -17,7 +17,7 @@ npm run server:test   # 60 tests over auth, storage and the HTTP surface
 | --- | --- | --- |
 | `PORT` | `4000` | |
 | `DATA_DIR` | `.data` | `memory` for a disposable server that keeps nothing |
-| `VOCAB_DIR` | `data/vocab` | The word lists to serve; missing is survivable |
+| `VOCAB_DIR` | `<repo>/data/vocab` | The word lists to serve; missing is survivable |
 | `ALLOWED_ORIGINS` | `*` | Comma-separated; set it to your app's origin in production |
 
 The app finds the API through `EXPO_PUBLIC_API_URL`, inlined at build time:
@@ -108,6 +108,12 @@ compiled in — every level of every language, shipped to a phone on install and
 again on every update, so that somebody could study fifteen a day. The client
 now fetches the levels in scope, caches them keyed by dataset version, and falls
 back to a bundled starter deck when there is no server to ask.
+
+The default is resolved against this repository rather than against the shell,
+because `npm run server` from the root runs the script with `apps/server` as its
+working directory — a relative default found nothing there and produced an API
+that answered `/vocabulary` with an empty manifest. An explicit `VOCAB_DIR` is
+still relative to wherever you typed it, which is what typing one implies.
 
 A server with no `VOCAB_DIR` still runs: it serves accounts, answers the
 vocabulary routes with 404, and clients keep the starter deck. Accounts and

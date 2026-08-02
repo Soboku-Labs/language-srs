@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { createApp } from './app.ts';
 import { VocabularyService } from './services/vocabulary.ts';
 import { JsonFileServerStore } from './store/json-file.ts';
@@ -19,7 +21,20 @@ import type { ServerStore } from './store/types.ts';
 const port = Number(process.env.PORT ?? 4000);
 const dataDir = process.env.DATA_DIR ?? '.data';
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '*').split(',').map((origin) => origin.trim());
-const vocabDir = process.env.VOCAB_DIR ?? 'data/vocab';
+/**
+ * The word lists, found relative to this file rather than to the shell.
+ *
+ * `npm run server` from the repository root runs the script with the *workspace*
+ * as its working directory, so a default of `data/vocab` resolved to
+ * `apps/server/data/vocab` and quietly found nothing: an API that answered
+ * `/vocabulary` with an empty manifest and every level with a 404, while logging
+ * four lines nobody was reading. The files sit at a known place relative to this
+ * source, so that is where the default looks. An explicit `VOCAB_DIR` still wins
+ * and is still resolved against the shell's cwd, which is what a person typing
+ * one expects.
+ */
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const vocabDir = process.env.VOCAB_DIR ?? resolve(repoRoot, 'data/vocab');
 
 /**
  * Open the store, or refuse to start.

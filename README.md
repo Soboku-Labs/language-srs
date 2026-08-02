@@ -78,6 +78,32 @@ for the whole syllabus at once — HSK 6 in scope is three thousand words, and n
 ten thousand cards in their pocket to study fifteen a day. Sources, licences and the
 derivations are in [docs/DATA.md](docs/DATA.md).
 
+## Seeing the words
+
+The vocabulary has its own screen, and it answers two questions with two pictures.
+
+**This level** is every word in the level as a grid of chips, each tinted along one
+gradient from just-met to known. That is deliberately not a table: a table of target,
+reading, gloss and interval is a spreadsheet, and nobody scans a spreadsheet to find out
+how they are doing. A field of colour has the one property the table cannot — you can see
+the *shape* of a level at a glance, and a red speck in it tells you where something is
+going wrong. Tap a word and it opens in place with its reading, gloss, an example and
+what the scheduler thinks of it. The counts double as filters, and the sort flips between
+syllabus order and weakest first.
+
+**All levels** is one row per level of the track, with the same colours as a single bar.
+It is computed from cards and the manifest alone, so a nine-level track costs nine
+numbers rather than five thousand entries; opening a level is what downloads it. Which
+means you can look at HSK 7-9 while studying HSK 2, and looking does not start scheduling
+it.
+
+A word's state is the **weakest of its cards**, not the average. If you can recognise a
+word but cannot produce it, you do not know it yet — and an average would report you
+three-fifths of the way there, which is a number that flatters and says nothing about
+what to do next. Strength is log-scaled against the maturity threshold, because the
+distance from one day to one week is a real achievement and the distance from eighty days
+to ninety is not.
+
 ## Accounts, and what a session means
 
 Studying works signed out, on the device, as it always has. An account adds three
@@ -177,6 +203,7 @@ packages/core/            @language-srs/core — all the domain logic, no React 
   srs/                    FSRS-4.5 scheduler + exam-date pressure
   session/                queue building, daily caps, exam-weighted card mix
   stats/                  streaks, true retention, coverage, exam readiness
+                          — and per-*word* progress, for the vocabulary views
   sessions/               study sittings: recording, reconstruction, summaries
   auth/                   the account contract, shared with the server
   teachers/               the four characters, their methods and their lines
@@ -194,6 +221,7 @@ apps/server/              @language-srs/server — the account API, no runtime d
 apps/mobile/              Expo app: iOS, Android and web from one codebase
   app/index.tsx           the landing page — languages, teachers, method
   app/home.tsx            the dashboard for the chosen language
+  app/words.tsx           the vocabulary: one level's words, and the syllabus
   app/                    the rest of the expo-router screens
   src/auth/               the API client, the session, and the sync loop
   modules/widget-bridge/  native module: shared container + widget reload

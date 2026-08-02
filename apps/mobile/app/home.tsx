@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   findExamLevel,
+  getCulture,
   getLanguageProfile,
   getTeacher,
   kindLabel,
@@ -11,6 +12,9 @@ import {
 } from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { BigButton, Caption, Row, Screen, Stat, TextButton, Title } from '../src/components/ui';
+import { LanguageArt } from '../src/components/LanguageArt';
+import { CountSkeleton } from '../src/components/Skeleton';
+import { useVocabulary } from '../src/vocabulary/VocabularyProvider';
 import { TeacherAvatar, TeacherNote } from '../src/components/Teacher';
 import { CountUp, Press, Rise } from '../src/motion/components';
 import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
@@ -28,6 +32,7 @@ import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } fr
  */
 export default function Dashboard() {
   const { engine, revision } = useEngine();
+  const { loading: loadingLanguages } = useVocabulary();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
@@ -38,6 +43,7 @@ export default function Dashboard() {
       profile,
       language: getLanguageProfile(profile.languageCode),
       teacher: getTeacher(profile.languageCode),
+      culture: getCulture(profile.languageCode),
       level: findExamLevel(profile.targetLevelId),
       queue: engine.getQueue(),
       stats: engine.getStats(),
@@ -46,7 +52,7 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, revision]);
 
-  const { profile, language, teacher, level, queue, stats, readiness } = view;
+  const { profile, language, teacher, culture, level, queue, stats, readiness } = view;
   const waiting = queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning;
 
   return (
@@ -67,15 +73,28 @@ export default function Dashboard() {
           <View style={styles.headerText}>
             <Title>{language.name}</Title>
             <Caption>
-              {teacher.address} · {level?.shortName}
+              {culture.cityLocal} · {level?.shortName}
               {profile.examDate ? ` · ${describeCountdown(readiness.daysToExam)}` : ''}
             </Caption>
           </View>
         </Press>
       </Rise>
 
-      <Rise index={1} style={styles.hero}>
-        {waiting > 0 ? (
+      {/* The place this language is spoken, drawn once at the top of the day's
+          work. It is the only decoration on the screen, and it earns its keep by
+          being the reason most people are here. */}
+      <Rise index={1} style={styles.artwork}>
+        <LanguageArt code={profile.languageCode} width={320} height={110} />
+      </Rise>
+
+      {/* The count is the answer this screen exists to give, and until the
+          level has arrived it would be the starter deck's answer rather than
+          the syllabus's. A skeleton of the same size says "this number is
+          coming" without showing a number that is about to change. */}
+      <Rise index={2} style={styles.hero}>
+        {loadingLanguages.has(profile.languageCode) ? (
+          <CountSkeleton />
+        ) : waiting > 0 ? (
           <>
             <CountUp value={waiting} style={styles.count} />
             <Text style={styles.countLabel}>{waiting === 1 ? 'card waiting' : 'cards waiting'}</Text>
@@ -96,11 +115,11 @@ export default function Dashboard() {
 
       {/* Seeded on the count so the line holds still while the screen re-renders,
           and changes when the situation it is describing actually changes. */}
-      <Rise index={2} style={styles.teacherLine}>
+      <Rise index={3} style={styles.teacherLine}>
         <TeacherNote align="center">{teacherLine(teacher, waiting > 0 ? 'greeting' : 'idle', waiting)}</TeacherNote>
       </Rise>
 
-      <Rise index={3}>
+      <Rise index={4}>
         <BigButton
           label={waiting > 0 ? 'Study now' : 'Study ahead'}
           {...(waiting > 0 && queue.kindMix ? { hint: describeMix(queue.kindMix) } : {})}
@@ -108,7 +127,7 @@ export default function Dashboard() {
         />
       </Rise>
 
-      <Rise index={4}>
+      <Rise index={5}>
         <Row style={styles.stats}>
           {/* Studied-today is carried by the colour rather than by a badge: the
               streak is either lit or it is not. */}
@@ -125,9 +144,11 @@ export default function Dashboard() {
         </Row>
       </Rise>
 
-      <Rise index={5}>
+      <Rise index={6}>
         <Row style={styles.links}>
+          <TextButton label="Words" onPress={() => router.push('/words')} />
           <TextButton label="Progress" onPress={() => router.push('/stats')} />
+          <TextButton label="Account" onPress={() => router.push('/account')} color={theme.colors.textMuted} />
           <TextButton label="Settings" onPress={() => router.push('/settings')} color={theme.colors.textMuted} />
         </Row>
       </Rise>
@@ -199,7 +220,8 @@ const createStyles = (theme: ResolvedTheme) => ({
   // edge reads as "more", which is the opposite of what tapping this does.
   chevron: { color: theme.colors.textFaint, fontSize: 26, marginRight: -spacing.xs },
 
-  hero: { alignItems: 'center' as const, gap: spacing.xs, paddingTop: spacing.xxl },
+  artwork: { alignItems: 'center' as const, opacity: 0.9 },
+  hero: { alignItems: 'center' as const, gap: spacing.xs, paddingTop: spacing.md },
   count: {
     color: theme.colors.accent,
     fontSize: 92,
@@ -218,5 +240,7 @@ const createStyles = (theme: ResolvedTheme) => ({
 
   teacherLine: { alignItems: 'center' as const, paddingBottom: spacing.md },
   stats: { justifyContent: 'space-between' as const, paddingHorizontal: spacing.sm },
-  links: { justifyContent: 'center' as const, gap: spacing.xl },
+  // Four links no longer fit on a narrow phone at the old spacing, and a row
+  // that overflows silently loses the last one.
+  links: { justifyContent: 'center' as const, flexWrap: 'wrap' as const, gap: spacing.md },
 });

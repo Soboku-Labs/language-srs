@@ -119,6 +119,63 @@ export type { CoverageStats, ForecastDay, RetentionStats, StreakInfo } from './s
 export { computeExamReadiness, suggestDailyNewLimit } from './stats/readiness';
 export type { ExamReadiness, ReadinessVerdict } from './stats/readiness';
 
+// Per-word progress — the grain the vocabulary views show, above cards
+export {
+  MATURE_DAYS,
+  STRUGGLING_LAPSES,
+  byWeakestFirst,
+  countBands,
+  levelProgress,
+  meanStrength,
+  summariseWord,
+  summariseWords,
+  wordsAtRisk,
+} from './stats/words';
+export type { BandCounts, WordBand, WordProgress } from './stats/words';
+
+// Accounts — the contract the API server and the app both implement
+export {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  SESSION_TTL_DAYS,
+  normaliseEmail,
+  resolveDisplayName,
+  validateEmail,
+  validatePassword,
+} from './auth/types';
+export type {
+  ApiErrorBody,
+  AuthErrorCode,
+  AuthResult,
+  AuthSessionInfo,
+  PublicUser,
+  UserId,
+} from './auth/types';
+export { mergeStudySessions } from './auth/sync';
+export type {
+  AccountState,
+  PutStateRequest,
+  PutStateResponse,
+  StateConflict,
+  StudySessionsResponse,
+} from './auth/sync';
+
+// Study sittings — the grain a person thinks in, above individual gradings
+export {
+  SESSION_GAP_MINUTES,
+  addGradeToSession,
+  finishStudySession,
+  formatDuration,
+  groupLogsIntoSessions,
+  startStudySession,
+  summariseSessions,
+} from './sessions';
+export type { SessionDay, SessionSummary, StudySessionDraft, StudySessionRecord } from './sessions';
+
+// Culture — the place behind each language, for the art and the copy
+export { CULTURE_PROFILES, describePlace, getCulture } from './culture';
+export type { CultureProfile } from './culture';
+
 // Teachers — one character per language, shown on the landing page and in session
 export { TEACHERS, getTeacher, teacherLine } from './teachers';
 export type { Teacher, TeacherLines, TeacherMood } from './teachers';
@@ -177,7 +234,7 @@ export {
 export type { ParsedDeepLink } from './widget/deeplinks';
 
 // Storage
-export { MemoryStore, MirroringStore, readJson, writeJson } from './storage/port';
+export { MemoryStore, MirroringStore, PrefixedStore, accountPrefix, readJson, writeJson } from './storage/port';
 export type { KeyValueStore } from './storage/port';
 
 // Data
@@ -190,6 +247,16 @@ export {
   getSeedCounts,
   getSeedEntries,
 } from './data/seed';
+
+// The vocabulary contract — the words themselves come from the API, not the bundle
+export { VOCABULARY_SOURCES, expandEntries } from './data/vocab';
+export type {
+  CompactEntry,
+  VocabularyFile,
+  VocabularyLevel,
+  VocabularyManifest,
+  VocabularySource,
+} from './data/vocab';
 export {
   CSV_COLUMNS,
   exportVocabularyJson,
@@ -219,8 +286,8 @@ export {
   toTimestamp,
 } from './utils/date';
 export type { Clock } from './utils/date';
-export { cardId, parseCardId, reviewLogId } from './utils/id';
+export { cardId, parseCardId, reviewLogId, studySessionId } from './utils/id';
 
 // Engine
-export { STORAGE_KEYS, StudyEngine } from './engine';
+export { STORAGE_KEYS, SYNCED_STORAGE_KEYS, StudyEngine } from './engine';
 export type { StudyEngineOptions } from './engine';

@@ -3,18 +3,41 @@ import { StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider } from '../src/auth/AuthProvider';
+import { SyncProvider } from '../src/auth/SyncProvider';
 import { EngineProvider } from '../src/engine/EngineProvider';
+import { VocabularyProvider } from '../src/vocabulary/VocabularyProvider';
 import { ThemeProvider, useTheme } from '../src/theme';
 import { ThemeFade } from '../src/motion/components';
 
+/**
+ * The provider stack, in dependency order.
+ *
+ * Auth is outermost because the account decides which storage namespace the
+ * engine opens — signing in swaps the whole domain underneath, rather than
+ * filtering it. Sync sits inside both because it needs the token from one and
+ * the state from the other, and theme inside the engine because the palette
+ * follows the active language.
+ *
+ * Vocabulary sits inside the engine because it feeds it: the word lists come
+ * from the API a level at a time and are handed over as they arrive. The engine
+ * never waits for them — it starts on the bundled starter deck, so a first
+ * launch with no network is a smaller app rather than a broken one.
+ */
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <EngineProvider>
-        <ThemeProvider>
-          <ThemedNavigator />
-        </ThemeProvider>
-      </EngineProvider>
+      <AuthProvider>
+        <EngineProvider>
+          <VocabularyProvider>
+            <SyncProvider>
+              <ThemeProvider>
+                <ThemedNavigator />
+              </ThemeProvider>
+            </SyncProvider>
+          </VocabularyProvider>
+        </EngineProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }
@@ -54,7 +77,10 @@ function ThemedNavigator() {
         <Stack.Screen name="home" options={{ headerShown: false }} />
         <Stack.Screen name="review" options={{ title: 'Review' }} />
         <Stack.Screen name="stats" options={{ title: 'Progress' }} />
+        <Stack.Screen name="words" options={{ title: 'Vocabulary' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="account" options={{ title: 'Account' }} />
+        <Stack.Screen name="sign-in" options={{ title: '' }} />
         {/* Entered only from a widget tap; it grades and redirects. */}
         <Stack.Screen name="grade" options={{ headerShown: false, presentation: 'transparentModal' }} />
       </Stack>

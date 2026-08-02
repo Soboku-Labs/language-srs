@@ -1,17 +1,94 @@
-# Vocabulary data
+# The vocabulary
 
-## What ships
+The app ships **14,093 words** across four languages, keyed by exam level. They are
+not hand-written: they come from the published word lists, normalised by a scraper in
+`tools/vocab/` whose output is committed to `data/vocab/` — so a syllabus change arrives
+as a diff somebody can review.
 
-A starter deck per language, in `packages/core/src/data/seed/`. Around 30 entries each,
-covering the first level of each exam track.
+They are **served by the API rather than bundled into the app**: `data/vocab/` is read by
+the server at startup and handed out a level at a time. That is what took the app bundle
+from 4.1MB to 2.2MB. See [API.md](API.md) for the routes and their caching.
 
-It is deliberately small and deliberately not a claim to be the HSK or JLPT syllabus. Its
-job is to make the app studiable on first launch and to exercise every card kind the exam
-models declare — including the ones easy to get wrong, such as tone cards for Mandarin
-and Vietnamese and script cards for kana and hangul. A test asserts that every kind is
-reachable from the seed data, so a level cannot weight a kind that no entry can satisfy.
+```bash
+node tools/vocab/build.mjs         # rebuild everything
+node tools/vocab/build.mjs zh ja   # rebuild one or two languages
+```
 
-Real coverage comes from importing official or community word lists.
+Downloads are cached in `tools/vocab/.cache/` (gitignored); delete it to force a refresh.
+The scraper is a tool rather than a build step, because vocabulary changes about as often
+as an examining body publishes a new syllabus and a build that reaches out to five hosts
+is a build that fails when one of them is down.
+
+## Where the words come from
+
+| Language | Source | Licence | Levels |
+| --- | --- | --- | --- |
+| Mandarin | [Complete HSK Vocabulary](https://github.com/drkameleon/complete-hsk-vocabulary) | MIT | **Official** — HSK 3.0 levels 1–7-9 and HSK 2.0 levels 1–6, as published |
+| Japanese | [Open Anki JLPT Decks](https://github.com/jamsinclair/open-anki-jlpt-decks) | MIT | Community reconstruction; the JLPT has published nothing since 2010 |
+| Korean | [NIKL / TOPIK combined list](https://github.com/julienshim/combined_korean_vocabulary_list) | MIT | Derived, see below |
+| Vietnamese | [FrequencyWords](https://github.com/hermitdave/FrequencyWords) (OpenSubtitles 2018) | CC BY-SA 4.0 | Frequency bands; MOET defines levels by descriptor, not by word list |
+| Korean and Vietnamese glosses | [Wiktionary via kaikki.org](https://kaikki.org/) | CC BY-SA 4.0 / GFDL | — |
+
+Two of those licences require attribution, which is why the sources are named in the
+app's settings screen and not only in this file.
+
+## What the scraper actually does
+
+**Tones are read off the spelling rather than taken from a source.** Mandarin tones come
+from the numeric pinyin — `ai4 hao4` becomes `[4, 4]`, a bare syllable being the neutral
+tone. Vietnamese tones come from the diacritics: decompose to NFD, skip the
+letter-forming marks on ă, â, ê, ô, ơ and ư, and read the tone mark that remains. This
+matters because the tone drill is the one exercise where missing data produces a card
+that teaches the opposite of the truth, so it is derived deterministically and asserted
+for every entry in `vocab.test.ts`.
+
+**Korean levels are derived, and the app says so.** TOPIK has never published a graded
+word list. The TOPIK band (A/B/C) splits the six levels into pairs, the National
+Institute band breaks the tie for words TOPIK does not cover, and frequency orders each
+band.
+
+**Vietnamese levels are frequency bands.** The MOET framework defines its levels by what
+a learner can *do*. Inventing a word list to match would be dishonest; frequency is both
+defensible as a learning order and exactly what the app already says it is doing.
+
+**Glosses are cleaned, ranked and truncated.** Wiktionary is a historical dictionary, so
+its first sense for `là` is "fine silk" and for `tôi` is "slave; domestic servant".
+Senses marked archaic, obsolete, historical, dated or rare are dropped, and what remains
+is ranked by sense position *and* gloss length together — either signal alone gets a
+common word wrong. Hanja and kanji "definitions", which Wiktionary carries as senses of
+the syllable they spell, are rejected outright: `수 = 誰` tells a learner of Korean
+nothing they can use.
+
+**Hand-written examples survive.** The starter decks that predate the scraper carried
+example sentences and mnemonics written by hand. Where a generated entry is the same
+word it inherits them *and keeps the seed's id*, so anyone already studying those words
+keeps their review history.
+
+**Ids are unique per word, not per spelling.** The seed id for `ăn` ("to eat") is
+`vi-an`, and so is the derived id for `an` ("calm"). The generator detects the collision
+and qualifies the newcomer, because two words sharing an id means one inherits the
+other's memory state.
+
+## Levels hold 500 words; cards are made 200 at a time
+
+Each level is truncated to its 500 most frequent words. The full lists run to about
+thirty thousand words across the four languages — a five-megabyte bundle shipped to a
+phone so that somebody can study fifteen words a day. Import the complete list if you
+want it; see below.
+
+Separately, the engine only *makes cards* for a sliding window of about two hundred
+entries ahead of the learner, extended as words are started. HSK 6 has five levels
+beneath it: generating every card up front would mean ten thousand cards in storage and
+in every sync. Nothing is lost by waiting, because a card that does not exist yet has no
+memory state to keep.
+
+## The starter decks
+
+`packages/core/src/data/seed/` still holds the hand-written decks — about thirty entries
+per language, with examples and mnemonics. They are no longer what the app studies from;
+they are the source of the examples the generated entries inherit, and the fixture the
+domain tests run against, which is why a test can still assert that every card kind is
+reachable.
 
 ## Entry shape
 

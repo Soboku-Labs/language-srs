@@ -100,6 +100,27 @@ rather than from a global token — the native widgets read them out of the same
 payload — but all four themes now declare the same values: 14pt for a card, 10pt
 for a control, fully round for a pill.
 
+## The places
+
+Four line drawings in `src/components/LanguageArt.tsx`, one per language, of the thing
+the app pictures when it pictures that language. They follow the same rules as everything
+else here:
+
+- **Drawn, not photographed.** A photograph of a country is a claim about it, and a stock
+  one is a cliché somebody else chose. Line art at this weight is closer to a woodblock
+  print or a stamp: it says "here" without insisting on which here.
+- **One ink.** Each drawing takes the language's accent and a wash of it, so the picture
+  and the palette are the same object rather than an illustration dropped on top of an
+  interface.
+- **Two stroke weights, no fills.** On a screen opened every morning, an illustration
+  that shouts is one you stop seeing by the second week.
+
+Their entrance is the one addition to the motion vocabulary: three layers — sky, then
+buildings, then the small bright thing — 110ms apart, once, on arrival. It is still
+motion that explains rather than entertains: it is the order you would draw it in, and
+it draws the eye down the screen towards the count. Nothing loops, nothing floats, and
+under reduce-motion the drawing is simply present.
+
 ## The teachers
 
 Four characters, one per language, defined as data in

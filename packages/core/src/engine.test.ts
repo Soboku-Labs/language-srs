@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { StudyEngine } from './engine';
+import { STORAGE_KEYS, StudyEngine } from './engine';
 import { SEED_ENTRIES } from './data/seed';
 import { getLanguageTheme } from './theme/palettes';
 import { WIDGET_SCHEMA_VERSION } from './widget/payload';
-import { MemoryStore } from './storage/port';
+import { MemoryStore, PrefixedStore, accountPrefix } from './storage/port';
 import { computeStreak } from './stats/metrics';
 import { computeExamReadiness, suggestDailyNewLimit } from './stats/readiness';
 import { DEFAULT_STUDY_PROFILE, type StudyProfile } from './types/card';
 import type { ReviewLog } from './types/review';
 import { addDays, fixedClock } from './utils/date';
 import { generateCards } from './cards/factory';
+import { makeEntry } from './data/helpers';
+import { getLevelIdsInScope } from './exams';
 import { MANDARIN_SEED } from './data/seed/mandarin';
 
 const NOW = '2026-03-01T09:00:00.000Z';
@@ -23,6 +25,8 @@ async function makeEngine(now = NOW) {
   });
   return { engine, store };
 }
+
+
 
 describe('engine lifecycle', () => {
   it('creates a default profile and cards on first run', async () => {
@@ -357,5 +361,341 @@ describe('exam readiness', () => {
 
   it('never suggests fewer than one a day', () => {
     expect(suggestDailyNewLimit('jlpt-n1', NOW, '2026-03-02')).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('study sittings', () => {
+  it('records a finished sitting and reads it back', async () => {
+    const { engine } = await makeEngine();
+
+    await engine.recordStudySession({
+      id: 's1',
+      languageCode: 'zh',
+      startedAt: NOW,
+      endedAt: NOW,
+      reviewed: 12,
+      recalled: 10,
+      activeMs: 300_000,
+    });
+
+    expect(engine.getStudySessions()).toHaveLength(1);
+    expect(engine.getSessionSummary().reviewed).toBe(12);
+  });
+
+  it('ignores a sitting already recorded, so a retried sync cannot double it', async () => {
+    const { engine } = await makeEngine();
+    const record = {
+      id: 's1',
+      languageCode: 'zh' as const,
+      startedAt: NOW,
+      endedAt: NOW,
+      reviewed: 3,
+      recalled: 3,
+      activeMs: 1_000,
+    };
+
+    await engine.recordStudySession(record);
+    await engine.recordStudySession({ ...record, reviewed: 99 });
+
+    expect(engine.getStudySessions()).toHaveLength(1);
+    expect(engine.getStudySessions()[0]?.reviewed).toBe(3);
+  });
+
+  it('keeps sittings per language', async () => {
+    const { engine } = await makeEngine();
+    await engine.setActiveLanguage('ja');
+    await engine.recordStudySession({
+      id: 's-ja',
+      languageCode: 'ja',
+      startedAt: NOW,
+      endedAt: NOW,
+      reviewed: 4,
+      recalled: 4,
+      activeMs: 1_000,
+    });
+
+    expect(engine.getStudySessions('ja')).toHaveLength(1);
+    expect(engine.getStudySessions('zh')).toHaveLength(0);
+  });
+
+  /**
+   * The upgrade path. An account that studied before sittings existed still has
+   * its review logs, and a progress screen that showed "no sessions yet" to
+   * somebody with a 40-day streak would be wrong in the most discouraging way.
+   */
+  it('reconstructs sittings from review logs when none were recorded', async () => {
+    const { engine } = await makeEngine();
+    const cards = engine.getQueue().cards.slice(0, 3);
+    for (const pair of cards) await engine.grade(pair.card.id, 3, { durationMs: 3_000 });
+
+    expect(engine.getStudySessions()).toHaveLength(0);
+
+    const summary = engine.getSessionSummary();
+    expect(summary.sessions).toBe(1);
+    expect(summary.reviewed).toBe(3);
+    expect(summary.recent[0]?.derived).toBe(true);
+  });
+
+  it('prefers recorded sittings over reconstructed ones once there are any', async () => {
+    const { engine } = await makeEngine();
+    const pair = engine.getQueue().cards[0]!;
+    await engine.grade(pair.card.id, 3, { durationMs: 3_000 });
+    await engine.recordStudySession({
+      id: 's1',
+      languageCode: 'zh',
+      startedAt: NOW,
+      endedAt: NOW,
+      reviewed: 1,
+      recalled: 1,
+      activeMs: 3_000,
+    });
+
+    expect(engine.getSessionSummary().recent.every((session) => !session.derived)).toBe(true);
+  });
+
+  it('merges sittings from another device without duplicating its own', async () => {
+    const { engine } = await makeEngine();
+    const mine = {
+      id: 's-phone',
+      languageCode: 'zh' as const,
+      startedAt: NOW,
+      endedAt: NOW,
+      reviewed: 5,
+      recalled: 5,
+      activeMs: 1_000,
+    };
+    await engine.recordStudySession(mine);
+
+    const result = await engine.mergeStudySessions([mine, { ...mine, id: 's-laptop' }]);
+
+    expect(result.added).toBe(1);
+    expect(engine.getStudySessions()).toHaveLength(2);
+  });
+
+  it('clears sittings on reset, like everything else', async () => {
+    const { engine } = await makeEngine();
+    await engine.recordStudySession({
+      id: 's1',
+      languageCode: 'zh',
+      startedAt: NOW,
+      endedAt: NOW,
+      reviewed: 1,
+      recalled: 1,
+      activeMs: 1,
+    });
+
+    await engine.reset();
+    expect(engine.getStudySessions()).toHaveLength(0);
+  });
+});
+
+describe('account sync', () => {
+  it('exports exactly the keys that make up an account', async () => {
+    const { engine } = await makeEngine();
+    const state = await engine.exportState();
+
+    expect(Object.keys(state)).toEqual(expect.arrayContaining([STORAGE_KEYS.meta, STORAGE_KEYS.cards]));
+    // Derived from the rest and rewritten on every change; sending it would be
+    // paying to transfer something the other device overwrites on arrival.
+    expect(state[STORAGE_KEYS.widget]).toBeUndefined();
+  });
+
+  it('carries a full account across devices', async () => {
+    const source = await makeEngine();
+    const pair = source.engine.getQueue().cards[0]!;
+    await source.engine.grade(pair.card.id, 3, { durationMs: 2_000 });
+    await source.engine.setActiveLanguage('ko');
+    await source.engine.recordStudySession({
+      id: 's1',
+      languageCode: 'ko',
+      startedAt: NOW,
+      endedAt: NOW,
+      reviewed: 7,
+      recalled: 6,
+      activeMs: 60_000,
+    });
+
+    const target = await makeEngine();
+    await target.engine.importState(await source.engine.exportState());
+
+    expect(target.engine.activeLanguage).toBe('ko');
+    expect(target.engine.getStudySessions()).toHaveLength(1);
+    expect(target.engine.getAllCards('zh').find((card) => card.id === pair.card.id)?.reps).toBe(1);
+  });
+
+  it('leaves the adopted state on disk, not just in memory', async () => {
+    const source = await makeEngine();
+    await source.engine.setActiveLanguage('vi');
+
+    const target = await makeEngine();
+    await target.engine.importState(await source.engine.exportState());
+
+    const reopened = await StudyEngine.create({
+      store: target.store,
+      seedEntries: SEED_ENTRIES,
+      clock: fixedClock(NOW),
+    });
+    expect(reopened.activeLanguage).toBe('vi');
+  });
+
+  /**
+   * Adopting a state that has no record of a key must clear the local one.
+   * Leaving it behind is how a device ends up with one account's cards and
+   * another's review logs, and every figure computed from that pair is fiction.
+   */
+  it('clears local keys the incoming state does not have', async () => {
+    const { engine, store } = await makeEngine();
+    await engine.importEntries([
+      { ...SEED_ENTRIES[0]!, id: 'zh-custom', target: '自定义' },
+    ]);
+    expect(await store.get(STORAGE_KEYS.entries)).not.toBeNull();
+
+    await engine.importState({ [STORAGE_KEYS.meta]: (await store.get(STORAGE_KEYS.meta))! });
+    expect(await store.get(STORAGE_KEYS.entries)).toBeNull();
+  });
+});
+
+describe('per-account storage', () => {
+  it('keeps two accounts on one device completely apart', async () => {
+    const device = new MemoryStore();
+
+    const first = await StudyEngine.create({
+      store: new PrefixedStore(device, accountPrefix('user-1')),
+      seedEntries: SEED_ENTRIES,
+      clock: fixedClock(NOW),
+    });
+    await first.setActiveLanguage('ja');
+    await first.grade(first.getQueue().cards[0]!.card.id, 3, {});
+
+    const second = await StudyEngine.create({
+      store: new PrefixedStore(device, accountPrefix('user-2')),
+      seedEntries: SEED_ENTRIES,
+      clock: fixedClock(NOW),
+    });
+
+    expect(second.activeLanguage).toBe('zh');
+    expect(second.getAllCards('ja').every((card) => card.reps === 0)).toBe(true);
+    expect(first.activeLanguage).toBe('ja');
+  });
+
+  /**
+   * The signed-out learner writes where the app always wrote, so anyone who
+   * studied before accounts existed finds their cards where they left them.
+   */
+  it('leaves signed-out storage exactly where it was', async () => {
+    const device = new MemoryStore();
+    const guest = await StudyEngine.create({
+      store: new PrefixedStore(device, accountPrefix()),
+      seedEntries: SEED_ENTRIES,
+      clock: fixedClock(NOW),
+    });
+    await guest.setActiveLanguage('vi');
+
+    expect(await device.get(STORAGE_KEYS.meta)).not.toBeNull();
+  });
+
+  it('lists only its own namespace', async () => {
+    const device = new MemoryStore();
+    await device.set('acct:user-1:srs:v1:meta', '{}');
+    await device.set('acct:user-2:srs:v1:meta', '{}');
+
+    const scoped = new PrefixedStore(device, accountPrefix('user-1'));
+    expect(await scoped.keys()).toEqual(['srs:v1:meta']);
+  });
+});
+
+/**
+ * A level's worth of generated words.
+ *
+ * The window tests used to lean on the bundled datasets. Those now live on the
+ * server, and a domain test reaching for a file the domain no longer ships would
+ * be testing the wrong layer — so the fixture states its own shape: five hundred
+ * words a level, ranked by frequency, exactly as the API serves them.
+ */
+function levelVocabulary(levelId: string, code: 'zh' = 'zh', size = 500) {
+  return Array.from({ length: size }, (_, index) =>
+    makeEntry({
+      id: `${levelId}-${index}`,
+      lang: code,
+      target: `词${levelId}${index}`,
+      reading: `ci${index}`,
+      meanings: [`word ${index}`],
+      levels: [levelId],
+      tones: [2],
+      rank: index + 1,
+    }),
+  );
+}
+
+describe('the card window', () => {
+  /**
+   * Levels hold five hundred words now rather than thirty, and HSK 6 has five
+   * levels beneath it. Generating a card for every word in scope would put ten
+   * thousand cards into storage — and into every sync — so that somebody can
+   * study fifteen a day.
+   */
+  it('makes cards for a window of the syllabus rather than all of it', async () => {
+    const { engine } = await makeEngine();
+    const inScope = getLevelIdsInScope('hsk3-6').flatMap((levelId) => levelVocabulary(levelId));
+
+    await engine.setVocabulary(inScope);
+    await engine.updateProfile('zh', { targetLevelId: 'hsk3-6' });
+
+    const entriesWithCards = new Set(engine.getAllCards('zh').map((card) => card.entryId));
+
+    expect(inScope.length).toBeGreaterThan(2_000);
+    expect(entriesWithCards.size).toBeLessThan(inScope.length);
+    expect(entriesWithCards.size).toBeGreaterThan(100);
+  });
+
+  it('starts at the front of the syllabus, most frequent word first', async () => {
+    const { engine } = await makeEngine();
+    const level = levelVocabulary('hsk3-1');
+    await engine.setVocabulary(level);
+
+    const entryIds = new Set(engine.getAllCards('zh').map((card) => card.entryId));
+    expect(entryIds.has(level[0]!.id)).toBe(true);
+    expect(entryIds.has(level[level.length - 1]!.id)).toBe(false);
+  });
+
+  /**
+   * The window has to move, or a learner who works through it finds the app
+   * empty with four hundred words of the level left unstudied.
+   */
+  it('extends as words are studied', async () => {
+    const { engine } = await makeEngine();
+    await engine.setVocabulary(levelVocabulary('hsk3-1'));
+    const before = new Set(engine.getAllCards('zh').map((card) => card.entryId)).size;
+
+    for (const pair of engine.getQueue({ sessionLimit: 40 }).cards.slice(0, 30)) {
+      await engine.grade(pair.card.id, 3, {});
+    }
+    await engine.syncCards();
+
+    const after = new Set(engine.getAllCards('zh').map((card) => card.entryId)).size;
+    expect(after).toBeGreaterThan(before);
+  });
+
+  /**
+   * The starter deck is what a first launch studies from while the real
+   * syllabus is still downloading, so it has to produce a usable queue on its
+   * own.
+   */
+  it('has something to study before any vocabulary has been downloaded', async () => {
+    const { engine } = await makeEngine();
+    expect(engine.getQueue().cards.length).toBeGreaterThan(0);
+  });
+
+  it('replaces the starter deck with the downloaded level, keeping history', async () => {
+    const { engine } = await makeEngine();
+    const pair = engine.getQueue().cards[0]!;
+    await engine.grade(pair.card.id, 3, {});
+
+    await engine.setVocabulary(levelVocabulary('hsk3-1'));
+
+    // The graded card survives the swap: cards are keyed by entry, and
+    // `syncCards` only ever adds.
+    expect(engine.getAllCards('zh').find((card) => card.id === pair.card.id)?.reps).toBe(1);
+    expect(engine.getQueue().cards.length).toBeGreaterThan(0);
   });
 });

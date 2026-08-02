@@ -52,6 +52,93 @@ The check never grades. FSRS is driven by your own judgement of recall, and an a
 What the check does is reveal the card, say something specific about what happened, and
 outline the grade it would suggest.
 
+## The words are the syllabus
+
+Every level carries the examining body's own vocabulary, not a sample deck: **14,093
+words**, generated from the published lists by `tools/vocab/build.mjs` and committed.
+HSK's list is official and exact. The JLPT stopped publishing in 2010, so Japanese uses
+the community reconstruction everybody uses. TOPIK has never published one, so Korean
+levels are derived from the TOPIK and National Institute bands. Vietnamese has no list to
+derive from at all, so its levels are frequency bands — which is what the app already
+said it was doing.
+
+Tones are read off the spelling rather than trusted to a source: numeric pinyin for
+Mandarin, and the diacritics for Vietnamese, decomposed and read mark by mark. The tone
+drill is the one exercise where missing data teaches the opposite of the truth.
+
+**The words are served, not shipped.** They used to be compiled into the app — 1.7MB sent
+to a phone on install and again on every update — which was most of a 4.1MB bundle. The
+API serves them a level at a time now, cached on the device against a version that is a
+hash of the dataset, and the bundle is 2.2MB. A learner on HSK 2 downloads two levels,
+not nine; a device that already has them asks and gets a 304. With no server reachable
+the app falls back to a bundled starter deck and still works.
+
+Cards are made for a sliding window of about two hundred words ahead of you rather than
+for the whole syllabus at once — HSK 6 in scope is three thousand words, and nobody needs
+ten thousand cards in their pocket to study fifteen a day. Sources, licences and the
+derivations are in [docs/DATA.md](docs/DATA.md).
+
+## Seeing the words
+
+The vocabulary has its own screen, and it answers two questions with two pictures.
+
+**This level** is every word in the level as a grid of chips, each tinted along one
+gradient from just-met to known. That is deliberately not a table: a table of target,
+reading, gloss and interval is a spreadsheet, and nobody scans a spreadsheet to find out
+how they are doing. A field of colour has the one property the table cannot — you can see
+the *shape* of a level at a glance, and a red speck in it tells you where something is
+going wrong. Tap a word and it opens in place with its reading, gloss, an example and
+what the scheduler thinks of it. The counts double as filters, and the sort flips between
+syllabus order and weakest first.
+
+**All levels** is one row per level of the track, with the same colours as a single bar.
+It is computed from cards and the manifest alone, so a nine-level track costs nine
+numbers rather than five thousand entries; opening a level is what downloads it. Which
+means you can look at HSK 7-9 while studying HSK 2, and looking does not start scheduling
+it.
+
+A word's state is the **weakest of its cards**, not the average. If you can recognise a
+word but cannot produce it, you do not know it yet — and an average would report you
+three-fifths of the way there, which is a number that flatters and says nothing about
+what to do next. Strength is log-scaled against the maturity threshold, because the
+distance from one day to one week is a real achievement and the distance from eighty days
+to ninety is not.
+
+## Accounts, and what a session means
+
+Studying works signed out, on the device, as it always has. An account adds three
+things, which are the three meanings of "session tracking" this app cares about:
+
+- **Study sessions.** Every sitting is recorded — when it started and ended, how
+  many cards, how many recalled, on which device — so the account screen can
+  answer "how much have I actually been studying?" with sittings rather than a
+  streak. History from before sessions existed is reconstructed from the review
+  log and labelled as reconstructed.
+- **Auth sessions.** You stay signed in across launches on a sliding thirty-day
+  token; the account screen lists every signed-in device, and any of them can be
+  revoked from any other.
+- **Per-account separation.** Two people sharing a device get separate decks,
+  schedules, streaks and histories. Signing in swaps the storage namespace under
+  the domain rather than filtering it, so nothing bleeds between them — and the
+  signed-out namespace is exactly where the app wrote before accounts existed, so
+  studying first and signing up later loses nothing.
+
+The API is a small service in `apps/server` with no runtime dependencies:
+
+```bash
+npm run server   # http://localhost:4000, accounts in .data/accounts.json
+```
+
+It ships with a Dockerfile and a `render.yaml` blueprint, so hosting it on a free
+tier is a repository-connect and one repository variable — `API_URL`, which the
+Pages workflow passes to the web build. Free tiers sleep when idle and keep no
+disk between deploys, and the app is built to behave sensibly under both: sign-in
+retries once with a long timeout and says it is waking the server, and studying
+never waits for the network at all.
+
+Endpoints, the security decisions behind them, the hosting steps, and what sync
+does and does not guarantee: [docs/API.md](docs/API.md).
+
 ## What makes it exam-shaped
 
 Most SRS apps are a word list with a scheduler bolted on. This one is built around the
@@ -97,6 +184,12 @@ only where it means something, and motion explains rather than entertains. The f
 spec, including every motion pattern and the reasoning behind each, is in
 [docs/DESIGN.md](docs/DESIGN.md).
 
+Each language also gets a place and a drawing of it: a pagoda over Beijing rooftops, a
+torii with the mountain behind, hanok eaves under Seoul's towers, a junk under the karsts
+of Hạ Long. Line art rather than photographs, in that language's own ink, arriving in
+three strokes — sky, buildings, then the sun or the moon or the seal. Nobody learns
+Vietnamese because it is ISO 639-1 `vi`, and the interface should know that.
+
 Tonal languages get a tone ramp: each syllable of a Mandarin or Vietnamese word is
 coloured by its tone. Colour is part of the answer on a tone card, so the ramps are
 stated explicitly per language and tested for distinctness and contrast — not derived
@@ -110,6 +203,9 @@ packages/core/            @language-srs/core — all the domain logic, no React 
   srs/                    FSRS-4.5 scheduler + exam-date pressure
   session/                queue building, daily caps, exam-weighted card mix
   stats/                  streaks, true retention, coverage, exam readiness
+                          — and per-*word* progress, for the vocabulary views
+  sessions/               study sittings: recording, reconstruction, summaries
+  auth/                   the account contract, shared with the server
   teachers/               the four characters, their methods and their lines
   practice/               tone inventories and answer checking
   theme/                  the shared ground and the four inks
@@ -117,10 +213,17 @@ packages/core/            @language-srs/core — all the domain logic, no React 
   data/                   seed decks and the bulk importer
   engine.ts               the single API the app talks to
 
+apps/server/              @language-srs/server — the account API, no runtime deps
+  crypto/                 scrypt password hashing, session tokens
+  services/               accounts, device sessions, state sync, sittings
+  store/                  the storage seam: in-memory and JSON-file
+
 apps/mobile/              Expo app: iOS, Android and web from one codebase
   app/index.tsx           the landing page — languages, teachers, method
   app/home.tsx            the dashboard for the chosen language
+  app/words.tsx           the vocabulary: one level's words, and the syllabus
   app/                    the rest of the expo-router screens
+  src/auth/               the API client, the session, and the sync loop
   modules/widget-bridge/  native module: shared container + widget reload
   targets/ios-widget/     WidgetKit sources (Swift)
   targets/android-widget/ Glance sources (Kotlin)
@@ -136,12 +239,17 @@ code. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ```bash
 npm install
 
-npm test          # unit tests over the core domain
-npm run typecheck # core + app
+npm test          # unit tests over the core domain and the API server
+npm run typecheck # core + server + app
 
 npm run web       # dev server in the browser
 npm run web:build # static export to apps/mobile/dist
+
+npm run server    # the account API on :4000 — optional, studying works without it
 ```
+
+The app talks to whatever `EXPO_PUBLIC_API_URL` says at build time, defaulting to
+`http://localhost:4000`. Signing in is the only thing that needs it.
 
 ### Deploying the web build
 

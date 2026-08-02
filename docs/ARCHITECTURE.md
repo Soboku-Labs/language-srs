@@ -127,6 +127,47 @@ labels, tone ramps and kind colours, asserts distinctness within each ramp, and 
 that the ground, the grade scale and the geometry are identical across the four. That
 last group is what stops the heavy version growing back one palette at a time.
 
+## Accounts
+
+Three layers, and the split matters:
+
+- **`core/auth/`** holds the contract — the wire types, the email and password
+  rules, and the state-sync envelope. It is imported by both sides, so a rule
+  cannot be enforced by the server and described differently by the form.
+- **`apps/server/`** implements it over `node:http` with no runtime dependencies.
+  Details and the security reasoning: [API.md](API.md).
+- **`apps/mobile/src/auth/`** holds the client, the stored session and the sync
+  loop.
+
+The engine knows nothing about any of it. What signing in actually does is swap
+the storage namespace underneath the domain: `PrefixedStore` puts every key under
+`acct:<id>:`, so two accounts on one device are two separate stores rather than
+one store with an owner column. The signed-out namespace is the empty prefix —
+where the app wrote before accounts existed, which is what makes studying first
+and signing up later lose nothing.
+
+Two guards keep that boundary honest, and both were bugs first:
+
+- `EngineProvider` withholds its context while the account and the open engine
+  disagree. React runs child effects before parent ones, so without it there is
+  one render where the new account is signed in and the previous engine is still
+  mounted — long enough for the sync loop to write one account's cards into
+  another's storage.
+- `SyncProvider` refuses to sync when `accountId !== user.id`, which is the same
+  check from the other end.
+
+## Study sittings
+
+`core/sessions/` turns gradings into sittings. A `ReviewLog` is the right grain
+for the scheduler and the wrong one for a person: nobody asks how many gradings
+they made on Tuesday, they ask how long they sat down for and how often.
+
+Sittings are recorded by the app — only it knows when a session was abandoned
+rather than finished — and reconstructed from review logs when there are none,
+which covers history from before sittings existed and gradings made on the
+widget. Reconstructed ones are marked `derived` and labelled as approximate in
+the UI.
+
 ## Teachers and practice
 
 `core/teachers/` holds four characters — portrait glyph, method, principles, lines — and

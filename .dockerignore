@@ -1,0 +1,21 @@
+# Everything the API image has no use for. Keeping this tight matters more than
+# usual here: the repo carries an Expo app whose node_modules is most of a
+# gigabyte, and none of it is involved in serving accounts.
+node_modules
+**/node_modules
+# The app itself is not in the image — but its manifest is, because `npm ci`
+# reconciles the lockfile against every workspace in the graph.
+apps/mobile/*
+!apps/mobile/package.json
+dist
+**/dist
+.data
+**/.data
+.git
+.github
+docs
+*.md
+.expo
+**/.expo
+coverage
+*.log

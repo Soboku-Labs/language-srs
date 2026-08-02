@@ -31,11 +31,27 @@ let sequence = 0;
  * two devices in the same millisecond do not collide when they sync.
  */
 export function reviewLogId(atMs: number = Date.now()): string {
+  return sortableId('r', atMs);
+}
+
+/**
+ * The same scheme for study sittings.
+ *
+ * Sortable and collision-resistant matters more here than for logs: session
+ * records are merged across devices by id when an account syncs, so two phones
+ * finishing a sitting in the same millisecond must not produce one record that
+ * silently overwrites the other.
+ */
+export function studySessionId(atMs: number = Date.now()): string {
+  return sortableId('s', atMs);
+}
+
+function sortableId(prefix: string, atMs: number): string {
   sequence = (sequence + 1) % 0x1000;
   const time = atMs.toString(36).padStart(9, '0');
   const counter = sequence.toString(36).padStart(3, '0');
   const random = Math.floor(Math.random() * 0x1000)
     .toString(36)
     .padStart(3, '0');
-  return `r_${time}${counter}${random}`;
+  return `${prefix}_${time}${counter}${random}`;
 }

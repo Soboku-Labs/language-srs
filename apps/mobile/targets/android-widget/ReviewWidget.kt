@@ -2,6 +2,7 @@ package com.languagesrs.app.widget
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -49,8 +50,11 @@ import androidx.glance.unit.ColorProvider
  * FSRS on next launch. As on iOS, nothing here computes an interval — the numbers
  * on the buttons came from `previewIntervals` in the payload.
  *
- * Colours come from `snapshot.theme`, so the widget wears whichever of the four
- * language themes is active. There is no palette in this file.
+ * Colours come from `snapshot.theme`, which carries both the light and the dark
+ * palette; the night-mode flag on the widget's own configuration picks between
+ * them. So the widget follows the home screen's appearance rather than whichever
+ * mode the app was last in when it wrote the payload, and holds no palette of its
+ * own.
  */
 
 /** Which face the widget shows. Set per receiver. */
@@ -59,9 +63,14 @@ enum class WidgetMode { REVIEW, SPOTLIGHT }
 class ReviewWidget(private val mode: WidgetMode = WidgetMode.REVIEW) : GlanceAppWidget() {
   override suspend fun provideGlance(context: Context, id: GlanceId) {
     val snapshot = SnapshotStore.read(context)
+    // Read here rather than inside the composable: the Context is already in hand,
+    // and the uiMode flag is the value Android itself uses to decide night mode.
+    val isDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+      Configuration.UI_MODE_NIGHT_YES
+
     provideContent {
       GlanceTheme {
-        WidgetBody(snapshot = snapshot, mode = mode)
+        WidgetBody(snapshot = snapshot, mode = mode, isDark = isDark)
       }
     }
   }
@@ -70,13 +79,14 @@ class ReviewWidget(private val mode: WidgetMode = WidgetMode.REVIEW) : GlanceApp
 private fun provider(color: Color): ColorProvider = ColorProvider(color)
 
 @Composable
-private fun WidgetBody(snapshot: WidgetSnapshot?, mode: WidgetMode) {
+private fun WidgetBody(snapshot: WidgetSnapshot?, mode: WidgetMode, isDark: Boolean) {
   if (snapshot == null) {
-    PlaceholderBody()
+    PlaceholderBody(isDark)
     return
   }
 
-  val theme = snapshot.theme
+  val theme = snapshot.theme.resolve(isDark)
+  val radius = snapshot.theme.cornerRadius
 
   // In review mode the next due card leads and the spotlight is the fallback;
   // in spotlight mode that order is reversed.
@@ -89,14 +99,14 @@ private fun WidgetBody(snapshot: WidgetSnapshot?, mode: WidgetMode) {
   Column(
     modifier = GlanceModifier
       .fillMaxSize()
-      .background(theme.background)
+      .background(theme.canvas)
       .padding(12.dp)
       .clickable(actionStartActivity(openAppIntent(snapshot.actionDeepLink))),
   ) {
     Row(modifier = GlanceModifier.fillMaxWidth()) {
       Text(
         "${snapshot.languageEmoji} ${snapshot.examCaption}",
-        style = TextStyle(color = provider(theme.textMuted), fontSize = 11.sp),
+        style = TextStyle(color = provider(theme.inkMuted), fontSize = 11.sp),
       )
       Spacer(modifier = GlanceModifier.defaultWeight())
       if (snapshot.totalCount > 0) {
@@ -116,13 +126,13 @@ private fun WidgetBody(snapshot: WidgetSnapshot?, mode: WidgetMode) {
     if (card != null) {
       Text(
         card.promptHint,
-        style = TextStyle(color = provider(theme.kindAccent), fontSize = 10.sp),
+        style = TextStyle(color = provider(theme.inkMuted), fontSize = 10.sp),
       )
       Text(
         card.prompt,
         maxLines = 2,
         style = TextStyle(
-          color = provider(theme.text),
+          color = provider(theme.ink),
           fontSize = 26.sp,
           fontWeight = FontWeight.Medium,
         ),
@@ -132,25 +142,25 @@ private fun WidgetBody(snapshot: WidgetSnapshot?, mode: WidgetMode) {
         Text(
           card.answer,
           maxLines = 2,
-          style = TextStyle(color = provider(theme.textMuted), fontSize = 13.sp),
+          style = TextStyle(color = provider(theme.inkMuted), fontSize = 13.sp),
         )
       }
     } else {
       Text(
         snapshot.readinessHeadline,
         maxLines = 3,
-        style = TextStyle(color = provider(theme.text), fontSize = 13.sp),
+        style = TextStyle(color = provider(theme.ink), fontSize = 13.sp),
       )
     }
 
     Spacer(modifier = GlanceModifier.defaultWeight())
 
     if (mode == WidgetMode.REVIEW && snapshot.nextCard != null) {
-      GradeRow(snapshot.nextCard, theme)
+      GradeRow(snapshot.nextCard, theme, radius)
     } else {
       Text(
         snapshot.emptyStateCaption.ifEmpty { snapshot.streakCaption },
-        style = TextStyle(color = provider(theme.textMuted), fontSize = 11.sp),
+        style = TextStyle(color = provider(theme.inkMuted), fontSize = 11.sp),
       )
     }
   }
@@ -164,24 +174,24 @@ private fun WidgetBody(snapshot: WidgetSnapshot?, mode: WidgetMode) {
  * state clears itself.
  */
 @Composable
-private fun PlaceholderBody() {
-  val theme = WidgetTheme.FALLBACK
+private fun PlaceholderBody(isDark: Boolean) {
+  val theme = WidgetTheme.FALLBACK.resolve(isDark)
 
   Column(
-    modifier = GlanceModifier.fillMaxSize().background(theme.background).padding(12.dp),
+    modifier = GlanceModifier.fillMaxSize().background(theme.canvas).padding(12.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    Text("Language SRS", style = TextStyle(color = provider(theme.textMuted), fontSize = 12.sp))
+    Text("Language SRS", style = TextStyle(color = provider(theme.inkMuted), fontSize = 12.sp))
     Text(
       "Open to sync",
-      style = TextStyle(color = provider(theme.text), fontSize = 16.sp, fontWeight = FontWeight.Bold),
+      style = TextStyle(color = provider(theme.ink), fontSize = 16.sp, fontWeight = FontWeight.Bold),
     )
   }
 }
 
 @Composable
-private fun GradeRow(card: WidgetCard, theme: WidgetTheme) {
+private fun GradeRow(card: WidgetCard, theme: WidgetPalette, radius: androidx.compose.ui.unit.Dp) {
   Row(modifier = GlanceModifier.fillMaxWidth()) {
     card.options.forEach { option ->
       val tint = theme.gradeColor(option.rating)
@@ -191,7 +201,7 @@ private fun GradeRow(card: WidgetCard, theme: WidgetTheme) {
           .defaultWeight()
           .padding(2.dp)
           .background(theme.surface)
-          .cornerRadius(theme.cornerRadius)
+          .cornerRadius(radius)
           .padding(vertical = 6.dp)
           .clickable(
             actionRunCallback<GradeActionCallback>(
@@ -209,7 +219,7 @@ private fun GradeRow(card: WidgetCard, theme: WidgetTheme) {
         )
         Text(
           option.interval,
-          style = TextStyle(color = provider(theme.textMuted), fontSize = 9.sp),
+          style = TextStyle(color = provider(theme.inkMuted), fontSize = 9.sp),
         )
       }
     }

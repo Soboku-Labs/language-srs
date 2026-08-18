@@ -1,14 +1,13 @@
 import { Easing, ReduceMotion, type WithSpringConfig, type WithTimingConfig } from 'react-native-reanimated';
 
 /**
- * Motion tokens for the Paper & Ink design language.
+ * Motion tokens for the Suboku system.
  *
  * Two ideas govern every value here.
  *
- * **Paper has weight.** Surfaces in this app are physical: a card is a thing you
- * pick up, put down and deal off a deck. So movement is spring-based rather than
- * eased — springs settle the way an object settles, and a card that decelerates
- * linearly reads as a sprite, not a sheet of paper.
+ * **Things have weight.** A card is an object you pick up, put down and deal off
+ * a deck, so movement is spring-based rather than eased — a spring settles the way
+ * an object settles, where a linear decelerate reads as a sprite.
  *
  * **Motion explains, it does not entertain.** Every animation in the app encodes
  * where something came from or where it went. If an animation can be removed
@@ -78,10 +77,10 @@ export const timing = (ms: number = duration.base): WithTimingConfig => ({
  * second after the first, and the screen feels like it is loading rather than
  * arriving.
  */
-export const STAGGER_MS = 45;
+export const STAGGER_MS = 38;
 
 /** How far an entering element rises. Enough to read as motion, not as a jump. */
-export const RISE_DISTANCE = 14;
+export const RISE_DISTANCE = 10;
 
 /** Scale a control drops to while pressed. */
-export const PRESS_SCALE = 0.965;
+export const PRESS_SCALE = 0.975;

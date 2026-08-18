@@ -1,59 +1,70 @@
-import type { CardKind } from '../types/exam';
 import type { LanguageCode } from '../types/language';
 
 /**
- * Four themed front ends over one shared core.
+ * The Suboku system.
  *
- * Each language gets a visual identity drawn from its own material culture rather
- * than from its flag — flags make four apps that differ only in a hue, which is
- * not a different front end, it is a recolour. The references here are surfaces a
- * learner of that language actually encounters: ink and cinnabar seals for
- * Mandarin, washi paper and indigo for Japanese, dancheong pigments for Korean,
- * lacquer and gold leaf for Vietnamese.
+ * One neutral canvas, and exactly one variable: a single accent hue per language.
  *
- * Two of them are light and two are dark, and the corner radii and type weights
- * differ, so switching language changes the feel of the app rather than its
- * accent colour.
+ * This replaced four fully-realised culture palettes — ink and cinnabar, washi and
+ * indigo, dancheong on hanji, lacquer and gold leaf — which were handsome and were
+ * too much. Four palettes is four design systems to keep honest, four sets of
+ * contrast to verify, and a product whose surface changes character depending on
+ * which language you happen to be studying. The identity was carried almost
+ * entirely by the accent anyway; the rest was decoration around it.
  *
- * Why this lives in core rather than in the app:
+ * So the reduction: the canvas is the same everywhere, near-white or near-black by
+ * the reader's own system setting. Language moves one hue. Everything else —
+ * neutrals, grade colours, semantic colours — is shared, defined once, and tested
+ * once.
  *
- * The home-screen widgets render in their own processes, in Swift and Kotlin.
- * If the palettes lived in the React layer, each theme would exist three times and
- * the Vietnamese widget would drift out of step with the Vietnamese app the first
- * time anyone adjusted a colour. Instead the themes are data here, they travel in
- * the widget payload, and the native widgets render whatever they are given. It is
- * the same rule as everything else on that boundary: the widget renders, it does
- * not decide.
+ * Two things survive the cut, and the reason each survives is the same test:
+ *
+ *  - **Tone ramps.** On a tone card the colour *is* the answer. Removing it would
+ *    remove the exercise, not the ornament.
+ *  - **Grade colours.** Again and Easy have to be distinguishable at a glance and
+ *    under a thumb, mid-session, without reading.
+ *
+ * Card-kind colour did not survive. Every kind chip already carries its name in
+ * text, so the colour was restating a label — which is the definition of
+ * decoration in this system.
  */
 
 export type ThemeMode = 'light' | 'dark';
 
-export interface ThemeColors {
-  background: string;
+/** The colours available once a language and a mode have been resolved. */
+export interface Palette {
+  /** The page. */
+  canvas: string;
+  /** A surface sitting on the page. */
   surface: string;
+  /** A surface sitting on a surface. */
   surfaceRaised: string;
-  border: string;
+  /** Hairline separators. Used sparingly; space is the preferred separator. */
+  line: string;
 
-  text: string;
-  textMuted: string;
-  textFaint: string;
+  ink: string;
+  inkMuted: string;
+  inkFaint: string;
 
-  /** Primary action and progress colour. */
+  /** The one colour that differs between languages. */
   accent: string;
-  /** Tinted background for accent-coloured chrome. */
+  /** A wash of the accent, for tinted backgrounds. */
   accentSoft: string;
-  /** Secondary accent, used for highlights and the streak. */
-  secondary: string;
+  /** Text colour that is legible on top of `accent`. */
+  onAccent: string;
 
-  /** Grade buttons, in rating order. */
+  /** Grade buttons, in rating order. Shared across languages. */
   again: string;
   hard: string;
   good: string;
   easy: string;
 
-  success: string;
-  warning: string;
-  danger: string;
+  positive: string;
+  caution: string;
+  critical: string;
+
+  /** One colour per tone, or empty for a non-tonal language. */
+  tones: string[];
 }
 
 export interface ThemeRadius {
@@ -62,257 +73,193 @@ export interface ThemeRadius {
   pill: number;
 }
 
-export interface LanguageTheme {
-  languageCode: LanguageCode;
-  /** Theme name shown in settings, e.g. "Ink and cinnabar". */
+/**
+ * Shared neutrals.
+ *
+ * Slightly warm rather than pure grey — a true #FFFFFF/#000000 pair reads as a
+ * spec sheet, and these are surfaces meant to be looked at for an hour at a time.
+ */
+const NEUTRALS: Record<ThemeMode, Pick<Palette, 'canvas' | 'surface' | 'surfaceRaised' | 'line' | 'ink' | 'inkMuted' | 'inkFaint'>> = {
+  light: {
+    canvas: '#FCFCFB',
+    surface: '#F4F4F1',
+    surfaceRaised: '#EAEAE6',
+    line: '#E2E2DD',
+    ink: '#16161A',
+    inkMuted: '#6B6B70',
+    inkFaint: '#9A9A9E',
+  },
+  dark: {
+    canvas: '#0C0C0D',
+    surface: '#161618',
+    surfaceRaised: '#202023',
+    line: '#26262A',
+    ink: '#F4F4F2',
+    inkMuted: '#98989E',
+    inkFaint: '#6A6A70',
+  },
+};
+
+/**
+ * Shared semantics.
+ *
+ * Muted on purpose. A saturated red for "Again" turns an ordinary part of studying
+ * into an alarm, and you press it dozens of times a day.
+ */
+const SEMANTICS: Record<ThemeMode, Pick<Palette, 'again' | 'hard' | 'good' | 'easy' | 'positive' | 'caution' | 'critical'>> = {
+  light: {
+    again: '#B4342A',
+    hard: '#A9762A',
+    good: '#2E7D6B',
+    easy: '#3B5B94',
+    positive: '#2E7D6B',
+    caution: '#A9762A',
+    critical: '#B4342A',
+  },
+  dark: {
+    again: '#E0665C',
+    hard: '#D8A24A',
+    good: '#58AE99',
+    easy: '#7A9BD4',
+    positive: '#58AE99',
+    caution: '#D8A24A',
+    critical: '#E0665C',
+  },
+};
+
+interface AccentDefinition {
+  /** Short name for the accent, shown once in settings. */
   name: string;
-  /** One line on where the palette comes from. */
-  inspiration: string;
-  mode: ThemeMode;
-  colors: ThemeColors;
-  radius: ThemeRadius;
-  /** Letter spacing on headings; part of what makes each theme feel distinct. */
-  headingLetterSpacing: number;
-  /** Weight for headings, as a React Native fontWeight string. */
-  headingWeight: '500' | '600' | '700' | '800';
-  /**
-   * One colour per card kind.
-   *
-   * Stated per theme for the same reason as `toneRamp`. Deriving these from the
-   * semantic colours looked tidy and was wrong: a theme legitimately reuses a hue
-   * across roles — in the washi palette the accent and the Easy button are both
-   * indigo — so a derived mapping renders "Meaning" and "Listening" in the same
-   * colour in the session-mix legend, where the whole point is telling them apart.
-   */
-  kindRamp: Record<CardKind, string>;
-  /**
-   * One colour per tone, for tonal languages only.
-   *
-   * Stated explicitly rather than derived from the semantic colours. On a tone
-   * card the colour *is* the answer, so two tones sharing a hue is a broken
-   * exercise, not a cosmetic issue — and semantic roles legitimately reuse hues
-   * (a theme's danger and accent are both cinnabar red in the Mandarin palette),
-   * so deriving a ramp from them collides by construction.
-   */
-  toneRamp?: string[];
+  light: string;
+  dark: string;
+  softLight: string;
+  softDark: string;
+  /** Ink colour on top of the accent, per mode. */
+  onLight: string;
+  onDark: string;
 }
 
 /**
- * Mandarin — ink on paper, with a cinnabar seal.
+ * One accent per language.
  *
- * Dark, because the reference is ink wash on a dark ground rather than the paper
- * itself. Corners are nearly square: seals, scroll ends and the character grid a
- * learner writes in are all rectilinear.
+ * Each is the single hue that survived from that language's original palette — the
+ * cinnabar of a seal, aizome indigo, celadon, gold leaf — held at comparable
+ * lightness so the four feel like one product rather than four skins.
  */
-const MANDARIN_THEME: LanguageTheme = {
-  languageCode: 'zh',
-  name: 'Ink and cinnabar',
-  inspiration: 'Sumi ink, cinnabar seal paste and gold on lacquer.',
-  mode: 'dark',
-  colors: {
-    background: '#14100E',
-    surface: '#201A17',
-    surfaceRaised: '#2B2320',
-    border: '#3A302B',
-
-    text: '#F5F0E6',
-    textMuted: '#B3A695',
-    textFaint: '#7C7062',
-
-    accent: '#C8102E',
-    accentSoft: '#3A1219',
-    secondary: '#D4AF37',
-
-    again: '#C8102E',
-    hard: '#D4AF37',
-    good: '#6FA287',
-    easy: '#C8A25B',
-
-    success: '#6FA287',
-    warning: '#D4AF37',
-    danger: '#C8102E',
+const ACCENTS: Record<LanguageCode, AccentDefinition> = {
+  zh: {
+    name: 'Cinnabar',
+    light: '#B4342A',
+    dark: '#E0665C',
+    softLight: '#F5E7E5',
+    softDark: '#2A1614',
+    onLight: '#FFFFFF',
+    onDark: '#1A0F0E',
   },
-  kindRamp: {
-    // Lighter than the cinnabar accent: true cinnabar is dark enough that it
-    // falls below 3:1 against the ink surface, which is fine for a filled button
-    // but not for a legend dot and its label.
-    recognition: '#D93A54',
-    production: '#D4AF37',
-    listening: '#7B9FD4',
-    reading: '#6FA287',
-    writing: '#E08A3C',
-    grammar: '#B07AA1',
-    tone: '#E5C76B',
-    script: '#64B6AC',
+  ja: {
+    name: 'Indigo',
+    light: '#33538C',
+    dark: '#8AA8DC',
+    softLight: '#E6EBF4',
+    softDark: '#141B29',
+    onLight: '#FFFFFF',
+    onDark: '#0D1220',
   },
-  radius: { card: 6, control: 4, pill: 999 },
-  headingLetterSpacing: 0.5,
-  headingWeight: '700',
-  // 1 high level, 2 rising, 3 falling-rising, 4 falling, 5 neutral.
-  toneRamp: ['#C8102E', '#D4AF37', '#6FA287', '#7B9FD4', '#7C7062'],
+  ko: {
+    name: 'Celadon',
+    light: '#2E7D6B',
+    dark: '#68BCA6',
+    softLight: '#E4F0EC',
+    softDark: '#0F211D',
+    onLight: '#FFFFFF',
+    onDark: '#08201B',
+  },
+  vi: {
+    name: 'Ochre',
+    // Darker than the ochre used elsewhere in the ramp: at #A9762A a white label
+    // on the primary button lands at 3.95:1, under the 4.5:1 bar. Darkening the
+    // accent keeps white text — and so keeps all four buttons identical apart
+    // from hue — rather than making this one language flip to dark text.
+    light: '#96681F',
+    dark: '#DDAA55',
+    softLight: '#F5EDDF',
+    softDark: '#241B0E',
+    onLight: '#FFFFFF',
+    onDark: '#20180A',
+  },
 };
 
 /**
- * Japanese — washi paper and indigo.
+ * Tone ramps, per tonal language and per mode.
  *
- * Light and rectilinear. Vermilion appears only where something needs to be
- * noticed, the way it does on a torii or a hanko, so it carries the Again button
- * and nothing else.
+ * Stated explicitly rather than derived. Semantic roles legitimately reuse a hue —
+ * critical and the Mandarin accent are both a red — so a derived ramp collides by
+ * construction, and two tones sharing a colour is a broken exercise rather than a
+ * cosmetic slip. Distinctness and contrast are both asserted in the tests.
+ *
+ * Mandarin is 1-4 plus the neutral tone; Vietnamese is ngang, huyền, sắc, hỏi, ngã,
+ * nặng. In both, the quietest tone gets the quietest colour: Mandarin's neutral and
+ * Vietnamese's unmarked ngang are grey, because colouring them loudly teaches the
+ * opposite of how they look on the page.
  */
-const JAPANESE_THEME: LanguageTheme = {
-  languageCode: 'ja',
-  name: 'Washi and indigo',
-  inspiration: 'Washi paper, aizome indigo and vermilion.',
-  mode: 'light',
-  colors: {
-    background: '#FAF6EF',
-    surface: '#FFFFFF',
-    surfaceRaised: '#F2ECE1',
-    border: '#E0D7C7',
-
-    text: '#1C1A17',
-    textMuted: '#5F5849',
-    textFaint: '#918875',
-
-    accent: '#1B3B6F',
-    accentSoft: '#E3E9F4',
-    secondary: '#E24A33',
-
-    again: '#E24A33',
-    hard: '#C98A24',
-    good: '#2E7D62',
-    easy: '#1B3B6F',
-
-    success: '#2E7D62',
-    warning: '#C98A24',
-    danger: '#E24A33',
+const TONE_RAMPS: Partial<Record<LanguageCode, Record<ThemeMode, string[]>>> = {
+  zh: {
+    light: ['#B4342A', '#A9762A', '#2E7D6B', '#3B5B94', '#8A8A8F'],
+    dark: ['#E0665C', '#D8A24A', '#58AE99', '#7A9BD4', '#86868B'],
   },
-  kindRamp: {
-    recognition: '#1B3B6F',
-    production: '#C23B26',
-    listening: '#26668C',
-    reading: '#2E7D62',
-    writing: '#8A5A16',
-    grammar: '#6E4285',
-    tone: '#7A5C30',
-    script: '#5E4335',
+  vi: {
+    light: ['#8A8A8F', '#A9762A', '#B4342A', '#2E7D6B', '#3B5B94', '#7A4A86'],
+    dark: ['#86868B', '#D8A24A', '#E0665C', '#58AE99', '#7A9BD4', '#B48FC4'],
   },
-  radius: { card: 4, control: 4, pill: 999 },
-  headingLetterSpacing: 0,
-  headingWeight: '600',
 };
 
 /**
- * Korean — dancheong pigments on hanji.
+ * One radius scale for the whole product.
  *
- * Light and cool, and the most rounded of the four: the reference is moon jars
- * and the curves of dancheong eaves rather than anything rectilinear. Cobalt
- * leads, jade supports, and taegeuk red is reserved for failure.
+ * Softly rounded, not pill-shaped. A fully-rounded primary button was the right
+ * call when the brief was playful; under a studio that trades on restraint it reads
+ * as a consumer app shouting. The pill radius survives only for the progress track,
+ * where it is a capsule rather than a decision.
  */
-const KOREAN_THEME: LanguageTheme = {
-  languageCode: 'ko',
-  name: 'Dancheong on hanji',
-  inspiration: 'Dancheong temple pigments, celadon jade and hanji paper.',
-  mode: 'light',
-  colors: {
-    background: '#F1F4F6',
-    surface: '#FFFFFF',
-    surfaceRaised: '#E7EDF1',
-    border: '#D3DEE5',
+export const RADIUS: ThemeRadius = { card: 14, control: 10, pill: 999 };
 
-    text: '#12202B',
-    textMuted: '#4E6273',
-    textFaint: '#8298A8',
+export interface LanguageTheme {
+  languageCode: LanguageCode;
+  /** Accent name, e.g. "Cinnabar". The whole of the per-language identity. */
+  accentName: string;
+  light: Palette;
+  dark: Palette;
+  radius: ThemeRadius;
+}
 
-    accent: '#0B4F9E',
-    accentSoft: '#DCE8F6',
-    secondary: '#1F8A70',
-
-    again: '#CD2E3A',
-    hard: '#D98324',
-    good: '#1F8A70',
-    easy: '#0B4F9E',
-
-    success: '#1F8A70',
-    warning: '#D98324',
-    danger: '#CD2E3A',
-  },
-  kindRamp: {
-    recognition: '#0B4F9E',
-    production: '#A33B29',
-    listening: '#6B4494',
-    reading: '#15705B',
-    writing: '#8F5514',
-    grammar: '#A83358',
-    tone: '#6F5729',
-    script: '#265E78',
-  },
-  radius: { card: 16, control: 12, pill: 999 },
-  headingLetterSpacing: -0.2,
-  headingWeight: '700',
-};
-
-/**
- * Vietnamese — son mai lacquer with gold leaf.
- *
- * Dark, warm and red-brown rather than black; the depth in lacquerware comes from
- * layers over a red ground. Gold leads because it is what the eye goes to on a
- * lacquer panel, and it doubles as the tone-drill accent for a language where
- * tones carry most of the difficulty.
- */
-const VIETNAMESE_THEME: LanguageTheme = {
-  languageCode: 'vi',
-  name: 'Lacquer and gold leaf',
-  inspiration: 'Son mai lacquerware, gold leaf and lotus.',
-  mode: 'dark',
-  colors: {
-    background: '#1A0F0C',
-    surface: '#2A1A14',
-    surfaceRaised: '#372219',
-    border: '#4A2E22',
-
-    text: '#F7EFE4',
-    textMuted: '#C0A88F',
-    textFaint: '#8B7259',
-
-    accent: '#E4A11B',
-    accentSoft: '#3E2A11',
-    secondary: '#E8919C',
-
-    again: '#DA251D',
-    hard: '#E4A11B',
-    good: '#7BAE7F',
-    easy: '#E8919C',
-
-    success: '#7BAE7F',
-    warning: '#E4A11B',
-    danger: '#DA251D',
-  },
-  kindRamp: {
-    recognition: '#E4A11B',
-    production: '#E8919C',
-    listening: '#9BC4E2',
-    reading: '#7BAE7F',
-    writing: '#DA251D',
-    grammar: '#C58AC7',
-    tone: '#F5D76E',
-    script: '#6FBFA8',
-  },
-  radius: { card: 12, control: 10, pill: 999 },
-  headingLetterSpacing: 0.2,
-  headingWeight: '600',
-  // 1 ngang, 2 huyen, 3 sac, 4 hoi, 5 nga, 6 nang. Ngang is deliberately the
-  // quietest: it is the unmarked tone, and colouring it loudly teaches the
-  // opposite of how it looks on the page.
-  toneRamp: ['#C0A88F', '#E8919C', '#E4A11B', '#7BAE7F', '#9BC4E2', '#DA251D'],
-};
+function buildPalette(code: LanguageCode, mode: ThemeMode): Palette {
+  const accent = ACCENTS[code];
+  return {
+    ...NEUTRALS[mode],
+    ...SEMANTICS[mode],
+    accent: mode === 'light' ? accent.light : accent.dark,
+    accentSoft: mode === 'light' ? accent.softLight : accent.softDark,
+    onAccent: mode === 'light' ? accent.onLight : accent.onDark,
+    tones: TONE_RAMPS[code]?.[mode] ?? [],
+  };
+}
 
 export const LANGUAGE_THEMES: Record<LanguageCode, LanguageTheme> = {
-  zh: MANDARIN_THEME,
-  ja: JAPANESE_THEME,
-  ko: KOREAN_THEME,
-  vi: VIETNAMESE_THEME,
+  zh: buildTheme('zh'),
+  ja: buildTheme('ja'),
+  ko: buildTheme('ko'),
+  vi: buildTheme('vi'),
 };
+
+function buildTheme(code: LanguageCode): LanguageTheme {
+  return {
+    languageCode: code,
+    accentName: ACCENTS[code].name,
+    light: buildPalette(code, 'light'),
+    dark: buildPalette(code, 'dark'),
+    radius: RADIUS,
+  };
+}
 
 export function getLanguageTheme(code: LanguageCode): LanguageTheme {
   const theme = LANGUAGE_THEMES[code];
@@ -320,31 +267,19 @@ export function getLanguageTheme(code: LanguageCode): LanguageTheme {
   return theme;
 }
 
-/**
- * Accent per card kind for a theme.
- *
- * Read straight off the theme's ramp. The session-mix legend on the dashboard
- * shows several kinds side by side, so these have to be distinguishable from each
- * other and legible on that theme's background — both of which are asserted in
- * `palettes.test.ts` rather than left to eyeballing four palettes.
- */
-export function getCardKindColors(theme: LanguageTheme): Record<CardKind, string> {
-  return theme.kindRamp;
+/** The palette for a language in a given mode. */
+export function resolvePalette(code: LanguageCode, mode: ThemeMode): Palette {
+  const theme = getLanguageTheme(code);
+  return mode === 'dark' ? theme.dark : theme.light;
 }
 
-/**
- * Tone colours for a theme, or an empty list for a non-tonal language.
- *
- * Only Mandarin and Vietnamese have a ramp. Japanese and Korean return nothing,
- * and the UI falls back to plain text rather than colouring syllables against
- * tones that do not exist.
- */
-export function getToneColors(theme: LanguageTheme): string[] {
-  return theme.toneRamp ?? [];
+/** Tone colours for a language and mode, or an empty list for a non-tonal one. */
+export function getToneColors(code: LanguageCode, mode: ThemeMode): string[] {
+  return resolvePalette(code, mode).tones;
 }
 
-export function getToneColor(theme: LanguageTheme, tone: number): string {
-  const palette = getToneColors(theme);
-  if (palette.length === 0) return theme.colors.text;
-  return palette[(tone - 1) % palette.length] ?? theme.colors.textMuted;
+export function getToneColor(code: LanguageCode, mode: ThemeMode, tone: number): string {
+  const palette = resolvePalette(code, mode);
+  if (palette.tones.length === 0) return palette.ink;
+  return palette.tones[(tone - 1) % palette.tones.length] ?? palette.inkMuted;
 }

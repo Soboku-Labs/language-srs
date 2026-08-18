@@ -9,7 +9,7 @@ import {
   type LanguageCode,
   type Rating,
 } from '@language-srs/core';
-import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../theme';
+import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTheme } from '../theme';
 import { Press, Rise } from '../motion/components';
 import { Caption, Card, Pill, Row } from './ui';
 import { ToneText } from './ToneText';
@@ -39,6 +39,9 @@ export function speakEntry(text: string, languageCode: LanguageCode): void {
  *  - `tone` shows the word and asks only for the tone pattern, so the reading —
  *    which spells the tones out — stays hidden.
  *  - `reading` shows the example sentence with the target blanked out.
+ *
+ * The kind used to be colour-coded as well as named. The colour said nothing the
+ * word next to it did not, so it went.
  */
 export function ReviewCard({
   pair,
@@ -49,15 +52,13 @@ export function ReviewCard({
   revealed: boolean;
   onReveal: () => void;
 }) {
-  const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const { card, entry } = pair;
-  const accent = theme.kindColors[card.kind] ?? theme.colors.accent;
 
   return (
-    <Card style={styles.card} accent={accent}>
+    <Card style={styles.card}>
       <Row style={styles.spaceBetween}>
-        <Pill label={kindLabel(card.kind)} color={accent} />
+        <Pill label={kindLabel(card.kind)} />
         <Caption>{entry.partOfSpeech ?? ''}</Caption>
       </Row>
 
@@ -98,8 +99,7 @@ function CardFront({ pair, revealed }: { pair: CardWithEntry; revealed: boolean 
           >
             <Text style={[styles.speakGlyph, { color: theme.colors.accent }]}>▶</Text>
           </Pressable>
-          <Caption>Tap to hear it again</Caption>
-          {revealed ? null : <Caption>What did you hear?</Caption>}
+          {revealed ? <Caption>Tap to hear it again</Caption> : <Caption>What did you hear?</Caption>}
         </View>
       );
 
@@ -123,7 +123,6 @@ function CardFront({ pair, revealed }: { pair: CardWithEntry; revealed: boolean 
         <View style={styles.centered}>
           <Text style={styles.glossPrompt}>{entry.meanings.join(', ')}</Text>
           <Caption>{entry.reading}</Caption>
-          <Caption>Write it out, then reveal</Caption>
         </View>
       );
 
@@ -183,29 +182,17 @@ function Answer({ pair }: { pair: CardWithEntry }) {
       {entry.tones && entry.tones.length > 0 ? (
         <Row style={styles.toneLegend}>
           {entry.tones.map((tone, index) => (
-            <View
-              key={`${tone}-${index}`}
-              style={[styles.tonePip, { backgroundColor: theme.toneColor(tone) }]}
-            >
-              <Text style={styles.tonePipLabel}>{tone}</Text>
-            </View>
+            <View key={`${tone}-${index}`} style={[styles.tonePip, { backgroundColor: theme.toneColor(tone) }]} />
           ))}
         </Row>
-      ) : null}
-
-      {entry.components && entry.components.length > 0 ? (
-        <Caption>Components: {entry.components.join(' ')}</Caption>
       ) : null}
 
       {example ? (
         <View style={styles.example}>
           <Text style={styles.exampleTarget}>{example.target}</Text>
-          {example.reading ? <Caption>{example.reading}</Caption> : null}
           <Caption>{example.translation}</Caption>
         </View>
       ) : null}
-
-      {entry.mnemonic ? <Caption>{entry.mnemonic}</Caption> : null}
     </View>
   );
 }
@@ -216,6 +203,9 @@ function Answer({ pair }: { pair: CardWithEntry }) {
  * Showing the interval is not decoration — it is how a learner calibrates. "Good"
  * meaning 4 days and "Easy" meaning 11 days is the information that makes the
  * choice between them meaningful.
+ *
+ * These keep their colour: Again and Easy have to be distinguishable under a thumb
+ * mid-session, without reading.
  */
 export function GradeButtons({
   previews,
@@ -245,12 +235,7 @@ export function GradeButtons({
           disabled={disabled}
           accessibilityRole="button"
           accessibilityLabel={`${RATING_LABELS[rating]}, next in ${previews[rating].display}`}
-          style={({ pressed }) => [
-            styles.grade,
-            { backgroundColor: `${gradeColors[rating]}22` },
-            pressed && !disabled && { backgroundColor: `${gradeColors[rating]}44` },
-            disabled && styles.gradeDisabled,
-          ]}
+          style={[styles.grade, disabled && styles.gradeDisabled]}
         >
           <Text style={[styles.gradeLabel, { color: gradeColors[rating] }]}>{RATING_LABELS[rating]}</Text>
           <Text style={styles.gradeInterval}>{previews[rating].display}</Text>
@@ -261,8 +246,6 @@ export function GradeButtons({
 }
 
 const createStyles = (theme: ResolvedTheme) => ({
-  // Sized to its content rather than stretched to a fixed height: an empty card
-  // with the prompt marooned in the middle reads as a loading state.
   card: { gap: spacing.md },
   spaceBetween: { justifyContent: 'space-between' as const },
   front: {
@@ -272,52 +255,47 @@ const createStyles = (theme: ResolvedTheme) => ({
     gap: spacing.md,
   },
   centered: { alignItems: 'center' as const, gap: spacing.sm },
-  centeredRow: { justifyContent: 'center' as const },
+  centeredRow: { justifyContent: 'center' as const, gap: spacing.sm },
   target: {
-    color: theme.colors.text,
+    color: theme.colors.ink,
     fontSize: typography.target,
-    fontWeight: '600' as const,
+    fontWeight: weight.medium,
     textAlign: 'center' as const,
   },
   glossPrompt: {
-    color: theme.colors.text,
+    color: theme.colors.ink,
     fontSize: typography.title,
-    fontWeight: '600' as const,
+    fontWeight: weight.medium,
     textAlign: 'center' as const,
   },
   sentencePrompt: {
-    color: theme.colors.text,
-    fontSize: typography.heading + 4,
-    lineHeight: 34,
+    color: theme.colors.ink,
+    fontSize: typography.heading + 3,
+    lineHeight: 32,
     textAlign: 'center' as const,
   },
   speakButton: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.radius.pill,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: theme.colors.accentSoft,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
-  speakGlyph: { fontSize: 24 },
+  speakGlyph: { fontSize: 20 },
   speakInline: { fontSize: typography.heading },
   answer: { gap: spacing.sm, alignItems: 'center' as const },
-  reading: { color: theme.colors.textMuted, fontSize: typography.heading },
+  reading: { color: theme.colors.inkMuted, fontSize: typography.heading },
   meaning: {
-    color: theme.colors.text,
+    color: theme.colors.ink,
     fontSize: typography.heading,
-    fontWeight: '600' as const,
+    fontWeight: weight.medium,
     textAlign: 'center' as const,
   },
+  // Tone pips lost their numerals: the colour is the legend, and a digit inside a
+  // 22pt circle was two encodings of one fact.
   toneLegend: { gap: spacing.xs, justifyContent: 'center' as const },
-  tonePip: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  tonePipLabel: { color: '#FFFFFF', fontSize: typography.micro, fontWeight: '700' as const },
+  tonePip: { width: 20, height: 3, borderRadius: 2 },
   example: {
     backgroundColor: theme.colors.surfaceRaised,
     borderRadius: theme.radius.control,
@@ -325,19 +303,18 @@ const createStyles = (theme: ResolvedTheme) => ({
     gap: 2,
     alignSelf: 'stretch' as const,
   },
-  exampleTarget: { color: theme.colors.text, fontSize: typography.body + 2, lineHeight: 26 },
+  exampleTarget: { color: theme.colors.ink, fontSize: typography.body + 1, lineHeight: 25 },
   grades: { flexDirection: 'row' as const, gap: spacing.sm },
   grade: {
     flex: 1,
-    // Filled tints rather than outlines: four outlined boxes in a row read as a
-    // form, four soft colour chips read as something to tap.
-    borderRadius: theme.radius.pill,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.colors.surface,
     paddingVertical: spacing.md + 2,
     alignItems: 'center' as const,
     gap: 1,
     ...Platform.select({ web: { cursor: 'pointer' as const }, default: {} }),
   },
   gradeDisabled: { opacity: 0.4 },
-  gradeLabel: { fontSize: typography.body, fontWeight: '700' as const },
-  gradeInterval: { color: theme.colors.textFaint, fontSize: typography.micro },
+  gradeLabel: { fontSize: typography.caption, fontWeight: weight.strong },
+  gradeInterval: { color: theme.colors.inkFaint, fontSize: typography.micro },
 });

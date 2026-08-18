@@ -45,56 +45,77 @@ data class WidgetSnapshot(
 )
 
 /**
- * The active language's palette, sent by the app.
+ * Both palettes, sent by the app.
  *
- * Colours arrive as `#RRGGBB` strings and are parsed into `Color` on demand. The
- * widget holds no palette of its own for the same reason the iOS one does not:
- * four themes defined in three languages would be four themes that disagree.
+ * Light *and* dark, because a widget follows the system appearance independently of
+ * the app that wrote its payload — the phone may have switched to dark mode without
+ * the app being opened since. `resolve` picks using Glance's own theme, which is
+ * still rendering rather than computing.
  */
 data class WidgetTheme(
-  val name: String,
-  val mode: String,
-  val background: Color,
-  val surface: Color,
-  val border: Color,
-  val text: Color,
-  val textMuted: Color,
-  val accent: Color,
-  val secondary: Color,
-  /** Grade button colours, indexed by rating 1-4. */
-  val gradeColors: List<Color>,
-  /** Accent for the card kind currently on screen. */
-  val kindAccent: Color,
+  val accentName: String,
+  val light: WidgetPalette,
+  val dark: WidgetPalette,
   val cornerRadius: Dp,
 ) {
-  fun gradeColor(rating: Int): Color = gradeColors.getOrElse(rating - 1) { accent }
+  fun resolve(dark: Boolean): WidgetPalette = if (dark) this.dark else light
 
   companion object {
     /**
-     * Used only when there is no readable payload, alongside the "open to sync"
-     * placeholder. Neutral rather than any one language's palette, because at that
-     * point the widget does not know which language it belongs to.
+     * Used only alongside the "open to sync" placeholder, when there is no readable
+     * payload. Neutral rather than any language's accent, because at that point the
+     * widget does not know which language it belongs to.
      */
     val FALLBACK = WidgetTheme(
-      name = "",
-      mode = "dark",
-      background = Color(0xFF101418),
-      surface = Color(0xFF1B2027),
-      border = Color(0xFF2B323B),
-      text = Color(0xFFF1F5F9),
-      textMuted = Color(0xFF94A3B8),
-      accent = Color(0xFF5B8DEF),
-      secondary = Color(0xFF94A3B8),
-      gradeColors = listOf(
-        Color(0xFFEF6461),
-        Color(0xFFE8A33D),
-        Color(0xFF4CAF7D),
-        Color(0xFF5B8DEF),
+      accentName = "",
+      light = WidgetPalette(
+        canvas = Color(0xFFFCFCFB),
+        surface = Color(0xFFF4F4F1),
+        line = Color(0xFFE2E2DD),
+        ink = Color(0xFF16161A),
+        inkMuted = Color(0xFF6B6B70),
+        accent = Color(0xFF16161A),
+        onAccent = Color(0xFFFFFFFF),
+        gradeColors = listOf(
+          Color(0xFFB4342A),
+          Color(0xFFA9762A),
+          Color(0xFF2E7D6B),
+          Color(0xFF3B5B94),
+        ),
       ),
-      kindAccent = Color(0xFF5B8DEF),
-      cornerRadius = 12.dp,
+      dark = WidgetPalette(
+        canvas = Color(0xFF0C0C0D),
+        surface = Color(0xFF161618),
+        line = Color(0xFF26262A),
+        ink = Color(0xFFF4F4F2),
+        inkMuted = Color(0xFF98989E),
+        accent = Color(0xFFF4F4F2),
+        onAccent = Color(0xFF0C0C0D),
+        gradeColors = listOf(
+          Color(0xFFE0665C),
+          Color(0xFFD8A24A),
+          Color(0xFF58AE99),
+          Color(0xFF7A9BD4),
+        ),
+      ),
+      cornerRadius = 14.dp,
     )
   }
+}
+
+/** One mode's colours, already resolved. */
+data class WidgetPalette(
+  val canvas: Color,
+  val surface: Color,
+  val line: Color,
+  val ink: Color,
+  val inkMuted: Color,
+  val accent: Color,
+  val onAccent: Color,
+  /** Grade button colours, indexed by rating 1-4. */
+  val gradeColors: List<Color>,
+) {
+  fun gradeColor(rating: Int): Color = gradeColors.getOrElse(rating - 1) { accent }
 }
 
 data class WidgetCard(
@@ -118,7 +139,7 @@ data class GradeOption(
 )
 
 /** Schema version this widget understands; matches `WIDGET_SCHEMA_VERSION` in core. */
-const val SUPPORTED_SCHEMA_VERSION = 2
+const val SUPPORTED_SCHEMA_VERSION = 3
 
 object SnapshotStore {
   private fun prefsName(context: Context): String = metadata(context, "com.languagesrs.WIDGET_PREFS", "language_srs_widget")
@@ -188,7 +209,17 @@ object SnapshotStore {
   private fun parseTheme(json: JSONObject?): WidgetTheme {
     if (json == null) return WidgetTheme.FALLBACK
 
-    val fallback = WidgetTheme.FALLBACK
+    return WidgetTheme(
+      accentName = json.optString("accentName"),
+      light = parsePalette(json.optJSONObject("light"), WidgetTheme.FALLBACK.light),
+      dark = parsePalette(json.optJSONObject("dark"), WidgetTheme.FALLBACK.dark),
+      cornerRadius = json.optDouble("cornerRadius", 14.0).dp,
+    )
+  }
+
+  private fun parsePalette(json: JSONObject?, fallback: WidgetPalette): WidgetPalette {
+    if (json == null) return fallback
+
     val gradesArray = json.optJSONArray("gradeColors")
     val grades = if (gradesArray == null) {
       fallback.gradeColors
@@ -198,21 +229,15 @@ object SnapshotStore {
       }
     }
 
-    return WidgetTheme(
-      name = json.optString("name"),
-      mode = json.optString("mode", "dark"),
-      background = parseColor(json.optString("background"), fallback.background),
+    return WidgetPalette(
+      canvas = parseColor(json.optString("canvas"), fallback.canvas),
       surface = parseColor(json.optString("surface"), fallback.surface),
-      border = parseColor(json.optString("border"), fallback.border),
-      text = parseColor(json.optString("text"), fallback.text),
-      textMuted = parseColor(json.optString("textMuted"), fallback.textMuted),
+      line = parseColor(json.optString("line"), fallback.line),
+      ink = parseColor(json.optString("ink"), fallback.ink),
+      inkMuted = parseColor(json.optString("inkMuted"), fallback.inkMuted),
       accent = parseColor(json.optString("accent"), fallback.accent),
-      secondary = parseColor(json.optString("secondary"), fallback.secondary),
+      onAccent = parseColor(json.optString("onAccent"), fallback.onAccent),
       gradeColors = grades,
-      kindAccent = parseColor(json.optString("kindAccent"), fallback.kindAccent),
-      // Compose supplies a Double.dp extension, so the payload's number converts
-      // directly.
-      cornerRadius = json.optDouble("cornerRadius", 12.0).dp,
     )
   }
 

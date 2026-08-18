@@ -1,161 +1,184 @@
-# Paper & Ink — the design language
+# The Suboku system
 
-## Why this one
+The design language for Suboku Labs products. This one is a language-study app; the
+system is meant to outlast it.
 
-The four themes already pointed at it. Every palette in the app references a
-physical writing surface: sumi ink on a dark ground, washi paper and aizome
-indigo, dancheong pigment on hanji, sơn mài lacquer under gold leaf. That is not
-a coincidence of taste — it is what learning these four languages has always
-physically involved.
+## The premise
 
-So the design language is: **the app behaves like paper and pigment.** Surfaces
-are sheets. Colour is pigment, applied where it means something. Cards are
-objects you pick up, put down and deal off a deck.
+**One canvas. One variable.**
 
-That gives the interface a consistent answer to "how should this behave?" that
-does not need a designer in the room for every new screen.
+The canvas is neutral — near-white or near-black, following the reader's own system
+setting. The variable is a single accent hue. In this product the accent is what
+distinguishes the four languages; in another it might distinguish nothing at all,
+and the system still holds.
 
-## The five principles
+That is the whole of it. Everything below is a consequence.
 
-### 1. Surfaces are sheets, not boxes
+### What this replaced, and why
 
-A sheet is separated from what is under it by tone and shadowless depth, not by
-an outline. An earlier version of this app boxed every group in a bordered panel,
-and the dashboard became six rectangles with no hierarchy — everything equally
-important is the same as nothing being important.
+The previous system, *Paper & Ink*, gave each language a fully realised palette
+drawn from its material culture: sumi ink and cinnabar, washi and aizome indigo,
+dancheong on hanji, sơn mài lacquer under gold leaf. Two were light, two were dark,
+and the corner radii and type weights differed between them.
 
-So: whitespace first, tint second, border almost never. `Card` is reserved for
-the one thing on a screen you are meant to act on.
+It was handsome and it was too much. Four palettes is four design systems to keep
+honest, four sets of contrast ratios to verify, and a product whose character
+changes depending on which language you happen to be studying. Reviewing it, almost
+all of the identity was carried by the accent; the rest was decoration arranged
+around it.
 
-### 2. Ink is expensive
+So the reduction kept the accent and dropped the rest. Four front ends survive —
+they are simply four front ends that agree with each other.
 
-Colour marks meaning. It is never decoration and never mood.
+## Principles
 
-In practice this means one filled control per screen — the primary action — and
-everything else in text. It also means colour that carries information is held to
-a standard: tone colours and card-kind colours are asserted for contrast and
-mutual distinctness in `packages/core/src/theme/palettes.test.ts`, because on a
-tone card **the colour is the answer**.
+### 1. Take away before adding
 
-### 3. One question per screen
+Every element on a screen should have survived a question: what breaks if this is
+removed? Three things failed that question during this redesign and were deleted
+rather than restyled — a colour-coded chip next to a text label saying the same
+thing, a stacked colour bar with a legend where a short sentence read better, and a
+full-width slab of accent that had stopped being an accent by occupying a quarter
+of the canvas.
+
+### 2. Space separates; lines almost never do
+
+An earlier version boxed every group in a bordered panel, and each screen became a
+stack of rectangles with no hierarchy. Everything equally important is the same as
+nothing being important. `Card` is now reserved for the single thing on a screen you
+act on, and it is a tint rather than an outline.
+
+### 3. Colour must carry information
+
+Colour that restates a label is decoration. Two uses earned their place, and both
+pass the same test — *removing this removes meaning, not ornament*:
+
+- **Tone ramps.** On a tone card the colour **is** the answer.
+- **Grade colours.** Again and Easy have to be distinguishable under a thumb,
+  mid-session, without reading.
+
+Everything else is ink, muted ink, or faint ink.
+
+### 4. One question per screen
 
 The dashboard answers "is there anything to study?" Review answers "what is this
-word?" Progress answers "how am I doing?" Anything that answers a different
-question belongs on a different screen, one tap away.
+word?" Progress answers "how am I doing?" Anything answering a different question
+belongs on a different screen, one tap away.
 
-### 4. Motion explains; it does not entertain
+### 5. Motion explains; it does not entertain
 
-Every animation in the app encodes where something came from or where it went. The
-test each one is written against: *if this animation were removed, would the
-interface become harder to follow?* If not, it should not have been added.
+Every animation encodes where something came from or where it went. The test: *if
+this were removed, would the interface become harder to follow?* If not, it should
+not have been added.
 
-This rules out the things that make apps feel expensive and behave worse —
-decorative loading shimmers, parallax, bouncing icons, anything that puts a
-duration between a tap and its result.
+### 6. Nothing is mandatory
 
-### 5. Nothing is mandatory
+Every motion honours the system reduce-motion setting and resolves instantly to its
+end state. Nothing is hidden behind a transition that never plays.
 
-Every motion respects the system's reduce-motion setting via Reanimated's
-`ReduceMotion.System` and `useReducedMotion()`. Under reduced motion, animations
-resolve instantly to their end state — nothing is hidden behind a transition that
-never plays.
+## Palette
+
+Shared, in both modes: canvas, surface, surface-raised, line, ink, ink-muted,
+ink-faint, plus the semantic set (positive, caution, critical) and the four grade
+colours. Defined once, tested once.
+
+Per language, one accent:
+
+| Language | Accent |
+| --- | --- |
+| Mandarin | Cinnabar |
+| Japanese | Indigo |
+| Korean | Celadon |
+| Vietnamese | Ochre |
+
+Held at comparable lightness so the four feel like one product rather than four
+skins. The primary action is **ink**, not accent — the accent appears in links,
+progress fills, tone marks and the language dot, where it distinguishes something.
+
+Neutrals are slightly warm rather than pure grey. A true `#FFFFFF`/`#000000` pair
+reads as a spec sheet, and these are surfaces meant to be looked at for an hour at a
+time.
+
+### Verified, not eyeballed
+
+`packages/core/src/theme/palettes.test.ts` asserts, across all four languages and
+both modes: body text at WCAG AA on canvas and surface, muted and faint text above
+their thresholds, the accent legible as text, the accent's own label legible on top
+of it, every grade colour legible and mutually distinct, and every tone colour
+legible and mutually distinct.
+
+One test is the system's own guardrail: **nothing varies between languages except
+the accent and the tone ramp.** If a second field ever starts varying, that test
+fails and the system has quietly become four systems again.
+
+Two palettes were caught by these tests rather than by looking: Vietnamese ochre at
+`#A9762A` put white button text at 3.95:1, under the 4.5:1 bar, and was darkened;
+and in the previous system Mandarin's tones 1 and 4 resolved to the same red, which
+would have silently broken the tone exercise.
 
 ## Type and shape
 
-| Token | Value | Note |
-| --- | --- | --- |
-| Target text | 44 / 30pt | Large on purpose: tone marks and the hỏi/ngã distinction do not survive body size. |
-| Title | 24pt | Weight and letter spacing come from the theme. |
-| Heading | 18pt | |
-| Body | 15pt | |
-| Caption | 13pt | |
-| Micro | 11pt | Section labels, in uppercase with wide tracking. |
+| Token | Size |
+| --- | --- |
+| Target text | 46 / 28 |
+| Display (the one big number) | 68 |
+| Title | 22 |
+| Heading | 17 |
+| Body | 15 |
+| Caption | 13 |
+| Micro | 11 |
 
-Spacing runs 4 / 8 / 12 / 16 / 24 / 32. Corner radii come from the **theme**, not
-from a global token — it is one of the things that makes the four front ends feel
-different rather than recoloured: Japanese is near-square at 4pt, Korean is round
-at 16pt.
+Target-language text is set large deliberately: tone marks, kanji strokes and the
+hỏi/ngã distinction do not survive body size, and a learner squinting at a diacritic
+is not studying it.
+
+Three weights — 400, 500, 600 — not five. Hierarchy comes from size and space;
+adding weight on top of both is what makes an interface look busy while every
+individual decision seemed reasonable.
+
+Spacing runs 4 / 8 / 12 / 20 / 28 / 44. One radius scale for the whole product:
+14 for surfaces, 10 for controls. Pill radius survives only for the progress track,
+where it is a capsule rather than a decision.
 
 ## Motion
 
+Springs, not eased curves, for anything with mass — a spring settles the way an
+object settles. Fades still use a bezier; light has no mass. Nothing exceeds 340ms:
+on a screen visited forty times a day, longer stops being polish and becomes a
+queue.
+
+| Pattern | What it encodes |
+| --- | --- |
+| **Press-scale** | The tap landed, before any state has changed. Without it a slow action reads as a missed tap and gets pressed twice. |
+| **Staggered rise** | Reading order. Tells you where to look first without anything being louder. |
+| **Count roll-up** | Draws the eye to the one number the dashboard exists to deliver, and makes a changed count noticeable on return. |
+| **Card deal** | Direction of the grade you gave — Again and Hard lean left, Good and Easy right. The only feedback distinguishing a grade you meant from one you mis-tapped. |
+| **Reveal** | The answer rises into place, so the eye follows content rather than re-finding it. |
+| **Progress fill** | Tight spring, no overshoot. A bar that bounces past its value is lying for a few frames. |
+| **Celebration** | One bouncy pop, at the end of a session. The only one, which is why it still works. |
+
+Deliberately absent: no screen-transition choreography beyond the platform default,
+no skeleton shimmers, no looping or idle animation. Nothing moves unless you did
+something.
+
 ### On sourcing
 
-Mobbin is login-gated — a direct fetch returns 403 — so nothing here was taken
-from it. What follows are the patterns Mobbin catalogues, implemented from the
-conventions themselves: the shared vocabulary you see across Duolingo, Things,
-Headspace, Linear and the iOS and Material motion guidelines. If you have a Mobbin
-subscription and want a specific app's timing curve matched, that is a
-straightforward change — every value lives in `src/motion/tokens.ts`.
-
-### The tokens
-
-Springs, not eased curves, for anything that moves. A spring settles the way an
-object settles; a card that decelerates on a bezier reads as a sprite rather than
-a sheet of paper. Fades still use a bezier — light has no mass.
-
-```
-spring        damping 18, stiffness 220   the house spring
-springTight   damping 26, overshoot off   progress fills and anything read as a value
-springBouncy  damping 11, stiffness 180   the one celebratory beat
-```
-
-Durations top out at 340ms. Anything longer, on a screen you visit forty times a
-day, stops being polish and becomes a queue.
-
-### The patterns
-
-**Press-scale** — `Press`, in `src/motion/components.tsx`. Every tappable drops to
-0.965 in 90ms and springs back. The cheapest and most valuable animation in the
-app: a control that moves under your thumb confirms the tap landed before any
-state has changed. Without it, a slow action reads as a missed tap and gets
-pressed twice.
-
-**Staggered rise** — `Rise`. Content fades up 14pt, 45ms apart between siblings,
-so a screen resolves top to bottom in the order you would read it. The ordering is
-the point: it tells you where to look first without anything having to be bigger
-or brighter than it deserves.
-
-**Count roll-up** — `CountUp`. The dashboard's waiting count rolls from zero over
-~520ms. It draws the eye to the number the whole screen exists to deliver, and
-makes a changed count noticeable when you come back.
-
-**Card deal** — `DealtCard`. The signature interaction. After you grade, the next
-card rises from beneath and settles, offset in the direction of the grade you gave
-— Again and Hard lean left, Good and Easy lean right. This is the only feedback
-that distinguishes a grade you meant from one you mis-tapped, and it arrives
-before the next card has rendered, so a wrong tap is obvious immediately rather
-than one card later.
-
-**Reveal** — the answer rises into place rather than the card snapping to a new
-height, so the eye follows the content instead of re-finding it.
-
-**Progress fill** — `AnimatedFill`, on the tight spring. No overshoot: a progress
-bar that bounces past its value and back is lying for a few frames.
-
-**Theme cross-fade** — `ThemeFade`. Switching language changes every colour at
-once, and in two of the four themes it flips light to dark. An instant swap reads
-as a glitch; a 340ms fade reads as the app changing clothes.
-
-**Celebration** — `PopIn` on the bouncy spring, used once: the end-of-session
-panel. One moment in the app where a little celebration is the correct response,
-and it stays effective because it is the only one.
-
-### What is deliberately absent
-
-- No screen-transition choreography beyond the platform default. The native
-  push/pop is what users already know.
-- No skeleton shimmers. The app loads from local storage; a shimmer would be
-  theatre for something that takes a frame.
-- No looping or idle animation anywhere. Nothing moves unless you did something.
+An earlier request asked for motion patterns from Mobbin. Mobbin is login-gated — a
+direct fetch returns 403 — so nothing here was taken from it. These are the patterns
+it catalogues, implemented from the conventions themselves. Every timing lives in
+`src/motion/tokens.ts` if a specific reference needs matching.
 
 ## Where things live
 
 ```
-src/motion/tokens.ts       springs, durations, easing, distances
-src/motion/components.tsx  Rise, Press, CountUp, AnimatedFill, DealtCard, PopIn, ThemeFade
-src/theme/                 layout tokens + the theme provider
-packages/core/src/theme/   the four palettes, as data
+packages/core/src/theme/     the palettes, as data — shared with the native widgets
+apps/mobile/src/theme/       layout tokens and the theme provider
+apps/mobile/src/motion/      tokens and the motion primitives
 ```
 
-Motion primitives take no colours and no layout opinions — they wrap children and
-animate them — so any screen can adopt one without inheriting a look.
+The palettes are in core rather than the app because the home-screen widgets render
+in their own processes, in Swift and Kotlin. Defining colours there too would mean
+each palette existing three times and drifting in two of them. Instead both modes
+travel in the widget payload and the native code picks with its own environment —
+so a widget follows the home screen's appearance, not whichever mode the app was
+last in.

@@ -119,15 +119,16 @@ export type { CoverageStats, ForecastDay, RetentionStats, StreakInfo } from './s
 export { computeExamReadiness, suggestDailyNewLimit } from './stats/readiness';
 export type { ExamReadiness, ReadinessVerdict } from './stats/readiness';
 
-// Themes — one per language, shared by the app and the native widgets
+// Themes — the Suboku system, shared by the app and the native widgets
 export {
   LANGUAGE_THEMES,
-  getCardKindColors,
+  RADIUS,
   getLanguageTheme,
   getToneColor,
   getToneColors,
+  resolvePalette,
 } from './theme/palettes';
-export type { LanguageTheme, ThemeColors, ThemeMode, ThemeRadius } from './theme/palettes';
+export type { LanguageTheme, Palette, ThemeMode, ThemeRadius } from './theme/palettes';
 
 // Widget contract
 export {

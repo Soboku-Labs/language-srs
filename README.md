@@ -1,8 +1,12 @@
 # language-srs
 
 Exam-aligned spaced repetition for **Mandarin, Japanese, Korean and Vietnamese**, with
-home-screen widgets. Four themed front ends over one shared core, running natively on
-iOS and Android and as a static web app — from a single codebase.
+home-screen widgets. One shared core, running natively on iOS and Android and as a
+static web app — from a single codebase.
+
+A [Suboku Labs](https://github.com/suboku-labs) product, built on the Suboku design
+system: one neutral canvas, one accent, and nothing on screen that has not earned its
+place. See [docs/DESIGN.md](docs/DESIGN.md).
 
 ## What makes it exam-shaped
 
@@ -23,31 +27,34 @@ paper you are actually sitting.
   reviews* — the number tells you what would happen if you stopped today, rather than
   counting scheduled-but-undone work as knowledge.
 
-## Four front ends, one backend
+## Four languages, one surface
 
-Each language has its own visual identity, drawn from its material culture rather than
-its flag. Two are light, two are dark; corner radii and type weights differ too.
+The canvas is the same everywhere — near-white or near-black, following the reader's
+system setting. A language changes exactly one thing: its accent.
 
-| Language | Theme | Palette |
-| --- | --- | --- |
-| Mandarin | Ink and cinnabar | Sumi ink ground, cinnabar seal paste, gold. Dark, near-square corners. |
-| Japanese | Washi and indigo | Washi paper, aizome indigo, vermilion. Light and rectilinear. |
-| Korean | Dancheong on hanji | Dancheong pigments, celadon jade, cobalt. Light, cool, the most rounded. |
-| Vietnamese | Lacquer and gold leaf | Sơn mài lacquer, gold leaf, lotus. Dark and warm. |
+| Language | Accent |
+| --- | --- |
+| Mandarin | Cinnabar |
+| Japanese | Indigo |
+| Korean | Celadon |
+| Vietnamese | Ochre |
 
-The themes live in `@language-srs/core` as data, not in the React layer — so the app,
-the iOS widget and the Android widget all render the same palette without it being
-defined three times. Switching language re-themes the app and its widget together.
+An earlier version gave each language a fully realised palette drawn from its material
+culture. It was handsome and it was four design systems to keep honest — so it was
+reduced to the part that was actually carrying the identity. A test asserts that
+nothing except the accent and the tone ramp varies between languages, so it cannot
+quietly become four systems again.
 
-They share one design language — **Paper & Ink** — in which surfaces are sheets,
-colour is pigment applied only where it means something, and motion explains rather
-than entertains. The full spec, including every motion pattern and the reasoning
-behind each, is in [docs/DESIGN.md](docs/DESIGN.md).
+The palettes live in `@language-srs/core` as data, not in the React layer, so the app
+and both native widgets render one definition. The widget payload carries *both* modes,
+letting the home screen follow its own appearance rather than whichever mode the app
+was last in.
 
-Tonal languages get a tone ramp: each syllable of a Mandarin or Vietnamese word is
-coloured by its tone, in that theme's own hues. Colour is the answer on a tone card, so
-the ramps are stated explicitly per theme and tested for distinctness and contrast —
-not derived from the semantic palette, which collides.
+Tone ramps are the exception that proves the rule about colour: each syllable of a
+Mandarin or Vietnamese word is coloured by its tone, because on a tone card the colour
+**is** the answer. Those ramps are stated explicitly per language and tested for
+distinctness and contrast — deriving them from the semantic palette collided, and
+silently broke the exercise.
 
 ## Layout
 
@@ -57,7 +64,7 @@ packages/core/            @language-srs/core — all the domain logic, no React 
   srs/                    FSRS-4.5 scheduler + exam-date pressure
   session/                queue building, daily caps, exam-weighted card mix
   stats/                  streaks, true retention, coverage, exam readiness
-  theme/                  the four palettes
+  theme/                  the Suboku palettes
   widget/                 the widget payload contract and deep links
   data/                   seed decks and the bulk importer
   engine.ts               the single API the app talks to

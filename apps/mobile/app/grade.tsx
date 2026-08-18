@@ -63,6 +63,6 @@ const createStyles = (theme: ResolvedTheme) => ({
     flex: 1,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.canvas,
   },
 });

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import type { LanguageCode } from '@language-srs/core';
-import { useTheme, useThemedStyles, type ResolvedTheme } from '../theme';
+import { useTheme, useThemedStyles, weight, type ResolvedTheme } from '../theme';
 
 /**
  * Target-language text with each syllable coloured by its tone.
@@ -18,8 +18,9 @@ import { useTheme, useThemedStyles, type ResolvedTheme } from '../theme';
  * colouring syllables against the wrong tones. Colour is the answer on a tone
  * card, so a wrong colour is worse than no colour.
  *
- * The ramp comes from the active theme, so Mandarin tones read as cinnabar, gold
- * and jade while Vietnamese tones read as lotus and gold leaf.
+ * The ramp comes from the active language and mode. It is one of only two places
+ * colour survived the move to the Suboku system, because here the colour *is* the
+ * answer rather than a restatement of a label.
  */
 export function ToneText({
   text,
@@ -75,5 +76,5 @@ const createStyles = (theme: ResolvedTheme) => ({
     justifyContent: 'center' as const,
     alignItems: 'baseline' as const,
   },
-  plain: { color: theme.colors.text, fontWeight: '600' as const, textAlign: 'center' as const },
+  plain: { color: theme.colors.ink, fontWeight: weight.medium, textAlign: 'center' as const },
 });

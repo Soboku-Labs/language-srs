@@ -4,7 +4,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { EngineProvider } from '../src/engine/EngineProvider';
-import { ThemeProvider, useTheme } from '../src/theme';
+import { ThemeProvider, useTheme, weight } from '../src/theme';
 import { ThemeFade } from '../src/motion/components';
 
 export default function RootLayout() {
@@ -38,12 +38,12 @@ function ThemedNavigator() {
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: theme.colors.background },
-          headerTintColor: theme.colors.text,
+          headerStyle: { backgroundColor: theme.colors.canvas },
+          headerTintColor: theme.colors.ink,
           // React Navigation only accepts font family, size, weight and colour
           // here, so the theme's letter spacing does not apply to header titles.
-          headerTitleStyle: { fontWeight: theme.headingWeight },
-          contentStyle: { backgroundColor: theme.colors.background },
+          headerTitleStyle: { fontWeight: weight.strong },
+          contentStyle: { backgroundColor: theme.colors.canvas },
           headerShadowVisible: false,
         }}
       >

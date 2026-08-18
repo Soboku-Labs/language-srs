@@ -11,7 +11,7 @@ import {
 import { useEngine } from '../src/engine/EngineProvider';
 import { widgetBridge } from '../modules/widget-bridge';
 import { Caption, DetailRow, Row, Screen, Section, TextButton } from '../src/components/ui';
-import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
+import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTheme } from '../src/theme';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -123,7 +123,7 @@ export default function SettingsScreen() {
             onBlur={() => void applyExamDate(examDateDraft)}
             onSubmitEditing={() => void applyExamDate(examDateDraft)}
             placeholder="YYYY-MM-DD"
-            placeholderTextColor={theme.colors.textFaint}
+            placeholderTextColor={theme.colors.inkFaint}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="numbers-and-punctuation"
@@ -194,7 +194,7 @@ export default function SettingsScreen() {
       </Section>
 
       <Section title="More">
-        <DetailRow label="Theme" value={theme.name} />
+        <DetailRow label="Accent" value={theme.accentName} />
         {widgetBridge.isSupported ? (
           <TextButton
             label="Refresh home-screen widget"
@@ -205,7 +205,7 @@ export default function SettingsScreen() {
         )}
         <TextButton
           label="Reset all progress"
-          color={theme.colors.danger}
+          color={theme.colors.critical}
           onPress={() => void mutate((instance) => instance.reset())}
         />
       </Section>
@@ -264,45 +264,45 @@ function Stepper({
 const createStyles = (theme: ResolvedTheme) => ({
   wrap: { flexWrap: 'wrap' as const, gap: spacing.sm },
   choice: {
-    borderRadius: theme.radius.pill,
+    borderRadius: theme.radius.control,
     backgroundColor: theme.colors.surface,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
   choiceSelected: { backgroundColor: theme.colors.accent },
-  choiceLabel: { color: theme.colors.textMuted, fontSize: typography.caption, fontWeight: '600' as const },
-  choiceLabelSelected: { color: theme.mode === 'light' ? '#FFFFFF' : theme.colors.background },
+  choiceLabel: { color: theme.colors.inkMuted, fontSize: typography.caption, fontWeight: weight.medium },
+  choiceLabelSelected: { color: theme.colors.onAccent },
   input: {
-    borderRadius: theme.radius.pill,
+    borderRadius: theme.radius.control,
     backgroundColor: theme.colors.surface,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    color: theme.colors.text,
+    color: theme.colors.ink,
     fontSize: typography.caption,
     minWidth: 140,
   },
-  error: { color: theme.colors.danger, fontSize: typography.caption },
+  error: { color: theme.colors.critical, fontSize: typography.caption },
   stepper: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
     paddingVertical: spacing.xs,
   },
-  stepperLabel: { color: theme.colors.text, fontSize: typography.body, flex: 1 },
+  stepperLabel: { color: theme.colors.ink, fontSize: typography.body, flex: 1 },
   stepperControls: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.md },
   stepperButton: {
     width: 36,
     height: 36,
-    borderRadius: theme.radius.pill,
+    borderRadius: theme.radius.control,
     backgroundColor: theme.colors.surface,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
-  stepperGlyph: { color: theme.colors.text, fontSize: typography.heading },
+  stepperGlyph: { color: theme.colors.ink, fontSize: typography.heading },
   stepperValue: {
-    color: theme.colors.text,
+    color: theme.colors.ink,
     fontSize: typography.body,
-    fontWeight: '700' as const,
+    fontWeight: weight.strong,
     minWidth: 48,
     textAlign: 'center' as const,
   },

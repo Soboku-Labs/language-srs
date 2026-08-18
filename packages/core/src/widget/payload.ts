@@ -4,7 +4,7 @@ import type { SchedulerConfig } from '../srs/params';
 import type { Card, CardWithEntry, LexicalEntry, StudyProfile, Timestamp } from '../types/card';
 import type { CardKind } from '../types/exam';
 import { getLanguageProfile, type LanguageCode } from '../types/language';
-import { getCardKindColors, getLanguageTheme } from '../theme/palettes';
+import { getLanguageTheme, type Palette } from '../theme/palettes';
 import type { Rating } from '../types/review';
 import { addDays, addMinutes, calendarDaysBetween } from '../utils/date';
 import type { ExamReadiness } from '../stats/readiness';
@@ -27,18 +27,20 @@ import { linkToCard, linkToGrade, linkToHome, linkToReveal, linkToReview } from 
  * drifts in two of them. Precomputing here means the scheduling behaviour a
  * learner sees on their home screen is the same code that runs in the app.
  *
- * That rule is also why the theme travels in the payload. Each language has its
- * own palette (see `theme/palettes.ts`), and the widget has to match the app it
- * belongs to. Sending the colours means Swift and Kotlin hold no palettes of
- * their own and cannot drift from the app when one is adjusted.
+ * That rule is also why the palettes travel in the payload. The Suboku system
+ * (see `theme/palettes.ts`) is one neutral canvas with a single accent per
+ * language, and the widget has to match the app it belongs to. Sending the
+ * colours means Swift and Kotlin hold no palette of their own and cannot drift
+ * when one is adjusted.
  *
  * Bump `WIDGET_SCHEMA_VERSION` on any breaking shape change: the native
  * decoders check it and fall back to a "tap to refresh" state rather than
  * crashing when an old widget binary meets a new payload.
  *
- * v2 added the `theme` block.
+ * v2 added the `theme` block. v3 replaced it with both palettes at once, so the
+ * widget can follow the home screen's own appearance.
  */
-export const WIDGET_SCHEMA_VERSION = 2;
+export const WIDGET_SCHEMA_VERSION = 3;
 
 /** Widget sizes the payload is designed to fill. */
 export type WidgetFamily =
@@ -87,6 +89,19 @@ export interface WidgetGradeOption {
   deepLink: string;
 }
 
+/** One mode's colours, already resolved. */
+export interface WidgetPalette {
+  canvas: string;
+  surface: string;
+  line: string;
+  ink: string;
+  inkMuted: string;
+  accent: string;
+  onAccent: string;
+  /** Grade button colours, indexed by rating 1-4. */
+  gradeColors: [string, string, string, string];
+}
+
 export interface WidgetCounts {
   due: number;
   fresh: number;
@@ -115,26 +130,19 @@ export interface WidgetSnapshot {
   };
 
   /**
-   * The active language's palette, flattened to hex strings.
+   * Both palettes, flattened to hex strings.
    *
-   * Sent rather than looked up natively so the widget's colours cannot diverge
-   * from the app's. `kindAccent` is the colour for `nextCard.kind`, resolved here
-   * so the widget does not need the kind-to-colour mapping either.
+   * Light *and* dark, rather than whichever the app happened to be showing. A
+   * widget sits on someone's home screen and follows the system appearance
+   * independently of the app that wrote its payload — the app may not have been
+   * opened since the phone last switched to dark mode. Sending both lets the
+   * native side pick with its own environment and still compute nothing.
    */
   theme: {
-    name: string;
-    mode: 'light' | 'dark';
-    background: string;
-    surface: string;
-    border: string;
-    text: string;
-    textMuted: string;
-    accent: string;
-    secondary: string;
-    /** Grade button colours, indexed by rating 1-4. */
-    gradeColors: [string, string, string, string];
-    /** Accent for the card kind currently being shown. */
-    kindAccent: string;
+    /** Accent name, e.g. "Cinnabar". The whole per-language identity. */
+    accentName: string;
+    light: WidgetPalette;
+    dark: WidgetPalette;
     /** Corner radius for widget surfaces, in points/dp. */
     cornerRadius: number;
   };
@@ -221,8 +229,6 @@ export function buildWidgetSnapshot(input: BuildWidgetSnapshotInput): WidgetSnap
   const daysToExam = profile.examDate ? calendarDaysBetween(now, profile.examDate) : undefined;
 
   const theme = getLanguageTheme(profile.languageCode);
-  const kindColors = getCardKindColors(theme);
-  const shownKind = nextCard?.kind ?? spotlight?.kind;
 
   return {
     schemaVersion: WIDGET_SCHEMA_VERSION,
@@ -237,17 +243,9 @@ export function buildWidgetSnapshot(input: BuildWidgetSnapshotInput): WidgetSnap
     },
 
     theme: {
-      name: theme.name,
-      mode: theme.mode,
-      background: theme.colors.background,
-      surface: theme.colors.surface,
-      border: theme.colors.border,
-      text: theme.colors.text,
-      textMuted: theme.colors.textMuted,
-      accent: theme.colors.accent,
-      secondary: theme.colors.secondary,
-      gradeColors: [theme.colors.again, theme.colors.hard, theme.colors.good, theme.colors.easy],
-      kindAccent: (shownKind ? kindColors[shownKind] : undefined) ?? theme.colors.accent,
+      accentName: theme.accentName,
+      light: toWidgetPalette(theme.light),
+      dark: toWidgetPalette(theme.dark),
       cornerRadius: theme.radius.card,
     },
 
@@ -279,6 +277,19 @@ export function buildWidgetSnapshot(input: BuildWidgetSnapshotInput): WidgetSnap
 
     action: buildAction(counts, profile.languageCode, nextCard),
     emptyStateCaption: buildEmptyStateCaption(counts, now, queue.nextDueAt),
+  };
+}
+
+function toWidgetPalette(palette: Palette): WidgetPalette {
+  return {
+    canvas: palette.canvas,
+    surface: palette.surface,
+    line: palette.line,
+    ink: palette.ink,
+    inkMuted: palette.inkMuted,
+    accent: palette.accent,
+    onAccent: palette.onAccent,
+    gradeColors: [palette.again, palette.hard, palette.good, palette.easy],
   };
 }
 

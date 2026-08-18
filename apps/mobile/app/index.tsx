@@ -5,20 +5,16 @@ import { findExamLevel, getLanguageProfile, kindLabel, type CardKind } from '@la
 import { useEngine } from '../src/engine/EngineProvider';
 import { BigButton, Caption, Row, Screen, Stat, TextButton, Title } from '../src/components/ui';
 import { CountUp, Press, Rise } from '../src/motion/components';
-import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
+import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTheme } from '../src/theme';
 
 /**
  * The dashboard.
  *
  * One question, answered immediately: is there anything to study, and how much.
- * An earlier version stacked six bordered panels here — today, session mix,
- * readiness, streak tiles, actions — which meant nothing stood out and the answer
- * took a scroll to find. Everything except the count, the button and a single row
- * of context now lives on the Progress screen, one tap away.
  *
- * The screen resolves top to bottom on arrival, and the count rolls up rather than
- * appearing: it is the number the whole screen exists to deliver, and the motion
- * puts the eye on it before the button below it.
+ * The session mix used to be shown here as a stacked colour bar with a legend. It
+ * was the last decorative use of colour in the app, and it was restating something
+ * a short line of text says better — so the bar went and the sentence stayed.
  */
 export default function Dashboard() {
   const { engine, revision } = useEngine();
@@ -47,7 +43,6 @@ export default function Dashboard() {
       {/* Tapping the language is how you switch it — no menu needed. */}
       <Rise index={0}>
         <Press onPress={() => router.push('/languages')} style={styles.header}>
-          <Text style={styles.emoji}>{language.emoji}</Text>
           <View style={styles.headerText}>
             <Title>{language.name}</Title>
             <Caption>
@@ -64,11 +59,10 @@ export default function Dashboard() {
           <>
             <CountUp value={waiting} style={styles.count} />
             <Text style={styles.countLabel}>{waiting === 1 ? 'card waiting' : 'cards waiting'}</Text>
-            <MixBar mix={queue.kindMix} />
           </>
         ) : (
           <>
-            <Text style={styles.count}>✨</Text>
+            <Text style={styles.count}>—</Text>
             <Text style={styles.countLabel}>All caught up</Text>
             <Caption>
               {queue.nextDueAt
@@ -81,8 +75,8 @@ export default function Dashboard() {
 
       <Rise index={2}>
         <BigButton
-          label={waiting > 0 ? 'Study now' : 'Study ahead'}
-          {...(waiting > 0 && queue.kindMix ? { hint: describeMix(queue.kindMix) } : {})}
+          label={waiting > 0 ? 'Study' : 'Study ahead'}
+          {...(waiting > 0 ? { hint: describeMix(queue.kindMix) } : {})}
           onPress={() => router.push('/review')}
         />
       </Rise>
@@ -90,9 +84,9 @@ export default function Dashboard() {
       <Rise index={3}>
         <Row style={styles.stats}>
           <Stat
-            label={stats.streak.studiedToday ? 'day streak 🔥' : 'day streak'}
+            label="day streak"
             value={String(stats.streak.current)}
-            color={stats.streak.current > 0 ? theme.colors.secondary : theme.colors.textMuted}
+            color={stats.streak.current > 0 ? theme.colors.ink : theme.colors.inkMuted}
           />
           <Stat label="words known" value={String(stats.coverage.entriesKnown)} />
           <Stat
@@ -105,43 +99,14 @@ export default function Dashboard() {
       <Rise index={4}>
         <Row style={styles.links}>
           <TextButton label="Progress" onPress={() => router.push('/stats')} />
-          <TextButton label="Settings" onPress={() => router.push('/settings')} color={theme.colors.textMuted} />
+          <TextButton label="Settings" onPress={() => router.push('/settings')} color={theme.colors.inkMuted} />
         </Row>
       </Rise>
     </Screen>
   );
 }
 
-/**
- * A thin band showing the session's card mix.
- *
- * The one piece of the old session-mix panel worth keeping on this screen: it
- * shows at a glance that the queue is shaped like the exam paper, without a
- * legend, a heading and a box to say so.
- */
-function MixBar({ mix }: { mix: Partial<Record<CardKind, number>> }) {
-  const theme = useTheme();
-  const styles = useThemedStyles(createStyles);
-
-  const entries = Object.entries(mix)
-    .filter((entry): entry is [CardKind, number] => (entry[1] ?? 0) > 0)
-    .sort((a, b) => b[1] - a[1]);
-
-  if (entries.length === 0) return null;
-
-  return (
-    <View style={styles.mixBar}>
-      {entries.map(([kind, count]) => (
-        <View
-          key={kind}
-          style={{ flex: count, backgroundColor: theme.kindColors[kind] ?? theme.colors.accent, height: 6 }}
-        />
-      ))}
-    </View>
-  );
-}
-
-/** "listening, meaning and tones" — the mix as a phrase rather than a legend. */
+/** "listening, meaning and tones" — the session mix as a phrase, not a chart. */
 function describeMix(mix: Partial<Record<CardKind, number>>): string {
   const kinds = Object.entries(mix)
     .filter((entry): entry is [CardKind, number] => (entry[1] ?? 0) > 0)
@@ -171,27 +136,19 @@ function formatRelative(at: string): string {
 
 const createStyles = (theme: ResolvedTheme) => ({
   header: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.md },
-  emoji: { fontSize: 34 },
-  headerText: { flex: 1, gap: 1 },
-  chevron: { color: theme.colors.textFaint, fontSize: 28 },
+  headerText: { flex: 1, gap: 2 },
+  chevron: { color: theme.colors.inkFaint, fontSize: 26 },
 
   hero: { alignItems: 'center' as const, gap: spacing.xs, paddingVertical: spacing.xxl },
   count: {
-    color: theme.colors.accent,
-    fontSize: 92,
-    lineHeight: 100,
-    fontWeight: '800' as const,
+    color: theme.colors.ink,
+    fontSize: typography.display,
+    lineHeight: typography.display + 8,
+    fontWeight: weight.regular,
     letterSpacing: -2,
   },
-  countLabel: { color: theme.colors.text, fontSize: typography.heading, fontWeight: '600' as const },
-  mixBar: {
-    flexDirection: 'row' as const,
-    borderRadius: theme.radius.pill,
-    overflow: 'hidden' as const,
-    width: 160,
-    marginTop: spacing.md,
-  },
+  countLabel: { color: theme.colors.inkMuted, fontSize: typography.body },
 
-  stats: { justifyContent: 'space-between' as const, paddingHorizontal: spacing.sm },
+  stats: { justifyContent: 'space-between' as const },
   links: { justifyContent: 'center' as const, gap: spacing.xl },
 });

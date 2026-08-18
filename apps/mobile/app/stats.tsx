@@ -4,7 +4,7 @@ import { findExamLevel, getExaminedSkills, getLanguageProfile } from '@language-
 import { useEngine } from '../src/engine/EngineProvider';
 import { Caption, DetailRow, Pill, ProgressBar, Row, Screen, Section, Stat, Title } from '../src/components/ui';
 import { Rise } from '../src/motion/components';
-import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
+import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTheme } from '../src/theme';
 
 /**
  * Progress.
@@ -47,7 +47,7 @@ export default function StatsScreen() {
         <Stat label="known" value={String(stats.coverage.entriesKnown)} />
         <Stat label="learning" value={String(stats.coverage.learningCards)} color={theme.colors.hard} />
         <Stat label="in review" value={String(stats.coverage.reviewCards)} color={theme.colors.good} />
-          <Stat label="unseen" value={String(stats.coverage.newCards)} color={theme.colors.textMuted} />
+          <Stat label="unseen" value={String(stats.coverage.newCards)} color={theme.colors.inkMuted} />
         </Row>
       </Rise>
 
@@ -70,7 +70,7 @@ export default function StatsScreen() {
                           {
                             height: `${(day.due / peak) * 100}%`,
                             backgroundColor:
-                              day.due > profile.dailyReviewLimit ? theme.colors.warning : theme.colors.accent,
+                              day.due > profile.dailyReviewLimit ? theme.colors.caution : theme.colors.accent,
                           },
                         ]}
                       />
@@ -170,6 +170,6 @@ const createStyles = (theme: ResolvedTheme) => ({
   chart: { flexDirection: 'row' as const, gap: 4, height: 96, alignItems: 'flex-end' as const },
   chartColumn: { flex: 1, alignItems: 'center' as const, gap: 4, height: '100%' as const },
   chartBarArea: { flex: 1, width: '100%' as const, justifyContent: 'flex-end' as const },
-  chartBar: { width: '100%' as const, borderRadius: theme.radius.pill, minHeight: 3 },
-  chartLabel: { color: theme.colors.textFaint, fontSize: typography.micro },
+  chartBar: { width: '100%' as const, borderRadius: theme.radius.control, minHeight: 3 },
+  chartLabel: { color: theme.colors.inkFaint, fontSize: typography.micro },
 });

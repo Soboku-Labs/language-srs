@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { StudyEngine } from './engine';
 import { SEED_ENTRIES } from './data/seed';
-import { getLanguageTheme } from './theme/palettes';
+import { resolvePalette } from './theme/palettes';
 import { WIDGET_SCHEMA_VERSION } from './widget/payload';
 import { MemoryStore } from './storage/port';
 import { computeStreak } from './stats/metrics';
@@ -200,9 +200,11 @@ describe('widget integration', () => {
     expect(parsed.schemaVersion).toBe(WIDGET_SCHEMA_VERSION);
     expect(parsed.language.code).toBe('zh');
     expect(parsed.nextCard.options).toHaveLength(4);
-    // The widget renders the active language's palette, so it has to travel too.
-    expect(parsed.theme.background).toBe(getLanguageTheme('zh').colors.background);
-    expect(parsed.theme.gradeColors).toHaveLength(4);
+    // Both palettes travel, so the widget can follow the home screen's own
+    // appearance rather than whichever mode the app last rendered.
+    expect(parsed.theme.light.canvas).toBe(resolvePalette('zh', 'light').canvas);
+    expect(parsed.theme.dark.canvas).toBe(resolvePalette('zh', 'dark').canvas);
+    expect(parsed.theme.light.gradeColors).toHaveLength(4);
   });
 
   it('replays a widget grading on the next launch', async () => {

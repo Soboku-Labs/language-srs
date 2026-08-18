@@ -15,8 +15,10 @@ least recently reviewed card you have already met — because passive exposure b
 sessions is the cheapest study there is, and a widget that is empty six days out of seven
 gets removed.
 
-Everything is themed by language: a Mandarin widget is ink and cinnabar, a Japanese one
-washi and indigo, and they sit correctly next to each other on the same home screen.
+The widget wears the Suboku system: the neutral canvas, with the active language's
+single accent. Both palettes travel in the payload and the widget picks with its own
+appearance, so it follows the home screen rather than whichever mode the app was last
+in — and holds no palette of its own, so it cannot drift from the app.
 
 ## The governing rule
 
@@ -31,7 +33,7 @@ So the payload is flat and every value in it is already final:
 
 - Intervals on the grade buttons ("10m", "4d", "1.2y") come from `previewIntervals`.
 - Captions are already written and pluralised: "HSK 4 in 23 days", "12 day streak".
-- The theme arrives as hex strings, including the accent for the card kind on screen.
+- Both palettes arrive as hex strings; the widget picks a mode, nothing more.
 - Which card is next has already been decided by the queue builder.
 
 Swift and Kotlin contain no date maths, no interval formatting, no palettes, and no
@@ -101,7 +103,8 @@ reaches `requireNativeModule` and no caller has to test the platform.
 
 ## Schema versioning
 
-`WIDGET_SCHEMA_VERSION` (currently **2**; v2 added the theme block) is stamped into every
+`WIDGET_SCHEMA_VERSION` (currently **3**; v2 added the theme block, v3 replaced it
+with both palettes at once) is stamped into every
 payload and checked by both decoders. A widget binary outlives the app process that wrote
 its payload — the user may not have updated, or may have updated and not yet opened the
 app — so a payload from the future renders "Open to sync" rather than half-understood

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /**
  The Swift mirror of the `WidgetSnapshot` type in `@language-srs/core`.
@@ -37,29 +38,22 @@ struct WidgetSnapshot: Decodable {
   }
 
   /**
-   The active language's palette, sent by the app.
+   Both palettes, sent by the app.
 
-   Each of the four languages has its own theme — ink and cinnabar for Mandarin,
-   washi and indigo for Japanese, and so on — and two of them are light while two
-   are dark. Defining them here as well as in TypeScript would mean the Vietnamese
-   widget drifting away from the Vietnamese app the first time anyone adjusted a
-   colour, so the widget holds no palette of its own and renders what it is given.
+   Light *and* dark, because a widget follows the system appearance independently
+   of the app that wrote its payload — the phone may have switched to dark mode
+   without the app being opened since. `resolved(for:)` picks with the widget's own
+   environment, which is still rendering rather than computing.
    */
   struct Theme: Decodable {
-    let name: String
-    let mode: String
-    let background: String
-    let surface: String
-    let border: String
-    let text: String
-    let textMuted: String
-    let accent: String
-    let secondary: String
-    /// Grade button colours, indexed by rating 1-4.
-    let gradeColors: [String]
-    /// Accent for the card kind currently on screen.
-    let kindAccent: String
+    let accentName: String
+    let light: WidgetPalette
+    let dark: WidgetPalette
     let cornerRadius: Double
+
+    func resolved(for scheme: ColorScheme) -> WidgetPalette {
+      scheme == .dark ? dark : light
+    }
   }
 
   struct Exam: Decodable {
@@ -125,7 +119,7 @@ struct WidgetCard: Decodable, Identifiable {
 
 /// Schema version this widget binary understands. Kept in step with
 /// `WIDGET_SCHEMA_VERSION` in core; a newer payload falls back to a refresh prompt.
-let supportedSchemaVersion = 2
+let supportedSchemaVersion = 3
 
 /**
  Reads the snapshot out of the App Group container.
@@ -199,8 +193,6 @@ struct SnapshotStore {
   }
 }
 
-import SwiftUI
-
 extension Color {
   /**
    Build a colour from a `#RRGGBB` string in the payload.
@@ -226,15 +218,24 @@ extension Color {
   }
 }
 
-extension WidgetSnapshot.Theme {
-  var backgroundColor: Color { Color(hex: background) }
+/// One mode's colours, as sent.
+struct WidgetPalette: Decodable {
+  let canvas: String
+  let surface: String
+  let line: String
+  let ink: String
+  let inkMuted: String
+  let accent: String
+  let onAccent: String
+  let gradeColors: [String]
+
+  var canvasColor: Color { Color(hex: canvas) }
   var surfaceColor: Color { Color(hex: surface) }
-  var borderColor: Color { Color(hex: border) }
-  var textColor: Color { Color(hex: text) }
-  var mutedColor: Color { Color(hex: textMuted) }
+  var lineColor: Color { Color(hex: line) }
+  var inkColor: Color { Color(hex: ink) }
+  var mutedColor: Color { Color(hex: inkMuted) }
   var accentColor: Color { Color(hex: accent) }
-  var secondaryColor: Color { Color(hex: secondary) }
-  var kindAccentColor: Color { Color(hex: kindAccent) }
+  var onAccentColor: Color { Color(hex: onAccent) }
 
   /// Rating is 1-4; anything else falls back to the accent.
   func gradeColor(_ rating: Int) -> Color {

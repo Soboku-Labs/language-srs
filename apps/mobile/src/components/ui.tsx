@@ -1,26 +1,28 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { spacing, typography, useTheme, useThemedStyles, type ResolvedTheme } from '../theme';
+import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTheme } from '../theme';
 import { AnimatedFill, Press } from '../motion/components';
 
 /**
- * The shared primitives.
+ * The Suboku primitives.
  *
- * Two rules keep the screens from getting dense again:
+ * Three rules, each one a thing that had to be taken out rather than added:
  *
- * 1. **Whitespace before borders.** An earlier version boxed every group in a
- *    bordered panel, which turned each screen into a stack of six rectangles with
- *    no hierarchy — everything equally important is the same as nothing being
- *    important. Surfaces are now flat tints, and `Card` is reserved for the one
- *    thing on a screen you are meant to act on.
- * 2. **One primary action per screen.** Everything else is a quiet text link.
+ * 1. **Space separates; lines almost never do.** An earlier version boxed every
+ *    group in a bordered panel, which turned each screen into a stack of
+ *    rectangles with no hierarchy. `Card` is now reserved for the single thing on
+ *    a screen you act on, and even that is a tint rather than an outline.
+ * 2. **One primary action per screen.** Everything else is text.
+ * 3. **Colour carries information or it is removed.** Kind chips used to be
+ *    colour-coded next to a text label that already said the same thing; the
+ *    colour is gone and the label stayed.
  *
- * Nothing here holds a colour of its own; all of it reads from the active
- * language's theme.
+ * Nothing here holds a colour of its own — all of it reads from the resolved
+ * palette, which is the system's neutrals plus the active language's one accent.
  */
 
-/** Screen shell: themed background, safe area, and scrolling when content overflows. */
+/** Screen shell: canvas, safe area, and scrolling when content overflows. */
 export function Screen({
   children,
   scroll = true,
@@ -54,58 +56,36 @@ export function Screen({
   );
 }
 
-/**
- * A raised surface, for the one thing on a screen that matters.
- *
- * Borderless by default — a tint against the background is enough separation, and
- * outlines on every group are what made the old layout read as a form.
- */
+/** A surface, for the one thing on a screen that matters. */
 export function Card({
   children,
   style,
   onPress,
-  accent,
 }: {
   children: React.ReactNode;
   style?: ViewStyle;
   onPress?: () => void;
-  /** Tints the left edge, for the review card's kind colour. */
-  accent?: string;
 }) {
   const styles = useThemedStyles(createStyles);
-  const accented = accent ? { borderLeftWidth: 3, borderLeftColor: accent } : undefined;
 
   if (onPress) {
     return (
-      <Press onPress={onPress} style={[styles.card, accented, style]}>
+      <Press onPress={onPress} style={[styles.card, style]}>
         {children}
       </Press>
     );
   }
 
-  return <View style={[styles.card, accented, style]}>{children}</View>;
+  return <View style={[styles.card, style]}>{children}</View>;
 }
 
 /** A group of related content, separated by space rather than by a box. */
-export function Section({
-  title,
-  children,
-  action,
-}: {
-  title?: string;
-  children: React.ReactNode;
-  action?: React.ReactNode;
-}) {
+export function Section({ title, children }: { title?: string; children: React.ReactNode }) {
   const styles = useThemedStyles(createStyles);
 
   return (
     <View style={styles.section}>
-      {title || action ? (
-        <View style={styles.sectionHeader}>
-          {title ? <Text style={styles.sectionTitle}>{title}</Text> : <View />}
-          {action}
-        </View>
-      ) : null}
+      {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
       {children}
     </View>
   );
@@ -131,14 +111,17 @@ export function Caption({ children, muted = true }: { children: React.ReactNode;
   return <Text style={[styles.caption, muted && styles.muted]}>{children}</Text>;
 }
 
+/**
+ * A small label.
+ *
+ * Neutral by default. It takes a colour only where the colour means something the
+ * text does not already say — which, in practice, is nowhere yet.
+ */
 export function Pill({ label, color }: { label: string; color?: string }) {
-  const theme = useTheme();
   const styles = useThemedStyles(createStyles);
-  const tint = color ?? theme.colors.accent;
-
   return (
-    <View style={[styles.pill, { backgroundColor: `${tint}1F` }]}>
-      <Text style={[styles.pillLabel, { color: tint }]}>{label}</Text>
+    <View style={styles.pill}>
+      <Text style={[styles.pillLabel, color ? { color } : undefined]}>{label}</Text>
     </View>
   );
 }
@@ -146,8 +129,11 @@ export function Pill({ label, color }: { label: string; color?: string }) {
 /**
  * The primary action.
  *
- * Deliberately large and round. It is the only filled control on a screen, so
- * "what do I do here" never needs a second look.
+ * Ink, not accent. A full-width slab of the language's accent was the loudest
+ * element on every screen, and an accent that occupies a quarter of the canvas has
+ * stopped being an accent. Filled ink is quieter, reads as more certain, and works
+ * identically in both modes — which leaves the accent free to appear where it
+ * actually distinguishes something: links, progress, tone marks, the language dot.
  */
 export function BigButton({
   label,
@@ -171,10 +157,8 @@ export function BigButton({
       accessibilityState={{ disabled: Boolean(disabled) }}
       style={[styles.bigButton, disabled && styles.faded]}
     >
-      <Text style={[styles.bigButtonLabel, { color: onAccentColor(theme) }]}>{label}</Text>
-      {hint ? (
-        <Text style={[styles.bigButtonHint, { color: onAccentColor(theme) }]}>{hint}</Text>
-      ) : null}
+      <Text style={[styles.bigButtonLabel, { color: theme.colors.canvas }]}>{label}</Text>
+      {hint ? <Text style={[styles.bigButtonHint, { color: theme.colors.canvas }]}>{hint}</Text> : null}
     </Press>
   );
 }
@@ -199,27 +183,10 @@ export function TextButton({
   );
 }
 
-/**
- * Readable text colour on top of the theme's accent.
- *
- * The four accents run from a light gold to a deep indigo, so a fixed white label
- * is unreadable on at least one of them.
- */
-function onAccentColor(theme: ResolvedTheme): string {
-  return luminance(theme.colors.accent) > 0.5 ? '#12100E' : '#FFFFFF';
-}
-
-function luminance(hex: string): number {
-  const channels = [1, 3, 5].map((offset) => {
-    const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
-    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  }) as [number, number, number];
-  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
-}
-
 export function ProgressBar({ value, color }: { value: number; color?: string }) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.progressTrack}>
       <AnimatedFill value={value} color={color ?? theme.colors.accent} style={styles.progressFill} />
@@ -227,27 +194,14 @@ export function ProgressBar({ value, color }: { value: number; color?: string })
   );
 }
 
-/**
- * One number and its label, inline.
- *
- * Replaces the old tile-in-a-panel: three of these on a row read as a sentence
- * about your progress, where three bordered tiles read as a dashboard.
- */
-export function Stat({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color?: string;
-}) {
+/** One number and its label. Three on a row read as a sentence about your progress. */
+export function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
 
   return (
     <View style={styles.stat}>
-      <Text style={[styles.statValue, { color: color ?? theme.colors.text }]}>{value}</Text>
+      <Text style={[styles.statValue, { color: color ?? theme.colors.ink }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
@@ -271,7 +225,7 @@ export function Row({ children, style }: { children: React.ReactNode; style?: Vi
 }
 
 const createStyles = (theme: ResolvedTheme) => ({
-  screen: { flex: 1, backgroundColor: theme.colors.background },
+  screen: { flex: 1, backgroundColor: theme.colors.canvas },
   fill: { flex: 1 },
   scrollContent: { gap: spacing.xl },
 
@@ -281,72 +235,57 @@ const createStyles = (theme: ResolvedTheme) => ({
     padding: spacing.lg,
     gap: spacing.md,
   },
-  pressed: { opacity: 0.75 },
   faded: { opacity: 0.4 },
 
   section: { gap: spacing.md },
-  sectionHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
-  },
   sectionTitle: {
-    color: theme.colors.textMuted,
+    color: theme.colors.inkMuted,
     fontSize: typography.micro,
-    fontWeight: '700' as const,
-    letterSpacing: 1.2,
+    fontWeight: weight.strong,
+    letterSpacing: 0.8,
     textTransform: 'uppercase' as const,
   },
 
-  title: {
-    color: theme.colors.text,
-    fontSize: typography.title,
-    fontWeight: theme.headingWeight,
-    letterSpacing: theme.headingLetterSpacing,
-  },
-  heading: {
-    color: theme.colors.text,
-    fontSize: typography.heading,
-    fontWeight: theme.headingWeight,
-    letterSpacing: theme.headingLetterSpacing,
-  },
-  body: { color: theme.colors.text, fontSize: typography.body, lineHeight: 22 },
-  caption: { color: theme.colors.text, fontSize: typography.caption, lineHeight: 19 },
-  muted: { color: theme.colors.textMuted },
+  title: { color: theme.colors.ink, fontSize: typography.title, fontWeight: weight.strong },
+  heading: { color: theme.colors.ink, fontSize: typography.heading, fontWeight: weight.medium },
+  body: { color: theme.colors.ink, fontSize: typography.body, lineHeight: 22 },
+  caption: { color: theme.colors.ink, fontSize: typography.caption, lineHeight: 19 },
+  muted: { color: theme.colors.inkMuted },
 
   pill: {
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 4,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.colors.surfaceRaised,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 3,
     alignSelf: 'flex-start' as const,
   },
-  pillLabel: { fontSize: typography.micro, fontWeight: '700' as const, letterSpacing: 0.4 },
+  pillLabel: { color: theme.colors.inkMuted, fontSize: typography.micro, fontWeight: weight.medium },
 
   bigButton: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: theme.radius.pill,
-    paddingVertical: spacing.lg + 2,
+    backgroundColor: theme.colors.ink,
+    borderRadius: theme.radius.control,
+    paddingVertical: spacing.md + 4,
     paddingHorizontal: spacing.xl,
     alignItems: 'center' as const,
     gap: 2,
   },
-  bigButtonLabel: { fontSize: typography.heading, fontWeight: '700' as const },
-  bigButtonHint: { fontSize: typography.micro, opacity: 0.75 },
+  bigButtonLabel: { fontSize: typography.heading, fontWeight: weight.strong },
+  bigButtonHint: { fontSize: typography.micro, opacity: 0.7 },
 
   textButton: { paddingVertical: spacing.sm, paddingHorizontal: 2 },
-  textButtonLabel: { fontSize: typography.body, fontWeight: '600' as const },
+  textButtonLabel: { fontSize: typography.body, fontWeight: weight.medium },
 
   progressTrack: {
-    height: 5,
+    height: 3,
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.surfaceRaised,
     overflow: 'hidden' as const,
   },
   progressFill: { height: '100%' as const, borderRadius: theme.radius.pill },
 
-  stat: { gap: 1 },
-  statValue: { fontSize: 22, fontWeight: '700' as const },
-  statLabel: { color: theme.colors.textMuted, fontSize: typography.micro },
+  stat: { gap: 2 },
+  statValue: { fontSize: 21, fontWeight: weight.medium },
+  statLabel: { color: theme.colors.inkMuted, fontSize: typography.micro },
 
   detailRow: {
     flexDirection: 'row' as const,
@@ -355,8 +294,8 @@ const createStyles = (theme: ResolvedTheme) => ({
     paddingVertical: spacing.sm,
     gap: spacing.md,
   },
-  detailLabel: { color: theme.colors.textMuted, fontSize: typography.caption, flex: 1 },
-  detailValue: { color: theme.colors.text, fontSize: typography.caption, fontWeight: '600' as const },
+  detailLabel: { color: theme.colors.inkMuted, fontSize: typography.caption, flex: 1 },
+  detailValue: { color: theme.colors.ink, fontSize: typography.caption, fontWeight: weight.medium },
 
   row: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: spacing.lg },
 });

@@ -1,17 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { CARD_KINDS } from '../types/exam';
 import { LANGUAGE_CODES, getLanguageProfile } from '../types/language';
-import { LANGUAGE_THEMES, getCardKindColors, getLanguageTheme, getToneColor, getToneColors } from './palettes';
+import {
+  LANGUAGE_THEMES,
+  RADIUS,
+  getLanguageTheme,
+  getToneColor,
+  getToneColors,
+  resolvePalette,
+  type Palette,
+  type ThemeMode,
+} from './palettes';
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
+const MODES: ThemeMode[] = ['light', 'dark'];
 
 /**
  * Relative luminance, per WCAG.
  *
- * Used to check that text is actually readable on its background in all four
- * themes. Four hand-picked palettes is exactly the situation where one of them
- * quietly ends up with grey-on-grey body text, and it is not something the type
- * system can catch.
+ * The palettes are hand-picked, which is exactly the situation where one quietly
+ * ends up with grey-on-grey text. The type system cannot catch that; this can.
  */
 function luminance(hex: string): number {
   const channels = [1, 3, 5].map((offset) => {
@@ -28,147 +35,182 @@ function contrast(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-describe('language themes', () => {
-  it('provides a theme for every supported language', () => {
+function eachPalette(visit: (palette: Palette, label: string) => void): void {
+  for (const code of LANGUAGE_CODES) {
+    for (const mode of MODES) {
+      visit(resolvePalette(code, mode), `${code}/${mode}`);
+    }
+  }
+}
+
+describe('the Suboku system', () => {
+  it('provides a light and a dark palette for every language', () => {
     for (const code of LANGUAGE_CODES) {
-      expect(getLanguageTheme(code).languageCode).toBe(code);
+      expect(getLanguageTheme(code).light.canvas).toMatch(HEX);
+      expect(getLanguageTheme(code).dark.canvas).toMatch(HEX);
     }
   });
 
-  it('uses well-formed hex for every colour', () => {
-    for (const theme of Object.values(LANGUAGE_THEMES)) {
-      for (const [name, value] of Object.entries(theme.colors)) {
-        expect(value, `${theme.languageCode}.${name}`).toMatch(HEX);
+  it('uses well-formed hex everywhere', () => {
+    eachPalette((palette, label) => {
+      for (const [name, value] of Object.entries(palette)) {
+        if (name === 'tones') continue;
+        expect(value, `${label}.${name}`).toMatch(HEX);
       }
-    }
-  });
-
-  it('keeps body text readable against its background in every theme', () => {
-    for (const theme of Object.values(LANGUAGE_THEMES)) {
-      // WCAG AA for normal text.
-      expect(contrast(theme.colors.text, theme.colors.background), theme.languageCode).toBeGreaterThan(4.5);
-      expect(contrast(theme.colors.text, theme.colors.surface), theme.languageCode).toBeGreaterThan(4.5);
-    }
-  });
-
-  it('keeps muted text readable, at least to the large-text threshold', () => {
-    for (const theme of Object.values(LANGUAGE_THEMES)) {
-      expect(contrast(theme.colors.textMuted, theme.colors.background), theme.languageCode).toBeGreaterThan(3);
-    }
-  });
-
-  it('declares a mode that matches the actual lightness of the background', () => {
-    for (const theme of Object.values(LANGUAGE_THEMES)) {
-      const isLight = luminance(theme.colors.background) > 0.4;
-      expect(isLight, theme.languageCode).toBe(theme.mode === 'light');
-    }
-  });
-
-  it('gives the four themes genuinely different accents, not one hue recoloured', () => {
-    const accents = Object.values(LANGUAGE_THEMES).map((theme) => theme.colors.accent);
-    expect(new Set(accents).size).toBe(4);
-  });
-
-  it('mixes light and dark rather than shipping four of the same', () => {
-    const modes = new Set(Object.values(LANGUAGE_THEMES).map((theme) => theme.mode));
-    expect(modes).toEqual(new Set(['light', 'dark']));
-  });
-
-  it('varies corner radius between themes', () => {
-    const radii = Object.values(LANGUAGE_THEMES).map((theme) => theme.radius.card);
-    expect(new Set(radii).size).toBeGreaterThan(2);
-  });
-
-  it('separates the four grade colours within each theme', () => {
-    for (const theme of Object.values(LANGUAGE_THEMES)) {
-      const grades = [theme.colors.again, theme.colors.hard, theme.colors.good, theme.colors.easy];
-      expect(new Set(grades).size, theme.languageCode).toBe(4);
-    }
-  });
-});
-
-describe('card kind colours', () => {
-  it('maps every card kind to a colour in every theme', () => {
-    for (const theme of Object.values(LANGUAGE_THEMES)) {
-      const kindColors = getCardKindColors(theme);
-      for (const kind of CARD_KINDS) {
-        expect(kindColors[kind], `${theme.languageCode}.${kind}`).toMatch(HEX);
-      }
-    }
+    });
   });
 
   /**
-   * The dashboard's session-mix legend puts these side by side with only a
-   * coloured dot to tell them apart, so two kinds sharing a colour makes the
-   * legend unreadable. An earlier version derived these from the semantic
-   * palette and produced exactly that.
+   * The core claim of the redesign: one canvas, and language moves exactly one
+   * thing. If a second field ever starts varying per language, this fails and the
+   * system has quietly become four systems again.
    */
-  it('gives every card kind a distinct colour within a theme', () => {
-    for (const theme of Object.values(LANGUAGE_THEMES)) {
-      const values = CARD_KINDS.map((kind) => getCardKindColors(theme)[kind]);
-      expect(new Set(values).size, theme.languageCode).toBe(CARD_KINDS.length);
+  it('varies nothing between languages except the accent and the tone ramp', () => {
+    for (const mode of MODES) {
+      const palettes = LANGUAGE_CODES.map((code) => resolvePalette(code, mode));
+      const varying = new Set<string>();
+
+      for (const key of Object.keys(palettes[0]!) as (keyof Palette)[]) {
+        const values = palettes.map((palette) => JSON.stringify(palette[key]));
+        if (new Set(values).size > 1) varying.add(key);
+      }
+
+      // A subset, not an equality: `onAccent` is white for every accent in light
+      // mode, so it does not vary there. The claim being tested is that nothing
+      // *outside* this set varies.
+      const allowed = new Set(['accent', 'accentSoft', 'onAccent', 'tones']);
+      expect([...varying].filter((key) => !allowed.has(key)), mode).toEqual([]);
     }
   });
 
-  it('keeps every card kind colour legible on its theme background', () => {
-    for (const theme of Object.values(LANGUAGE_THEMES)) {
-      const kindColors = getCardKindColors(theme);
-      for (const kind of CARD_KINDS) {
-        expect(
-          contrast(kindColors[kind], theme.colors.background),
-          `${theme.languageCode}.${kind}`,
-        ).toBeGreaterThan(3);
-      }
+  it('shares one radius scale across the product', () => {
+    for (const code of LANGUAGE_CODES) {
+      expect(getLanguageTheme(code).radius).toBe(RADIUS);
     }
   });
 
-  it('keeps card kind colours legible on the surface they sit on', () => {
-    for (const theme of Object.values(LANGUAGE_THEMES)) {
-      const kindColors = getCardKindColors(theme);
-      for (const kind of CARD_KINDS) {
-        expect(
-          contrast(kindColors[kind], theme.colors.surface),
-          `${theme.languageCode}.${kind}`,
-        ).toBeGreaterThan(3);
-      }
+  it('keeps the two modes genuinely inverted rather than merely tinted', () => {
+    for (const code of LANGUAGE_CODES) {
+      const { light, dark } = getLanguageTheme(code);
+      expect(luminance(light.canvas)).toBeGreaterThan(0.7);
+      expect(luminance(dark.canvas)).toBeLessThan(0.05);
+    }
+  });
+
+  it('gives each language a distinct accent in both modes', () => {
+    for (const mode of MODES) {
+      const accents = LANGUAGE_CODES.map((code) => resolvePalette(code, mode).accent);
+      expect(new Set(accents).size, mode).toBe(LANGUAGE_CODES.length);
+    }
+  });
+
+  it('names every accent', () => {
+    for (const code of LANGUAGE_CODES) {
+      expect(getLanguageTheme(code).accentName.length).toBeGreaterThan(2);
     }
   });
 });
 
-describe('derived colours', () => {
+describe('legibility', () => {
+  it('keeps body text at AA on both the canvas and a surface', () => {
+    eachPalette((palette, label) => {
+      expect(contrast(palette.ink, palette.canvas), label).toBeGreaterThan(4.5);
+      expect(contrast(palette.ink, palette.surface), label).toBeGreaterThan(4.5);
+    });
+  });
 
+  it('keeps muted text readable, and faint text at least at the large-text bar', () => {
+    eachPalette((palette, label) => {
+      expect(contrast(palette.inkMuted, palette.canvas), label).toBeGreaterThan(4);
+      expect(contrast(palette.inkFaint, palette.canvas), label).toBeGreaterThan(2.5);
+    });
+  });
+
+  it('keeps the accent legible as text on the canvas', () => {
+    eachPalette((palette, label) => {
+      expect(contrast(palette.accent, palette.canvas), label).toBeGreaterThan(3);
+    });
+  });
+
+  it('keeps the accent label legible on top of the accent itself', () => {
+    // The four accents run from a deep indigo to a light ochre, so a fixed white
+    // label is unreadable on at least one of them.
+    eachPalette((palette, label) => {
+      expect(contrast(palette.onAccent, palette.accent), label).toBeGreaterThan(4.5);
+    });
+  });
+
+  it('keeps the accent wash distinct from the canvas it sits on', () => {
+    eachPalette((palette, label) => {
+      expect(palette.accentSoft, label).not.toBe(palette.canvas);
+      expect(contrast(palette.accentSoft, palette.canvas), label).toBeLessThan(2);
+    });
+  });
+
+  it('keeps every grade colour legible on the canvas', () => {
+    eachPalette((palette, label) => {
+      for (const grade of ['again', 'hard', 'good', 'easy'] as const) {
+        expect(contrast(palette[grade], palette.canvas), `${label}.${grade}`).toBeGreaterThan(3);
+      }
+    });
+  });
+
+  it('keeps the four grade colours distinct from each other', () => {
+    eachPalette((palette, label) => {
+      const grades = [palette.again, palette.hard, palette.good, palette.easy];
+      expect(new Set(grades).size, label).toBe(4);
+    });
+  });
+});
+
+describe('tone ramps', () => {
   it('gives tonal languages one colour per tone and non-tonal ones none', () => {
     for (const code of LANGUAGE_CODES) {
       const profile = getLanguageProfile(code);
-      const theme = getLanguageTheme(code);
-      expect(getToneColors(theme), code).toHaveLength(profile.tonal ? profile.toneCount : 0);
+      for (const mode of MODES) {
+        expect(getToneColors(code, mode), `${code}/${mode}`).toHaveLength(
+          profile.tonal ? profile.toneCount : 0,
+        );
+      }
     }
   });
 
   it('gives each tone a distinct colour, since the colour is the answer', () => {
     for (const code of ['zh', 'vi'] as const) {
-      const colors = getToneColors(getLanguageTheme(code));
-      expect(new Set(colors).size, code).toBe(colors.length);
+      for (const mode of MODES) {
+        const colors = getToneColors(code, mode);
+        expect(new Set(colors).size, `${code}/${mode}`).toBe(colors.length);
+      }
     }
+  });
+
+  it('keeps every tone colour legible on its canvas', () => {
+    for (const code of ['zh', 'vi'] as const) {
+      for (const mode of MODES) {
+        const palette = resolvePalette(code, mode);
+        for (const [index, color] of palette.tones.entries()) {
+          expect(contrast(color, palette.canvas), `${code}/${mode} tone ${index + 1}`).toBeGreaterThan(3);
+        }
+      }
+    }
+  });
+
+  it('gives the quietest tone the quietest colour in each language', () => {
+    // Mandarin's neutral tone is fifth; Vietnamese's unmarked ngang is first.
+    // Both should be the least saturated entry, matching how they look on the page.
+    const zh = getToneColors('zh', 'light');
+    const vi = getToneColors('vi', 'light');
+    expect(zh[4]).toBe('#8A8A8F');
+    expect(vi[0]).toBe('#8A8A8F');
   });
 
   it('wraps rather than returning undefined for an out-of-range tone', () => {
-    expect(getToneColor(getLanguageTheme('zh'), 9)).toMatch(HEX);
+    expect(getToneColor('zh', 'light', 9)).toMatch(HEX);
   });
 
-  it('falls back to plain text colour for a language with no tones', () => {
-    const theme = getLanguageTheme('ja');
-    expect(getToneColor(theme, 1)).toBe(theme.colors.text);
-  });
-
-  it('keeps every tone colour legible on its own theme background', () => {
-    for (const code of ['zh', 'vi'] as const) {
-      const theme = getLanguageTheme(code);
-      for (const [index, color] of getToneColors(theme).entries()) {
-        // Tone-coloured text is set large, so the large-text threshold applies.
-        expect(contrast(color, theme.colors.background), `${code} tone ${index + 1}`).toBeGreaterThan(3);
-      }
-    }
+  it('falls back to ink for a language with no tones', () => {
+    const palette = resolvePalette('ja', 'light');
+    expect(getToneColor('ja', 'light', 1)).toBe(palette.ink);
   });
 
   it('rejects an unknown language rather than returning a broken theme', () => {

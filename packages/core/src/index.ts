@@ -130,6 +130,34 @@ export {
 } from './theme/palettes';
 export type { LanguageTheme, Palette, ThemeMode, ThemeRadius } from './theme/palettes';
 
+// Answering — multiple choice, typed input, tone questions
+export {
+  CHOICE_COUNT,
+  MEANING_KINDS,
+  PRODUCTION_KINDS,
+  buildChoiceOptions,
+  buildToneOptions,
+  checkTypedAnswer,
+  editDistance,
+  expectedAnswers,
+  isAutoGraded,
+  isTypingFeasible,
+  normaliseAnswer,
+  optionLabel,
+  resolveAnswerMode,
+  seededRandom,
+  stripDiacritics,
+  suggestRating,
+  toneName,
+} from './answer';
+export type {
+  AnswerAttempt,
+  AnswerCheck,
+  AnswerMode,
+  AnswerOption,
+  AnswerQuality,
+} from './answer';
+
 // Widget contract
 export {
   WIDGET_SCHEMA_VERSION,

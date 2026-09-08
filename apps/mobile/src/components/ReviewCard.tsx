@@ -47,13 +47,18 @@ export function ReviewCard({
   pair,
   revealed,
   onReveal,
+  prompt,
 }: {
   pair: CardWithEntry;
   revealed: boolean;
-  onReveal: () => void;
+  /** Omitted when the card is answered rather than revealed — then there is nothing to tap. */
+  onReveal?: () => void;
+  /** What the question is asking for, when it is not simply "recall this". */
+  prompt?: string;
 }) {
   const styles = useThemedStyles(createStyles);
   const { card, entry } = pair;
+  const hint = prompt ?? (onReveal ? 'Tap to reveal' : undefined);
 
   return (
     <Card style={styles.card}>
@@ -70,11 +75,11 @@ export function ReviewCard({
         <Rise>
           <Answer pair={pair} />
         </Rise>
-      ) : (
+      ) : hint ? (
         <View style={styles.centered}>
-          <Caption>Tap to reveal</Caption>
+          <Caption>{hint}</Caption>
         </View>
-      )}
+      ) : null}
     </Card>
   );
 }
@@ -206,15 +211,22 @@ function Answer({ pair }: { pair: CardWithEntry }) {
  *
  * These keep their colour: Again and Easy have to be distinguishable under a thumb
  * mid-session, without reading.
+ *
+ * `suggested` outlines one of them when the app has watched the answer land and has
+ * an opinion about how it went. It is an outline rather than a fill because the
+ * learner is still the one grading — the app can see that an answer took eleven
+ * seconds, not whether that was hesitation or someone talking to them.
  */
 export function GradeButtons({
   previews,
   onGrade,
   disabled,
+  suggested,
 }: {
   previews: Record<Rating, IntervalPreview>;
   onGrade: (rating: Rating) => void;
   disabled?: boolean;
+  suggested?: Rating;
 }) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -234,8 +246,14 @@ export function GradeButtons({
           onPress={() => onGrade(rating)}
           disabled={disabled}
           accessibilityRole="button"
-          accessibilityLabel={`${RATING_LABELS[rating]}, next in ${previews[rating].display}`}
-          style={[styles.grade, disabled && styles.gradeDisabled]}
+          accessibilityLabel={`${RATING_LABELS[rating]}, next in ${previews[rating].display}${
+            rating === suggested ? ', suggested' : ''
+          }`}
+          style={[
+            styles.grade,
+            rating === suggested && { borderColor: gradeColors[rating], borderWidth: 1.5 },
+            disabled && styles.gradeDisabled,
+          ]}
         >
           <Text style={[styles.gradeLabel, { color: gradeColors[rating] }]}>{RATING_LABELS[rating]}</Text>
           <Text style={styles.gradeInterval}>{previews[rating].display}</Text>

@@ -3,7 +3,7 @@ import { cardRetrievability, projectedRetrievability } from '../srs/scheduler';
 import type { Card, CardWithEntry, LexicalEntry, StudyProfile, Timestamp } from '../types/card';
 import type { CardKind } from '../types/exam';
 import type { ReviewLog } from '../types/review';
-import { isDue, startOfStudyDay, studyDayOf, toEpochMs } from '../utils/date';
+import { endOfStudyDay, isDue, startOfStudyDay, studyDayOf, toEpochMs } from '../utils/date';
 
 export interface DailyCounts {
   /** New cards introduced during the current study day. */
@@ -144,6 +144,21 @@ export function buildStudyQueue(options: BuildQueueOptions): StudyQueue {
   const heldByCap = due.length - servedReviews.length;
   const servedNew = fresh.slice(0, newAllowance);
 
+  /**
+   * Cards held back by the cap come back at the daily reset, not on their own due
+   * date — they are already overdue.
+   *
+   * Without this the empty state lies in the one case it matters: with the review
+   * cap spent, `nextDueAt` would report the next *scheduled* card and the dashboard
+   * would say "all caught up, more in 3 days" while a pile of overdue cards waits
+   * for tomorrow. The reset is sooner than any of those, so it wins.
+   */
+  const heldBackReturnAt = heldByCap > 0 || fresh.length > servedNew.length
+    ? toEpochMs(endOfStudyDay(now, profile.dayStartHour))
+    : Number.POSITIVE_INFINITY;
+
+  const nextAvailableMs = Math.min(nextDueAtMs, heldBackReturnAt);
+
   // Learning cards bypass the caps: they were already counted when introduced,
   // and stranding a card mid-ladder is worse than a slightly longer session.
   const interleaved = interleaveByKindWeights([...servedReviews, ...servedNew], weights);
@@ -161,7 +176,7 @@ export function buildStudyQueue(options: BuildQueueOptions): StudyQueue {
       total: limited.length,
     },
     kindMix: countKinds(limited),
-    ...(Number.isFinite(nextDueAtMs) ? { nextDueAt: new Date(nextDueAtMs).toISOString() } : {}),
+    ...(Number.isFinite(nextAvailableMs) ? { nextDueAt: new Date(nextAvailableMs).toISOString() } : {}),
   };
 }
 

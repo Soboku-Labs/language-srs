@@ -15,7 +15,7 @@ import {
 } from './types/card';
 import { LANGUAGE_CODES, getLanguageProfile, type LanguageCode } from './types/language';
 import type { GradeResult, Rating, ReviewSource } from './types/review';
-import { systemClock, type Clock } from './utils/date';
+import { endOfStudyDay, systemClock, type Clock } from './utils/date';
 import { buildWidgetSnapshot, buildWidgetTimeline, pickSpotlight, type WidgetSnapshot, type WidgetTimeline } from './widget/payload';
 import { applyPendingGrades, type PendingWidgetGrade } from './widget/pending';
 
@@ -41,6 +41,15 @@ export const STORAGE_KEYS = {
  * first.
  */
 const MAX_RETAINED_LOGS = 20_000;
+
+/**
+ * How many gradings back you can undo.
+ *
+ * Deep enough to fix a mis-tap you noticed a few cards later, shallow enough that
+ * it cannot be used to rewind a session — which would be a way to game the
+ * schedule rather than to correct a mistake.
+ */
+const MAX_UNDO_DEPTH = 10;
 
 interface EngineMeta {
   version: number;
@@ -81,6 +90,8 @@ export class StudyEngine {
   private pending: PendingWidgetGrade[];
   private readonly entriesById = new Map<string, LexicalEntry>();
   private readonly clock: Clock;
+  /** Cards as they were before their last grading, newest last. */
+  private readonly undoStack: { card: Card; logId: string }[] = [];
 
   private constructor(
     private readonly options: StudyEngineOptions,
@@ -311,6 +322,9 @@ export class StudyEngine {
       source: options.source ?? 'app',
     });
 
+    this.undoStack.push({ card, logId: result.log.id });
+    if (this.undoStack.length > MAX_UNDO_DEPTH) this.undoStack.shift();
+
     this.cards[index] = result.card;
     this.logs.push(result.log);
     this.trimLogs();
@@ -318,6 +332,64 @@ export class StudyEngine {
     await Promise.all([this.persistCards(), this.persistLogs()]);
     await this.notifyChanged();
     return result;
+  }
+
+  /**
+   * Undo the last grading.
+   *
+   * Restores the card wholesale from a snapshot taken before it was graded, rather
+   * than reconstructing it from the review log. The log records the memory state
+   * either side of a grading but not the step, due date or lapse count, so
+   * reconstructing would silently get those wrong — and an undo that leaves a card
+   * subtly altered is worse than no undo, because nothing surfaces the damage.
+   *
+   * In-memory only: mis-tapping a grade is something you notice within seconds, so
+   * the stack does not need to survive a relaunch, and persisting it would mean
+   * writing a second copy of every card on every review.
+   */
+  async undoLastGrade(): Promise<boolean> {
+    const previous = this.undoStack.pop();
+    if (!previous) return false;
+
+    const index = this.cards.findIndex((card) => card.id === previous.card.id);
+    if (index === -1) return false;
+
+    this.cards[index] = previous.card;
+    this.logs = this.logs.filter((log) => log.id !== previous.logId);
+
+    await Promise.all([this.persistCards(), this.persistLogs()]);
+    await this.notifyChanged();
+    return true;
+  }
+
+  /** Whether there is a grading to undo. */
+  get canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+
+  /**
+   * Hide a card until the next study day.
+   *
+   * Distinct from suspending: burying is "not now", suspending is "not until I say
+   * so". Memory state is untouched either way — neither is a judgement about
+   * whether the word is known.
+   */
+  async setCardBuried(cardId: string, until?: Timestamp): Promise<void> {
+    const index = this.cards.findIndex((card) => card.id === cardId);
+    if (index === -1) return;
+
+    const card = this.cards[index]!;
+    const profile = this.getProfile(card.languageCode);
+    const buriedUntil = until ?? endOfStudyDay(this.now(), profile.dayStartHour);
+
+    this.cards[index] = { ...card, buriedUntil };
+    await this.persistCards();
+    await this.notifyChanged();
+  }
+
+  /** Every entry for a language — the candidate pool for answer distractors. */
+  getEntries(code: LanguageCode = this.meta.activeLanguage): LexicalEntry[] {
+    return [...this.entriesById.values()].filter((entry) => entry.languageCode === code);
   }
 
   async setCardSuspended(cardId: string, suspended: boolean): Promise<void> {

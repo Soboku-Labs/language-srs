@@ -101,11 +101,22 @@ export {
 // Sessions
 export {
   EMPTY_DAILY_COUNTS,
+  STUDY_MODES,
   buildStudyQueue,
   countTodaysWork,
   interleaveByKindWeights,
 } from './session/queue';
-export type { BuildQueueOptions, DailyCounts, QueueBreakdown, StudyQueue } from './session/queue';
+export type {
+  BuildQueueOptions,
+  DailyCounts,
+  QueueBreakdown,
+  StudyMode,
+  StudyQueue,
+} from './session/queue';
+
+// Deck — the learner's words, for browsing rather than studying
+export { countByStatus, filterDeck, sortDeck, summariseDeck } from './deck';
+export type { DeckEntry, DeckFilter, DeckSort, DeckStatus, SummariseDeckOptions } from './deck';
 
 // Stats
 export {

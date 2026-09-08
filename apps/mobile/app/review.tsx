@@ -3,6 +3,8 @@ import { Platform, ScrollView, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  CARD_KINDS,
+  STUDY_MODES,
   buildChoiceOptions,
   buildToneOptions,
   checkTypedAnswer,
@@ -14,9 +16,11 @@ import {
   type AnswerAttempt,
   type AnswerMode,
   type AnswerOption,
+  type CardKind,
   type CardWithEntry,
   type LexicalEntry,
   type Rating,
+  type StudyMode,
 } from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { GradeButtons, ReviewCard, speakEntry } from '../src/components/ReviewCard';
@@ -25,6 +29,29 @@ import { BigButton, Caption, ProgressBar, Row, Screen, TextButton, Title } from 
 import { DealtCard, PopIn, Rise } from '../src/motion/components';
 import { springBouncy } from '../src/motion/tokens';
 import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTheme } from '../src/theme';
+
+/**
+ * What the card says it wants, under the prompt.
+ *
+ * Tone cards already ask "Which tones?" on the face of the card, so they get
+ * nothing here rather than asking twice.
+ */
+const ANSWER_PROMPTS: Partial<Record<AnswerMode, string>> = {
+  choice: 'Pick the answer',
+  typed: 'Type it',
+};
+
+/**
+ * Why a session is empty, said in the mode's own terms.
+ *
+ * An empty cram session used to advise raising the daily new-card limit, which
+ * has nothing to do with cramming and would not have helped.
+ */
+const EMPTY_COPY: Record<StudyMode, string> = {
+  due: 'Come back when reviews are ready, or raise your daily new-card limit.',
+  learn: 'No new words left at this level. Move up a level, or raise your daily new-card limit.',
+  cram: 'Nothing to cram — you have not started any words at this level yet.',
+};
 
 /**
  * The review session.
@@ -45,23 +72,18 @@ import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTh
  * left, Easy leans right. That is the only signal distinguishing a grade you meant
  * from one you mis-tapped, and it arrives immediately rather than a card later.
  */
-/**
- * What the card says it wants, under the prompt.
- *
- * Tone cards already ask "Which tones?" on the face of the card, so they get
- * nothing here rather than asking twice.
- */
-const ANSWER_PROMPTS: Partial<Record<AnswerMode, string>> = {
-  choice: 'Pick the answer',
-  typed: 'Type it',
-};
-
 export default function ReviewScreen() {
   const { engine, revision, grade, mutate } = useEngine();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
-  const params = useLocalSearchParams<{ card?: string; reveal?: string; language?: string }>();
+  const params = useLocalSearchParams<{
+    card?: string;
+    reveal?: string;
+    language?: string;
+    mode?: string;
+    kind?: string;
+  }>();
 
   const [revealed, setRevealed] = useState(params.reveal === '1');
   const [attempt, setAttempt] = useState<AnswerAttempt | undefined>();
@@ -89,10 +111,22 @@ export default function ReviewScreen() {
   const history = useRef<{ rating: Rating; missedEntryId?: string }[]>([]);
   const missedIds = useRef(new Set<string>());
 
+  /**
+   * The session mode, from the link that opened this screen.
+   *
+   * Validated rather than cast: a deep link is external input, and an unrecognised
+   * mode should quietly give the ordinary session rather than an empty one.
+   */
+  const sessionMode = STUDY_MODES.includes(params.mode as StudyMode) ? (params.mode as StudyMode) : 'due';
+  const kinds = useMemo(
+    () => (params.kind && CARD_KINDS.includes(params.kind as CardKind) ? [params.kind as CardKind] : undefined),
+    [params.kind],
+  );
+
   const queue = useMemo(() => {
-    return engine.getQueue();
+    return engine.getQueue({ mode: sessionMode, ...(kinds ? { kinds } : {}) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, revision]);
+  }, [engine, revision, sessionMode, kinds]);
 
   /**
    * The card on screen.
@@ -343,7 +377,7 @@ export default function ReviewScreen() {
           <Caption>
             {session.reviewed > 0
               ? `${session.reviewed} card${session.reviewed === 1 ? '' : 's'}, ${accuracy}% recalled.`
-              : 'Come back when reviews are ready, or raise your daily new-card limit.'}
+              : EMPTY_COPY[sessionMode]}
           </Caption>
         </PopIn>
 

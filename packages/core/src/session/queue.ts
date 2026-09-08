@@ -58,6 +58,31 @@ export interface StudyQueue {
   nextDueAt?: Timestamp;
 }
 
+/**
+ * What kind of session this is.
+ *
+ * Only three, because a mode is a promise about what the scheduler will do and
+ * three is all this app can honestly keep. Filtering by card kind is orthogonal
+ * and lives in `kinds` — "listening drill" is not a fourth mode, it is a cram
+ * session narrowed to one kind.
+ */
+export type StudyMode =
+  /** What is actually due, under the daily caps. The default, and the honest one. */
+  | 'due'
+  /** New cards only. For deliberately taking on vocabulary rather than maintaining it. */
+  | 'learn'
+  /**
+   * Everything in scope, weakest first, due or not, caps ignored.
+   *
+   * For the week before an exam, and genuinely a trade: grading a card that was
+   * not due still moves its schedule, so cramming buys recall now at the cost of
+   * a less well-spaced next interval.
+   */
+  | 'cram';
+
+/** Every mode, for validating a mode that arrived from a link or stored state. */
+export const STUDY_MODES: StudyMode[] = ['due', 'learn', 'cram'];
+
 export interface BuildQueueOptions {
   now: Timestamp;
   profile: StudyProfile;
@@ -67,6 +92,10 @@ export interface BuildQueueOptions {
   done?: DailyCounts;
   /** Cap on queue length, for a "quick session" of a fixed size. */
   sessionLimit?: number;
+  /** Defaults to `'due'`. */
+  mode?: StudyMode;
+  /** Restrict to these card kinds, for drilling one skill. */
+  kinds?: CardKind[];
 }
 
 /**
@@ -86,6 +115,8 @@ export interface BuildQueueOptions {
  */
 export function buildStudyQueue(options: BuildQueueOptions): StudyQueue {
   const { now, profile, cards } = options;
+  const mode = options.mode ?? 'due';
+  const kindFilter = options.kinds && options.kinds.length > 0 ? new Set(options.kinds) : undefined;
   const done = options.done ?? EMPTY_DAILY_COUNTS;
   const entriesById = toEntryMap(options.entries);
   const scope = new Set(getLevelIdsInScope(profile.targetLevelId));
@@ -116,16 +147,30 @@ export function buildStudyQueue(options: BuildQueueOptions): StudyQueue {
       continue;
     }
 
+    if (kindFilter && !kindFilter.has(card.kind)) {
+      excluded += 1;
+      continue;
+    }
+
     const pair: CardWithEntry = { card, entry };
 
     if (card.state === 'new') {
-      fresh.push(pair);
+      // A cram session is about shoring up what is already half-known; dropping
+      // unseen words into it would be starting from scratch under time pressure.
+      if (mode === 'cram') excluded += 1;
+      else fresh.push(pair);
+      continue;
+    }
+
+    if (mode === 'learn') {
+      excluded += 1;
       continue;
     }
 
     if (!isDue(card.due, now)) {
       nextDueAtMs = Math.min(nextDueAtMs, toEpochMs(card.due));
-      continue;
+      // Cramming reaches past the due date on purpose. Everything else does not.
+      if (mode !== 'cram') continue;
     }
 
     if (card.state === 'learning' || card.state === 'relearning') learning.push(pair);
@@ -137,7 +182,11 @@ export function buildStudyQueue(options: BuildQueueOptions): StudyQueue {
   due.sort(urgency);
   fresh.sort(newCardComparator);
 
-  const reviewAllowance = Math.max(0, profile.dailyReviewLimit - done.reviews);
+  // Cramming is an explicit decision to spend the evening on this, so the daily
+  // caps — which exist to stop tomorrow being unmanageable — are not applied. The
+  // learner has already accepted that trade by choosing the mode.
+  const reviewAllowance =
+    mode === 'cram' ? due.length : Math.max(0, profile.dailyReviewLimit - done.reviews);
   const newAllowance = Math.max(0, profile.dailyNewLimit - done.newCards);
 
   const servedReviews = due.slice(0, reviewAllowance);

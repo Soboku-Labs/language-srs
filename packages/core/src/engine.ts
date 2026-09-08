@@ -1,6 +1,7 @@
 import { generateCards } from './cards/factory';
 import { findExamTrack, getExamTrack, getLevelIdsInScope } from './exams';
-import { buildStudyQueue, countTodaysWork, type StudyQueue } from './session/queue';
+import { summariseDeck, type DeckEntry } from './deck';
+import { buildStudyQueue, countTodaysWork, type StudyMode, type StudyQueue } from './session/queue';
 import { DEFAULT_SCHEDULER_CONFIG, type SchedulerConfig } from './srs/params';
 import { gradeCard } from './srs/scheduler';
 import { computeCoverage, computeRetention, computeStreak, forecastReviews } from './stats/metrics';
@@ -13,6 +14,7 @@ import {
   type StudyProfile,
   type Timestamp,
 } from './types/card';
+import type { CardKind } from './types/exam';
 import { LANGUAGE_CODES, getLanguageProfile, type LanguageCode } from './types/language';
 import type { GradeResult, Rating, ReviewSource } from './types/review';
 import { endOfStudyDay, systemClock, type Clock } from './utils/date';
@@ -287,7 +289,15 @@ export class StudyEngine {
 
   // ---------------------------------------------------------------- studying
 
-  getQueue(options: { code?: LanguageCode; sessionLimit?: number; now?: Timestamp } = {}): StudyQueue {
+  getQueue(
+    options: {
+      code?: LanguageCode;
+      sessionLimit?: number;
+      now?: Timestamp;
+      mode?: StudyMode;
+      kinds?: CardKind[];
+    } = {},
+  ): StudyQueue {
     const code = options.code ?? this.meta.activeLanguage;
     const profile = this.getProfile(code);
     const now = options.now ?? this.now();
@@ -299,7 +309,40 @@ export class StudyEngine {
       entries: this.entriesById,
       done: countTodaysWork(this.logs, now, profile.dayStartHour),
       ...(options.sessionLimit !== undefined ? { sessionLimit: options.sessionLimit } : {}),
+      ...(options.mode !== undefined ? { mode: options.mode } : {}),
+      ...(options.kinds !== undefined ? { kinds: options.kinds } : {}),
     });
+  }
+
+  /**
+   * The learner's words, one row each, for browsing rather than studying.
+   *
+   * Deliberately not filtered to the current level: someone looking a word up is
+   * as likely to be checking something they met in the wild as something on the
+   * syllabus. `inScope` on each row carries that distinction instead.
+   */
+  getDeck(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): DeckEntry[] {
+    const profile = this.getProfile(code);
+    return summariseDeck({
+      entries: this.getEntries(code),
+      cards: this.getAllCards(code),
+      now,
+      targetLevelId: profile.targetLevelId,
+    });
+  }
+
+  /** Suspend or restore every card for one word. */
+  async setEntrySuspended(entryId: string, suspended: boolean): Promise<void> {
+    let changed = false;
+    this.cards = this.cards.map((card) => {
+      if (card.entryId !== entryId || Boolean(card.suspended) === suspended) return card;
+      changed = true;
+      return { ...card, suspended };
+    });
+
+    if (!changed) return;
+    await this.persistCards();
+    await this.notifyChanged();
   }
 
   /** Grade a card and persist the result. */

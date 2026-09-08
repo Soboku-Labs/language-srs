@@ -52,6 +52,10 @@ function ThemedNavigator() {
         <Stack.Screen name="stats" options={{ title: 'Progress' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="languages" options={{ title: 'Languages' }} />
+        <Stack.Screen name="words" options={{ title: 'Words' }} />
+        {/* Titled by the word itself once loaded would need the entry here; the
+            generic title keeps the header stable while the screen resolves. */}
+        <Stack.Screen name="word/[id]" options={{ title: 'Word' }} />
         {/* Entered only from a widget tap; it grades and redirects. */}
         <Stack.Screen name="grade" options={{ headerShown: false, presentation: 'transparentModal' }} />
       </Stack>

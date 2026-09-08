@@ -332,3 +332,126 @@ describe('end-to-end session', () => {
     expect(second.breakdown.learning).toBe(0);
   });
 });
+
+describe('study modes', () => {
+  /** A deck where every card is in review state and none is due for days. */
+  function matureDeck(): Card[] {
+    return seedCards(MANDARIN_SEED, ['hsk3-1']).map((card, index) => ({
+      ...card,
+      state: 'review' as const,
+      reps: 4,
+      stability: 10 + index,
+      difficulty: 5,
+      lastReview: NOW,
+      due: addDays(NOW, 5 + index),
+    }));
+  }
+
+  it('serves nothing in the default mode when nothing is due', () => {
+    const queue = buildStudyQueue({
+      now: NOW,
+      profile: profile(),
+      cards: matureDeck(),
+      entries: MANDARIN_SEED,
+    });
+    expect(queue.cards).toHaveLength(0);
+    expect(queue.nextDueAt).toBeDefined();
+  });
+
+  it('reaches past the due date when cramming', () => {
+    const queue = buildStudyQueue({
+      now: NOW,
+      profile: profile(),
+      cards: matureDeck(),
+      entries: MANDARIN_SEED,
+      mode: 'cram',
+    });
+    expect(queue.cards.length).toBeGreaterThan(0);
+  });
+
+  it('orders a cram session weakest first', () => {
+    const queue = buildStudyQueue({
+      now: NOW,
+      profile: profile(),
+      cards: matureDeck(),
+      entries: MANDARIN_SEED,
+      mode: 'cram',
+      // One kind only, so the exam-weight interleave cannot reorder the result
+      // and hide what is being asserted.
+      kinds: ['recognition'],
+    });
+
+    const stabilities = queue.cards.map(({ card }) => card.stability);
+    expect(stabilities).toEqual([...stabilities].sort((a, b) => a - b));
+  });
+
+  it('ignores the daily review cap when cramming, but not the new-card cap', () => {
+    const cards = matureDeck();
+    const settings = profile({ dailyReviewLimit: 2, dailyNewLimit: 0 });
+
+    const crammed = buildStudyQueue({
+      now: NOW,
+      profile: settings,
+      cards,
+      entries: MANDARIN_SEED,
+      mode: 'cram',
+    });
+
+    expect(crammed.cards.length).toBeGreaterThan(2);
+    expect(crammed.breakdown.heldByCap).toBe(0);
+    expect(crammed.breakdown.fresh).toBe(0);
+  });
+
+  it('leaves unseen words out of a cram session', () => {
+    const queue = buildStudyQueue({
+      now: NOW,
+      profile: profile({ dailyNewLimit: 20 }),
+      cards: seedCards(MANDARIN_SEED, ['hsk3-1']),
+      entries: MANDARIN_SEED,
+      mode: 'cram',
+    });
+    expect(queue.cards).toHaveLength(0);
+  });
+
+  it('serves only new cards when learning', () => {
+    const cards = [...matureDeck().slice(0, 3), ...seedCards(MANDARIN_SEED, ['hsk3-2'])];
+    const queue = buildStudyQueue({
+      now: NOW,
+      // Targeting level 2 puts level 1 in scope too, so the mature cards are
+      // genuinely available to serve and their absence means the mode excluded
+      // them rather than the syllabus scope doing it.
+      profile: profile({ targetLevelId: 'hsk3-2', dailyNewLimit: 50 }),
+      cards,
+      entries: MANDARIN_SEED,
+      mode: 'learn',
+    });
+
+    expect(queue.cards.length).toBeGreaterThan(0);
+    expect(queue.cards.every(({ card }) => card.state === 'new')).toBe(true);
+  });
+
+  it('still respects the daily new-card limit when learning', () => {
+    const queue = buildStudyQueue({
+      now: NOW,
+      profile: profile({ dailyNewLimit: 3 }),
+      cards: seedCards(MANDARIN_SEED, ['hsk3-1']),
+      entries: MANDARIN_SEED,
+      mode: 'learn',
+    });
+    expect(queue.cards).toHaveLength(3);
+  });
+
+  it('narrows to one card kind when asked, and counts the rest as excluded', () => {
+    const queue = buildStudyQueue({
+      now: NOW,
+      profile: profile({ dailyNewLimit: 50 }),
+      cards: seedCards(MANDARIN_SEED, ['hsk3-1']),
+      entries: MANDARIN_SEED,
+      kinds: ['listening'],
+    });
+
+    expect(queue.cards.length).toBeGreaterThan(0);
+    expect(queue.cards.every(({ card }) => card.kind === 'listening')).toBe(true);
+    expect(queue.breakdown.excluded).toBeGreaterThan(0);
+  });
+});

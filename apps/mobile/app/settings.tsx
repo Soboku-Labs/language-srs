@@ -8,6 +8,8 @@ import {
   suggestDailyNewLimit,
   toDateOnly,
 } from '@language-srs/core';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../src/auth/AuthProvider';
 import { useEngine } from '../src/engine/EngineProvider';
 import { widgetBridge } from '../modules/widget-bridge';
 import { Caption, DetailRow, Row, Screen, Section, TextButton } from '../src/components/ui';
@@ -25,6 +27,8 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  */
 export default function SettingsScreen() {
   const { engine, revision, mutate } = useEngine();
+  const { account, signOut } = useAuth();
+  const router = useRouter();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const code = engine.activeLanguage;
@@ -191,6 +195,27 @@ export default function SettingsScreen() {
         <Caption>
           Higher retention means shorter intervals and more reviews. 90% is where most learners get the best return.
         </Caption>
+      </Section>
+
+      <Section title="Account">
+        <DetailRow label="Signed in as" value={account?.displayName ?? 'Not signed in'} />
+        {account?.email ? <DetailRow label="Email" value={account.email} /> : null}
+        {account?.provider === 'device' ? (
+          <Caption>
+            A local profile on this device. Progress is not carried to your other devices.
+          </Caption>
+        ) : null}
+        <TextButton
+          label={account?.provider === 'device' ? 'Sign in to an account' : 'Sign out'}
+          {...(account?.provider === 'device'
+            ? { onPress: () => router.push('/sign-in') }
+            : {
+                color: theme.colors.inkMuted,
+                // Signing out leaves this account's cards where they are, under
+                // its own storage prefix. Signing back in finds them.
+                onPress: () => void signOut(),
+              })}
+        />
       </Section>
 
       <Section title="More">

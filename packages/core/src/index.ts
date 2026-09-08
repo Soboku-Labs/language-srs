@@ -200,8 +200,27 @@ export {
 } from './widget/deeplinks';
 export type { ParsedDeepLink } from './widget/deeplinks';
 
+// Accounts
+export {
+  AUTH_KEY,
+  AuthError,
+  AuthStore,
+  DeviceAccountProvider,
+  HttpAuthProvider,
+  storagePrefixFor,
+} from './auth';
+export type {
+  Account,
+  AuthErrorCode,
+  AuthProvider,
+  AuthProviderId,
+  AuthSession,
+  Credentials,
+  HttpAuthOptions,
+} from './auth';
+
 // Storage
-export { MemoryStore, MirroringStore, readJson, writeJson } from './storage/port';
+export { MemoryStore, MirroringStore, PrefixedStore, readJson, writeJson } from './storage/port';
 export type { KeyValueStore } from './storage/port';
 
 // Data

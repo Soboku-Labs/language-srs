@@ -1,22 +1,53 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider, useAuth } from '../src/auth/AuthProvider';
 import { EngineProvider } from '../src/engine/EngineProvider';
 import { ThemeProvider, useTheme, weight } from '../src/theme';
 import { ThemeFade } from '../src/motion/components';
 
+/**
+ * Auth wraps the engine, because which account you are decides which slice of
+ * storage the engine reads. The engine is rebuilt when that changes.
+ */
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <EngineProvider>
-        <ThemeProvider>
-          <ThemedNavigator />
-        </ThemeProvider>
-      </EngineProvider>
+      <AuthProvider>
+        <EngineProvider>
+          <ThemeProvider>
+            <AccountGate />
+            <ThemedNavigator />
+          </ThemeProvider>
+        </EngineProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
+}
+
+/**
+ * Sends a first-time visitor to the sign-in screen once.
+ *
+ * A redirect rather than a wall. Every route stays reachable — the deep links a
+ * home-screen widget fires are the obvious case, and stranding one of those on a
+ * login form would break the widget for someone who simply chose the device
+ * profile. This only handles the first launch, when there is no account at all
+ * and no meaningful screen to show instead.
+ */
+function AccountGate() {
+  const { isSignedIn } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isSignedIn) return;
+    if (segments[0] === 'sign-in') return;
+    router.replace('/sign-in');
+  }, [isSignedIn, segments, router]);
+
+  return null;
 }
 
 /**
@@ -56,6 +87,7 @@ function ThemedNavigator() {
         {/* Titled by the word itself once loaded would need the entry here; the
             generic title keeps the header stable while the screen resolves. */}
         <Stack.Screen name="word/[id]" options={{ title: 'Word' }} />
+        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
         {/* Entered only from a widget tap; it grades and redirects. */}
         <Stack.Screen name="grade" options={{ headerShown: false, presentation: 'transparentModal' }} />
       </Stack>

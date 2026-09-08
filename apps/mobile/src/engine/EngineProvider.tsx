@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { SEED_ENTRIES, StudyEngine, type LanguageCode, type Rating, type ReviewSource } from '@language-srs/core';
-import { appStore } from '../storage/adapter';
+import { useAuth } from '../auth/AuthProvider';
 import { widgetBridge } from '../../modules/widget-bridge';
 
 interface EngineContextValue {
@@ -23,6 +23,10 @@ interface EngineContextValue {
 const EngineContext = createContext<EngineContextValue | undefined>(undefined);
 
 export function EngineProvider({ children }: { children: React.ReactNode }) {
+  // Whose data this is. Changing accounts changes the store, which rebuilds the
+  // engine below — the one place the two concerns meet.
+  const { store } = useAuth();
+
   const [engine, setEngine] = useState<StudyEngine | undefined>();
   const [error, setError] = useState<Error | undefined>();
   const [revision, setRevision] = useState(0);
@@ -50,10 +54,15 @@ export function EngineProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
+    // Clearing first so a switch between accounts cannot show the previous
+    // account's queue while the next one loads.
+    engineRef.current = undefined;
+    setEngine(undefined);
+
     (async () => {
       try {
         const instance = await StudyEngine.create({
-          store: appStore,
+          store,
           seedEntries: SEED_ENTRIES,
           onStateChanged: async (self) => {
             bump();
@@ -75,7 +84,7 @@ export function EngineProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [bump, publishToWidget]);
+  }, [bump, publishToWidget, store]);
 
   /**
    * Pick up home-screen gradings whenever the app comes back to the foreground.

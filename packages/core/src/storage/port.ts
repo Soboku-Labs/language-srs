@@ -84,6 +84,52 @@ export class MirroringStore implements KeyValueStore {
   }
 }
 
+/**
+ * A store that prefixes every key.
+ *
+ * This is what keeps two accounts on one device from reading each other's decks.
+ * Namespacing at the store rather than at each call site means the engine never
+ * learns that accounts exist — it asks for `srs:v1:cards` as it always did, and
+ * which cards that resolves to is decided once, at wiring time.
+ *
+ * `passthrough` exempts keys that are deliberately global. The widget snapshot is
+ * the one that matters: the home screen shows whoever is signed in now, so it is
+ * a single shared slot rather than one per account, and the native widget reads
+ * it at a fixed key it cannot be told about.
+ */
+export class PrefixedStore implements KeyValueStore {
+  constructor(
+    private readonly inner: KeyValueStore,
+    private readonly prefix: string,
+    private readonly options: { passthrough?: (key: string) => boolean } = {},
+  ) {}
+
+  private resolve(key: string): string {
+    return this.options.passthrough?.(key) ? key : `${this.prefix}${key}`;
+  }
+
+  async get(key: string): Promise<string | null> {
+    return this.inner.get(this.resolve(key));
+  }
+
+  async set(key: string, value: string): Promise<void> {
+    await this.inner.set(this.resolve(key), value);
+  }
+
+  async remove(key: string): Promise<void> {
+    await this.inner.remove(this.resolve(key));
+  }
+
+  async keys(): Promise<string[]> {
+    const all = (await this.inner.keys?.()) ?? [];
+    // Reported unprefixed, so a caller enumerating keys sees the same namespace
+    // it writes to rather than a mix of both.
+    return all
+      .filter((key) => key.startsWith(this.prefix))
+      .map((key) => key.slice(this.prefix.length));
+  }
+}
+
 export async function readJson<T>(store: KeyValueStore, key: string, fallback: T): Promise<T> {
   const raw = await store.get(key);
   if (raw === null) return fallback;

@@ -63,6 +63,9 @@ packages/core/            @language-srs/core — all the domain logic, no React 
   exams/                  HSK, JLPT, TOPIK and Vietnamese curricula
   srs/                    FSRS-4.5 scheduler + exam-date pressure
   session/                queue building, daily caps, exam-weighted card mix
+  answer/                 multiple choice, typed answers, tone questions
+  deck/                   the learner's words, for browsing and searching
+  auth/                   accounts, and which slice of storage each one reads
   stats/                  streaks, true retention, coverage, exam readiness
   theme/                  the Suboku palettes
   widget/                 the widget payload contract and deep links
@@ -92,6 +95,30 @@ npm run typecheck # core + app
 npm run web       # dev server in the browser
 npm run web:build # static export to apps/mobile/dist
 ```
+
+### Accounts
+
+Studying never requires one. A learner who taps "Continue on this device" gets a
+local profile and the whole app; the account exists so two people can share a
+device and so a future sync has an identity to attach progress to.
+
+Email sign-in talks to a backend over the client in `packages/core/src/auth/http.ts`
+and appears only when one is configured:
+
+```bash
+EXPO_PUBLIC_AUTH_URL=https://your-api.example.com npm run web:build
+```
+
+With nothing set, the sign-in screen says so rather than showing a password field
+with nothing behind it. **There is no backend yet** — the client is written, the
+server is not, so email sign-in cannot currently succeed against anything.
+
+Metro's cache is not keyed on environment variables, so pass `--clear` the first
+time you change this or the old value stays compiled in.
+
+Each account reads its own slice of storage (`PrefixedStore`). The device profile
+deliberately keeps the unprefixed keys, so upgrading to this version does not look
+like your progress was deleted.
 
 ### Deploying the web build
 

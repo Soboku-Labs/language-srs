@@ -263,6 +263,7 @@ export class StudyEngine {
   async syncCards(): Promise<void> {
     const existing = new Map(this.cards.map((card) => [card.id, card]));
     const next = new Map(existing);
+    let changed = false;
 
     for (const code of LANGUAGE_CODES) {
       const profile = this.meta.profiles[code];
@@ -277,11 +278,19 @@ export class StudyEngine {
       });
 
       for (const card of generated) {
-        if (!next.has(card.id)) next.set(card.id, card);
+        const current = next.get(card.id);
+        // New card, or one the generator re-tagged to the level now introducing
+        // it. Comparing sizes alone missed the second case — the count is
+        // unchanged when a card is only re-tagged, so a track switch persisted
+        // nothing and the queue stayed empty.
+        if (current === undefined || current.levelId !== card.levelId) {
+          next.set(card.id, card);
+          changed = true;
+        }
       }
     }
 
-    if (next.size !== existing.size) {
+    if (changed) {
       this.cards = [...next.values()];
       await this.persistCards();
     }
@@ -445,23 +454,59 @@ export class StudyEngine {
 
   // ---------------------------------------------------------------- stats
 
+  /**
+   * Words the deck holds inside the current level's scope.
+   *
+   * The denominator for every progress number the app shows. It is counted from
+   * the entries themselves rather than from the cards, so a word that is in scope
+   * but has generated no cards still counts against the total instead of silently
+   * shrinking it.
+   */
+  getAvailableWordCount(code: LanguageCode = this.meta.activeLanguage): number {
+    const scope = new Set(getLevelIdsInScope(this.getProfile(code).targetLevelId));
+    return this.getEntries(code).filter((entry) => entry.levelIds.some((id) => scope.has(id))).length;
+  }
+
+  /**
+   * Cards the current level actually asks for.
+   *
+   * The same `levelId` filter the queue applies, and every progress number has to
+   * use it too. Statistics were computed over *all* cards for the language, which
+   * included cards left behind by a level or track change — an entry with one
+   * stranded, never-served `new` card can never satisfy "every card in review",
+   * so "words known" sat at zero permanently while the learner cleared their
+   * queue every day.
+   */
+  getCardsInScope(code: LanguageCode = this.meta.activeLanguage): Card[] {
+    const scope = new Set(getLevelIdsInScope(this.getProfile(code).targetLevelId));
+    return this.getAllCards(code).filter((card) => scope.has(card.levelId));
+  }
+
   getStats(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()) {
     const profile = this.getProfile(code);
-    const cards = this.getAllCards(code);
+    const cards = this.getCardsInScope(code);
     const trackLevels = getExamTrack(profile.examTrackId).levels;
     const level = trackLevels.find((candidate) => candidate.id === profile.targetLevelId);
 
     return {
       streak: computeStreak(this.logs, now, profile.dayStartHour),
       retention: computeRetention(this.logs, 30, now),
-      coverage: computeCoverage(cards, level?.vocabularyTarget ?? 0),
+      coverage: computeCoverage(cards, {
+        available: this.getAvailableWordCount(code),
+        ...(level?.vocabularyTarget !== undefined ? { syllabusTarget: level.vocabularyTarget } : {}),
+      }),
       forecast: forecastReviews(cards, now, 14, profile.dayStartHour),
       today: countTodaysWork(this.logs, now, profile.dayStartHour),
     };
   }
 
   getReadiness(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): ExamReadiness {
-    return computeExamReadiness(this.getAllCards(code), this.getProfile(code), now);
+    return computeExamReadiness(
+      this.getCardsInScope(code),
+      this.getProfile(code),
+      now,
+      this.getAvailableWordCount(code),
+    );
   }
 
   // ---------------------------------------------------------------- widget

@@ -10,6 +10,7 @@ import { DEFAULT_STUDY_PROFILE, type StudyProfile } from './types/card';
 import type { ReviewLog } from './types/review';
 import { addDays, fixedClock } from './utils/date';
 import { generateCards } from './cards/factory';
+import { getExamLevel } from './exams';
 import { MANDARIN_SEED } from './data/seed/mandarin';
 
 const NOW = '2026-03-01T09:00:00.000Z';
@@ -148,6 +149,53 @@ describe('changing level and track', () => {
 
     expect(engine.getProfile('zh').examTrackId).toBe('hsk2');
     expect(engine.getProfile('zh').targetLevelId).toBe('hsk2-3');
+  });
+
+  it('still has something to study after a track switch', async () => {
+    // The regression that made this test exist: card ids are `entryId:kind` and
+    // carry no level, so every card stayed tagged `hsk3-1` after switching to
+    // HSK 2.0. The queue filters on `levelId`, nothing matched `hsk2-1`, and the
+    // app went permanently empty while the dashboard said "all caught up".
+    const { engine } = await makeEngine();
+    const before = engine.getQueue({ code: 'zh' }).cards.length;
+    expect(before).toBeGreaterThan(0);
+
+    await engine.setExamTrack('zh', 'hsk2');
+
+    expect(engine.getQueue({ code: 'zh' }).cards.length).toBeGreaterThan(0);
+
+    // Every card for a kind the new level examines follows the learner across.
+    // Kinds it does not examine stay behind on purpose — HSK 2.0 Level 1 prints
+    // pinyin on the paper and has no production section — and the queue filters
+    // them out rather than the history being deleted.
+    const examined = new Set(Object.keys(getExamLevel('hsk2-1').cardWeights));
+    const stranded = engine
+      .getAllCards('zh')
+      .filter((card) => !card.levelId.startsWith('hsk2-') && examined.has(card.kind));
+    expect(stranded).toEqual([]);
+  });
+
+  it('carries review history through a track switch', async () => {
+    const { engine } = await makeEngine();
+    const card = engine.getQueue({ code: 'zh' }).cards[0]!.card;
+    await engine.grade(card.id, 3, { source: 'app' });
+
+    const graded = engine.getAllCards('zh').find((candidate) => candidate.id === card.id)!;
+    await engine.setExamTrack('zh', 'hsk2');
+    const after = engine.getAllCards('zh').find((candidate) => candidate.id === card.id)!;
+
+    // Only the tag moves. The memory state is the learner's.
+    expect(after.levelId).not.toBe(graded.levelId);
+    expect(after.reps).toBe(graded.reps);
+    expect(after.stability).toBe(graded.stability);
+    expect(after.due).toBe(graded.due);
+  });
+
+  it('survives a round trip between tracks', async () => {
+    const { engine } = await makeEngine();
+    await engine.setExamTrack('zh', 'hsk2');
+    await engine.setExamTrack('zh', 'hsk3');
+    expect(engine.getQueue({ code: 'zh' }).cards.length).toBeGreaterThan(0);
   });
 
   it('refuses a track from the wrong language', async () => {
@@ -302,9 +350,41 @@ describe('exam readiness', () => {
   const cards = generateCards(MANDARIN_SEED, ['hsk3-1'], { now: NOW });
 
   it('asks for an exam date before claiming to measure readiness', () => {
-    const readiness = computeExamReadiness(cards, profile(), NOW);
+    // A deck that holds the whole syllabus has nothing to caveat, so the
+    // headline is free to ask for the date.
+    const readiness = computeExamReadiness(cards, profile(), NOW, 500);
     expect(readiness.verdict).toBe('no-exam-set');
     expect(readiness.headline).toMatch(/Set an exam date/);
+  });
+
+  it('names the gap between the deck and the syllabus instead of a bare percentage', () => {
+    // The seed deck holds 27 of HSK 1's 500 words. Reporting "5% known" and
+    // "473 words remaining" implied 473 words were in here to study.
+    const readiness = computeExamReadiness(cards, profile(), NOW, 27);
+
+    expect(readiness.coverage).toBe(0);
+    expect(readiness.wordsRemaining).toBe(27);
+    expect(readiness.syllabusShortfall).toBe(473);
+    expect(readiness.headline).toContain('of 27');
+    expect(readiness.headline).toContain('473');
+  });
+
+  it('lets deck progress reach the end', () => {
+    // Mastering everything the app holds is 100% of the deck — and still only 5%
+    // of the paper, which is the number readiness is scored on.
+    const known = cards.map((card) => ({
+      ...card,
+      state: 'review' as const,
+      stability: 40,
+      difficulty: 5,
+      reps: 4,
+      lastReviewedAt: NOW,
+    }));
+    const readiness = computeExamReadiness(known, profile(), NOW, 27);
+
+    expect(readiness.coverage).toBe(1);
+    expect(readiness.wordsRemaining).toBe(0);
+    expect(readiness.syllabusCoverage).toBeCloseTo(27 / 500, 3);
   });
 
   it('reports not-started when nothing has been studied', () => {
@@ -313,7 +393,24 @@ describe('exam readiness', () => {
     expect(readiness.score).toBe(0);
   });
 
-  it('calls out an insufficient daily pace', () => {
+  it('calls out an insufficient daily pace, against words that exist', () => {
+    // 400 words in the deck, none started, 10 days, 5 a day: not going to happen.
+    // Paced against the deck rather than the syllabus, because no daily limit
+    // gets through words the app does not have.
+    const readiness = computeExamReadiness(
+      cards.map((card) => ({ ...card, state: 'new' as const })),
+      profile({ examDate: '2026-03-11', dailyNewLimit: 5 }),
+      NOW,
+      400,
+    );
+
+    expect(readiness.requiredNewPerDay).toBeGreaterThan(5);
+    expect(readiness.paceIsSufficient).toBe(false);
+  });
+
+  it('does not demand a pace through words the deck does not contain', () => {
+    // Everything available already started: there is no pace that could be
+    // insufficient, and the old code called this "behind" forever.
     const studied = cards.map((card) => ({
       ...card,
       state: 'review' as const,
@@ -322,11 +419,35 @@ describe('exam readiness', () => {
       reps: 3,
       lastReviewedAt: NOW,
     }));
-    // 500 words to cover, 10 days, 5 new a day: not going to happen.
-    const readiness = computeExamReadiness(studied, profile({ examDate: '2026-03-11', dailyNewLimit: 5 }), NOW);
-    expect(readiness.paceIsSufficient).toBe(false);
-    expect(readiness.verdict).toBe('behind');
-    expect(readiness.headline).toMatch(/new words a day/);
+    const readiness = computeExamReadiness(
+      studied,
+      profile({ examDate: '2026-03-11', dailyNewLimit: 5 }),
+      NOW,
+      27,
+    );
+
+    expect(readiness.requiredNewPerDay).toBe(0);
+    expect(readiness.paceIsSufficient).toBe(true);
+    expect(readiness.wordsRemaining).toBe(0);
+  });
+
+  it('blames the deck, not the learner, when the syllabus cannot be reached', () => {
+    const readiness = computeExamReadiness(
+      cards.map((card) => ({ ...card, state: 'new' as const })),
+      profile({ examDate: '2026-03-11', dailyNewLimit: 500 }),
+      NOW,
+      27,
+    );
+
+    expect(readiness.verdict).toBe('not-started');
+    expect(readiness.syllabusShortfall).toBe(473);
+  });
+
+  it('caps a suggested pace at the words actually available', () => {
+    const uncapped = suggestDailyNewLimit('hsk3-1', NOW, '2026-03-11');
+    const capped = suggestDailyNewLimit('hsk3-1', NOW, '2026-03-11', 27);
+    expect(uncapped).toBeGreaterThan(capped);
+    expect(capped).toBeLessThanOrEqual(27);
   });
 
   it('decays as the exam gets further away, because it assumes no more study', () => {

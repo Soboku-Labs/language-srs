@@ -2,7 +2,7 @@ import { findExamLevel, getVocabularyDelta } from '../exams';
 import { projectedRetrievability } from '../srs/scheduler';
 import type { Card, DateOnly, StudyProfile, Timestamp } from '../types/card';
 import { calendarDaysBetween } from '../utils/date';
-import { computeCoverage } from './metrics';
+import { computeCoverage, type CoverageStats } from './metrics';
 
 export type ReadinessVerdict = 'no-exam-set' | 'not-started' | 'behind' | 'on-track' | 'ready' | 'exam-passed';
 
@@ -20,8 +20,19 @@ export interface ExamReadiness {
    */
   score: number;
 
-  /** Share of the level's cumulative vocabulary target that is known. */
+  /** Share of the words the deck holds for this level that are known. */
   coverage: number;
+  /** Share of the exam's own vocabulary target that is known. */
+  syllabusCoverage: number;
+  /**
+   * Words the exam expects that the deck does not contain.
+   *
+   * The honest caveat on every other number here. With a seed deck of a few dozen
+   * words against a syllabus of hundreds, a learner can finish everything the app
+   * has and still be nowhere near the paper — and the app has to say so rather
+   * than let a full progress bar imply otherwise.
+   */
+  syllabusShortfall: number;
   /**
    * Mean recall probability on exam day across everything studied, assuming no
    * further reviews. This is what makes the number honest — it decays if the
@@ -60,29 +71,37 @@ export function computeExamReadiness(
   cards: Card[],
   profile: StudyProfile,
   now: Timestamp,
+  /** Words the deck holds in this level's scope. Defaults to what the cards imply. */
+  available?: number,
 ): ExamReadiness {
   const level = findExamLevel(profile.targetLevelId);
   const levelName = level?.name ?? profile.targetLevelId;
-  const target = level?.vocabularyTarget ?? 0;
+  const syllabusTarget = level?.vocabularyTarget ?? 0;
 
   const inScope = cards.filter((card) => !card.suspended);
-  const coverage = computeCoverage(inScope, target);
-  const wordsRemaining = Math.max(0, target - coverage.entriesStarted);
+  // Falling back to the distinct entries the cards cover keeps this correct for
+  // callers that have not counted the deck themselves.
+  const deckSize = available ?? new Set(inScope.map((card) => card.entryId)).size;
+  const coverage = computeCoverage(inScope, { available: deckSize, syllabusTarget });
+
+  const wordsRemaining = Math.max(0, deckSize - coverage.entriesStarted);
+  const syllabusShortfall = Math.max(0, syllabusTarget - deckSize);
 
   if (!profile.examDate) {
-    const score = coverage.fraction;
     return {
       levelId: profile.targetLevelId,
       levelName,
-      score,
+      score: coverage.fraction,
       coverage: coverage.fraction,
+      syllabusCoverage: coverage.syllabusFraction,
+      syllabusShortfall,
       projectedRecall: 0,
       requiredNewPerDay: 0,
       plannedNewPerDay: profile.dailyNewLimit,
       paceIsSufficient: true,
       wordsRemaining,
       verdict: 'no-exam-set',
-      headline: `${Math.round(coverage.fraction * 100)}% of ${levelName} vocabulary known. Set an exam date to track readiness.`,
+      headline: describeDeckProgress({ levelName, coverage, syllabusShortfall }),
     };
   }
 
@@ -96,6 +115,8 @@ export function computeExamReadiness(
       daysToExam,
       score: coverage.fraction,
       coverage: coverage.fraction,
+      syllabusCoverage: coverage.syllabusFraction,
+      syllabusShortfall,
       projectedRecall: 0,
       requiredNewPerDay: 0,
       plannedNewPerDay: profile.dailyNewLimit,
@@ -114,9 +135,20 @@ export function computeExamReadiness(
       : 0;
 
   const effectiveDays = Math.max(1, daysToExam);
+  // Paced against the words that exist. Dividing the exam's own target by the
+  // days left demanded 30 new words a day from a deck holding 27 in total, and
+  // then called the learner "behind" for not doing it.
   const requiredNewPerDay = wordsRemaining / effectiveDays;
   const paceIsSufficient = profile.dailyNewLimit >= requiredNewPerDay;
-  const score = clamp01(coverage.fraction * projectedRecall);
+
+  /**
+   * Readiness for the paper, not for the deck.
+   *
+   * Grounded in `syllabusFraction` on purpose. Someone who has mastered all 27
+   * words the app holds is 100% through their deck and is not ready for a
+   * 500-word exam, and this is the number that has to keep saying so.
+   */
+  const score = clamp01(coverage.syllabusFraction * projectedRecall);
 
   const verdict = decideVerdict({
     score,
@@ -133,6 +165,8 @@ export function computeExamReadiness(
     daysToExam,
     score,
     coverage: coverage.fraction,
+    syllabusCoverage: coverage.syllabusFraction,
+    syllabusShortfall,
     projectedRecall,
     requiredNewPerDay,
     plannedNewPerDay: profile.dailyNewLimit,
@@ -146,8 +180,33 @@ export function computeExamReadiness(
       verdict,
       requiredNewPerDay,
       plannedNewPerDay: profile.dailyNewLimit,
+      syllabusShortfall,
     }),
   };
+}
+
+/**
+ * The no-exam headline.
+ *
+ * Says what was learned out of what is here, then names the gap to the real
+ * syllabus rather than leaving "100%" to be read as "ready".
+ */
+function describeDeckProgress(input: {
+  levelName: string;
+  coverage: CoverageStats;
+  syllabusShortfall: number;
+}): string {
+  const { entriesKnown, available, syllabusTarget } = input.coverage;
+
+  if (available === 0) {
+    return `No ${input.levelName} words in your deck yet. Import a word list to start this level.`;
+  }
+
+  const progress = `${entriesKnown} of ${available} ${input.levelName} words in your deck known.`;
+  if (input.syllabusShortfall > 0 && syllabusTarget > 0) {
+    return `${progress} The exam covers ${syllabusTarget.toLocaleString()} — ${input.syllabusShortfall.toLocaleString()} are not in the deck.`;
+  }
+  return `${progress} Set an exam date to track readiness.`;
 }
 
 function decideVerdict(input: {
@@ -172,6 +231,7 @@ function buildHeadline(input: {
   verdict: ReadinessVerdict;
   requiredNewPerDay: number;
   plannedNewPerDay: number;
+  syllabusShortfall: number;
 }): string {
   const percent = Math.round(input.score * 100);
   const days = input.daysToExam === 0 ? 'today' : `in ${input.daysToExam} day${input.daysToExam === 1 ? '' : 's'}`;
@@ -180,6 +240,11 @@ function buildHeadline(input: {
     case 'not-started':
       return `${input.levelName} ${days}. Nothing studied yet — start with today's new words.`;
     case 'behind':
+      // When the deck cannot reach the syllabus, "study faster" is not the
+      // advice — no daily limit closes a gap made of words that are not there.
+      if (input.syllabusShortfall > 0) {
+        return `${percent}% ready for ${input.levelName} ${days}. Your deck is ${input.syllabusShortfall.toLocaleString()} words short of the syllabus — import more to close it.`;
+      }
       return `${percent}% ready for ${input.levelName} ${days}. Needs ${Math.ceil(
         input.requiredNewPerDay,
       )} new words a day; the limit is ${input.plannedNewPerDay}.`;
@@ -191,16 +256,27 @@ function buildHeadline(input: {
 }
 
 /**
- * Suggested daily new-card limit to finish a level's own vocabulary by exam day.
+ * Suggested daily new-card limit to finish by exam day.
  *
  * Uses the level's delta rather than the cumulative target, on the assumption
  * that a learner sitting N2 already has N3 behind them. Padded by 15% for the
  * days nobody studies.
+ *
+ * Capped at the words actually available when the caller knows that number. The
+ * uncapped version suggested a pace drawn from the size of the real syllabus,
+ * which on a deck of a few dozen words meant recommending a daily limit an order
+ * of magnitude beyond anything the app could serve.
  */
-export function suggestDailyNewLimit(levelId: string, now: Timestamp, examDate: DateOnly): number {
+export function suggestDailyNewLimit(
+  levelId: string,
+  now: Timestamp,
+  examDate: DateOnly,
+  available?: number,
+): number {
   const days = Math.max(1, calendarDaysBetween(now, examDate));
   const delta = getVocabularyDelta(levelId);
-  return Math.max(1, Math.ceil((delta / days) * 1.15));
+  const words = available !== undefined ? Math.min(delta, available) : delta;
+  return Math.max(1, Math.ceil((words / days) * 1.15));
 }
 
 function clamp01(value: number): number {

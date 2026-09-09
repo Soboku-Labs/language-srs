@@ -36,9 +36,19 @@ export default function StatsScreen() {
 
   return (
     <Screen>
+      {/*
+        "Ready" is a claim about the exam and is only made when there is an exam
+        to be ready for. Without a date this is progress through the deck, and
+        saying so is the difference between a number and a promise — the caption
+        underneath names the gap to the real syllabus either way.
+      */}
       <Rise index={0} style={styles.headline}>
-        <Title>{Math.round(readiness.score * 100)}% ready</Title>
-        <ProgressBar value={readiness.score} />
+        <Title>
+          {readiness.examDate
+            ? `${Math.round(readiness.score * 100)}% ready`
+            : `${Math.round(readiness.coverage * 100)}% of your deck`}
+        </Title>
+        <ProgressBar value={readiness.examDate ? readiness.score : readiness.coverage} />
         <Caption>{readiness.headline}</Caption>
       </Rise>
 

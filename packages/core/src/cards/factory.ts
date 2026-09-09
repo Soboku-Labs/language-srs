@@ -88,6 +88,14 @@ export interface GenerateCardsOptions {
  * Idempotent: card ids are derived from `entryId:kind`, so re-running after a
  * level's weights change adds the newly-relevant kinds and leaves existing cards
  * — and their review history — untouched.
+ *
+ * An existing card is re-tagged to the level now introducing it. Card ids carry
+ * no level, so without this a card stayed pinned to whichever scope first created
+ * it, and the queue — which filters on `levelId` — stopped serving it the moment
+ * that level left scope. Switching from HSK 3.0 to HSK 2.0 emptied the whole app
+ * that way: every card still said `hsk3-1`, nothing matched `hsk2-1`, and the
+ * dashboard cheerfully reported "all caught up". Only the tag moves; stability,
+ * due date, reps and lapses are the learner's and are carried over untouched.
  */
 export function generateCardsForEntry(
   entry: LexicalEntry,
@@ -107,7 +115,11 @@ export function generateCardsForEntry(
 
   return allowed
     .filter((kind) => isCardKindApplicable(entry, kind))
-    .map((kind) => existingById.get(cardId(entry.id, kind)) ?? createCard(entry, kind, level.id, now));
+    .map((kind) => {
+      const existing = existingById.get(cardId(entry.id, kind));
+      if (!existing) return createCard(entry, kind, level.id, now);
+      return existing.levelId === level.id ? existing : { ...existing, levelId: level.id };
+    });
 }
 
 /**

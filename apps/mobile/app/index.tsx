@@ -121,9 +121,20 @@ export default function Dashboard() {
             value={String(stats.streak.current)}
             color={stats.streak.current > 0 ? theme.colors.ink : theme.colors.inkMuted}
           />
-          <Stat label="words known" value={String(stats.coverage.entriesKnown)} />
           <Stat
-            label={profile.examDate ? 'exam ready' : 'syllabus'}
+            label={`of ${stats.coverage.available} words`}
+            value={String(stats.coverage.entriesKnown)}
+          />
+          {/*
+            Two different questions, and the label has to say which one is being
+            answered. Without an exam date this is progress through the deck,
+            which can reach 100%. With one it is readiness for the paper, which
+            is measured against the exam's own vocabulary and stays low while the
+            deck is short of it — labelling deck progress "syllabus" was how the
+            app came to report 5% to someone who had learned every word it had.
+          */}
+          <Stat
+            label={profile.examDate ? 'exam ready' : 'deck learned'}
             value={`${Math.round((profile.examDate ? readiness.score : readiness.coverage) * 100)}%`}
           />
         </Row>

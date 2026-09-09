@@ -97,6 +97,19 @@ export function computeRetention(logs: ReviewLog[], windowDays = 30, now?: Times
   };
 }
 
+/**
+ * Two denominators, kept apart on purpose.
+ *
+ * The exam expects 500 words at HSK 1. The app's deck holds 27 of them. Dividing
+ * by the first was making the app report 5% to a learner who had just mastered
+ * every word it contains, and promise "473 words remaining" that do not exist
+ * anywhere in it. Dividing only by the second would be the opposite lie — "100%
+ * of HSK 1" when the paper asks for eighteen times more.
+ *
+ * So both are reported and each is used for the question it answers: `fraction`
+ * for progress the learner can actually make, `syllabusFraction` for how much of
+ * the real exam that represents.
+ */
 export interface CoverageStats {
   /** Distinct entries with at least one card out of the new state. */
   entriesStarted: number;
@@ -105,10 +118,14 @@ export interface CoverageStats {
    * of a week or more. The bar for calling a word "known" rather than "seen".
    */
   entriesKnown: number;
-  /** Cumulative vocabulary the exam level expects. */
-  target: number;
-  /** entriesKnown / target, capped at 1. */
+  /** Words the deck actually holds in the current level's scope. */
+  available: number;
+  /** Cumulative vocabulary the exam level expects. A fact about the exam. */
+  syllabusTarget: number;
+  /** entriesKnown / available — the progress bar that can reach the end. */
   fraction: number;
+  /** entriesKnown / syllabusTarget — how much of the real paper that covers. */
+  syllabusFraction: number;
   newCards: number;
   learningCards: number;
   reviewCards: number;
@@ -117,7 +134,14 @@ export interface CoverageStats {
 
 const KNOWN_STABILITY_DAYS = 7;
 
-export function computeCoverage(cards: Card[], vocabularyTarget: number): CoverageStats {
+export interface CoverageTargets {
+  /** Entries in scope in the deck. Pass the real count, not an estimate. */
+  available: number;
+  /** The exam level's cumulative vocabulary target. */
+  syllabusTarget?: number;
+}
+
+export function computeCoverage(cards: Card[], targets: CoverageTargets): CoverageStats {
   const byEntry = new Map<string, Card[]>();
   let newCards = 0;
   let learningCards = 0;
@@ -144,11 +168,15 @@ export function computeCoverage(cards: Card[], vocabularyTarget: number): Covera
     }
   }
 
+  const syllabusTarget = targets.syllabusTarget ?? 0;
+
   return {
     entriesStarted,
     entriesKnown,
-    target: vocabularyTarget,
-    fraction: vocabularyTarget > 0 ? Math.min(1, entriesKnown / vocabularyTarget) : 0,
+    available: targets.available,
+    syllabusTarget,
+    fraction: targets.available > 0 ? Math.min(1, entriesKnown / targets.available) : 0,
+    syllabusFraction: syllabusTarget > 0 ? Math.min(1, entriesKnown / syllabusTarget) : 0,
     newCards,
     learningCards,
     reviewCards,

@@ -63,9 +63,15 @@ export default function SettingsScreen() {
     await mutate((instance) => instance.updateProfile(code, { examDate: trimmed }));
   };
 
+  /** Words the deck actually holds for the selected level. */
+  const available = useMemo(() => {
+    return engine.getAvailableWordCount(code);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, revision, code, profile.targetLevelId]);
+
   const suggestedNewLimit =
     profile.examDate && DATE_PATTERN.test(profile.examDate)
-      ? suggestDailyNewLimit(profile.targetLevelId, engine.now(), profile.examDate)
+      ? suggestDailyNewLimit(profile.targetLevelId, engine.now(), profile.examDate, available)
       : undefined;
 
   return (
@@ -102,15 +108,34 @@ export default function SettingsScreen() {
         {(() => {
           const level = track?.levels.find((candidate) => candidate.id === profile.targetLevelId);
           if (!level) return null;
+          const shortfall = Math.max(0, level.vocabularyTarget - available);
           return (
             <>
               <Caption>{level.description}</Caption>
+              {/*
+                Two rows, because they are two different facts and running them
+                together was the screen's worst lie. "Target vocabulary: 500
+                words" is what the exam asks for; it is not what is in here, and
+                read as one number it promised 500 words to study when the deck
+                holds a few dozen.
+              */}
               <DetailRow
-                label="Target vocabulary"
+                label="The exam covers"
                 value={`${level.vocabularyTarget.toLocaleString()} words${
                   level.characterTarget ? ` · ${level.characterTarget.toLocaleString()} characters` : ''
                 }`}
               />
+              <DetailRow
+                label="In your deck"
+                value={`${available.toLocaleString()} word${available === 1 ? '' : 's'}`}
+              />
+              {shortfall > 0 ? (
+                <Caption>
+                  {available === 0
+                    ? 'No words for this level yet. Import a word list to start it.'
+                    : `${shortfall.toLocaleString()} of the exam's words are not in your deck yet. Import a word list to close the gap.`}
+                </Caption>
+              ) : null}
               {track && !track.targetsAreOfficial ? (
                 <Caption>{track.authority} publishes no word list, so this is an estimate.</Caption>
               ) : null}

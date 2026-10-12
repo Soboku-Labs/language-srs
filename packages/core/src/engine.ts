@@ -1,10 +1,17 @@
-import { generateCards } from './cards/factory';
+import { createCard, generateCards } from './cards/factory';
 import { findExamTrack, getExamTrack, getLevelIdsInScope } from './exams';
 import { summariseDeck, type DeckEntry } from './deck';
+import { findStrugglingCards, type StrugglingCard } from './triage';
 import { buildStudyQueue, countTodaysWork, type StudyMode, type StudyQueue } from './session/queue';
-import { DEFAULT_SCHEDULER_CONFIG, type SchedulerConfig } from './srs/params';
+import { DEFAULT_SCHEDULER_CONFIG, resolveSchedulerConfig, type SchedulerConfig } from './srs/params';
 import { gradeCard } from './srs/scheduler';
-import { computeCoverage, computeRetention, computeStreak, forecastReviews } from './stats/metrics';
+import {
+  computeCoverage,
+  computeRetention,
+  computeRetentionByKind,
+  computeStreak,
+  forecastReviews,
+} from './stats/metrics';
 import { computeExamReadiness, type ExamReadiness } from './stats/readiness';
 import { readJson, writeJson, type KeyValueStore } from './storage/port';
 import {
@@ -452,6 +459,107 @@ export class StudyEngine {
     await this.notifyChanged();
   }
 
+  // ---------------------------------------------------------------- triage
+
+  /** Cards that are lapsing, failing, or already flagged as leeches. */
+  getStrugglingCards(
+    code: LanguageCode = this.meta.activeLanguage,
+    options: { limit?: number; since?: Timestamp } = {},
+  ): StrugglingCard[] {
+    return findStrugglingCards({
+      cards: this.getCardsInScope(code),
+      entries: this.entriesById,
+      logs: this.logs,
+      leechThreshold: resolveSchedulerConfig(this.meta.schedulerConfig).leechThreshold,
+      ...(options.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options.since !== undefined ? { since: options.since } : {}),
+    });
+  }
+
+  /**
+   * Start a card over.
+   *
+   * Back to new: no stability, no due date, no lapse count, no leech flag. For
+   * the word that has been forgotten eight times and whose scheduling history is
+   * now actively unhelpful — FSRS has learned it is hard and keeps the intervals
+   * short, which is correct and is also why it will keep coming back forever.
+   *
+   * The review log is deliberately left intact. It is the record of what actually
+   * happened, and retention statistics computed from it would be flattered by
+   * deleting every failure the learner has just chosen to move past.
+   */
+  async resetCard(cardId: string): Promise<void> {
+    const index = this.cards.findIndex((card) => card.id === cardId);
+    if (index === -1) return;
+
+    const card = this.cards[index]!;
+    const entry = this.entriesById.get(card.entryId);
+    if (!entry) return;
+
+    this.cards[index] = {
+      ...createCard(entry, card.kind, card.levelId, this.now()),
+      // Kept from the old card: when the learner first met this word, and any
+      // decision they have made about whether it should be in rotation.
+      createdAt: card.createdAt,
+      ...(card.suspended !== undefined ? { suspended: card.suspended } : {}),
+    };
+
+    await this.persistCards();
+    await this.notifyChanged();
+  }
+
+  /**
+   * Clear the leech flag without touching the schedule.
+   *
+   * "I have dealt with this" — the learner rewrote the note, or decided the word
+   * is simply hard and they are fine with that. Without this the flag is
+   * permanent, since lapses only ever increase, and the card is reported as a
+   * problem for the rest of its life.
+   */
+  async clearLeech(cardId: string): Promise<void> {
+    const index = this.cards.findIndex((card) => card.id === cardId);
+    if (index === -1) return;
+
+    const card = this.cards[index]!;
+    if (!card.leech) return;
+
+    // Lapses are reset alongside the flag, because the scheduler re-raises the
+    // flag from the lapse count — leaving it would mean the flag came back on the
+    // very next lapse and the button appeared to do nothing.
+    this.cards[index] = { ...card, leech: false, lapses: 0 };
+    await this.persistCards();
+    await this.notifyChanged();
+  }
+
+  // ---------------------------------------------------------------- notes
+
+  /**
+   * Attach a learner's own note to a word.
+   *
+   * Written through the imported-entry layer, which already exists so that a
+   * learner can correct a shipped definition — a memory hook is the same kind of
+   * correction. That also means a note survives re-importing the word list, and
+   * that `reset()` clears notes along with everything else, both of which are the
+   * behaviour someone would expect from "my notes on my deck".
+   */
+  async setEntryNote(entryId: string, note: string): Promise<void> {
+    const entry = this.entriesById.get(entryId);
+    if (!entry) return;
+
+    const trimmed = note.trim();
+    if ((entry.mnemonic ?? '') === trimmed) return;
+
+    const { mnemonic: _dropped, ...withoutNote } = entry;
+    const updated: LexicalEntry = trimmed ? { ...entry, mnemonic: trimmed } : withoutNote;
+
+    const existing = this.importedEntries.filter((candidate) => candidate.id !== entryId);
+    this.importedEntries = [...existing, updated];
+    this.reindexEntries();
+
+    await writeJson(this.options.store, STORAGE_KEYS.entries, this.importedEntries);
+    await this.notifyChanged();
+  }
+
   // ---------------------------------------------------------------- stats
 
   /**
@@ -491,6 +599,7 @@ export class StudyEngine {
     return {
       streak: computeStreak(this.logs, now, profile.dayStartHour),
       retention: computeRetention(this.logs, 30, now),
+      retentionByKind: computeRetentionByKind(this.logs, { windowDays: 30, now }),
       coverage: computeCoverage(cards, {
         available: this.getAvailableWordCount(code),
         ...(level?.vocabularyTarget !== undefined ? { syllabusTarget: level.vocabularyTarget } : {}),

@@ -400,6 +400,17 @@ export default function ReviewScreen() {
         <Rise index={2}>
           <BigButton label="Back home" onPress={() => router.replace('/')} />
         </Rise>
+
+        {/*
+          Running out of cards is the moment the deck's size becomes a problem
+          worth solving, so the way to solve it belongs here rather than three
+          taps away in settings.
+        */}
+        <Rise index={3}>
+          <Row style={styles.doneLinks}>
+            <TextButton label="Add more words" onPress={() => router.push('/import')} />
+          </Row>
+        </Rise>
       </Screen>
     );
   }
@@ -503,6 +514,7 @@ export default function ReviewScreen() {
 
 const createStyles = (theme: ResolvedTheme) => ({
   done: { gap: spacing.sm, paddingVertical: spacing.xxl, alignItems: 'center' as const },
+  doneLinks: { justifyContent: 'center' as const },
   missed: { gap: spacing.sm },
   missedTitle: {
     color: theme.colors.inkMuted,

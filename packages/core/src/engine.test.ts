@@ -482,3 +482,157 @@ describe('exam readiness', () => {
     expect(suggestDailyNewLimit('jlpt-n1', NOW, '2026-03-02')).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('rescuing a word that is fighting back', () => {
+  /**
+   * Fail a card until the scheduler gives up on it.
+   *
+   * Time has to move. Lapses are only counted against a card already in review,
+   * and with the clock frozen a card walks the one- and ten-minute learning steps
+   * forever without ever graduating, so no amount of failing it registers.
+   */
+  async function makeLeech() {
+    const { engine, store } = await makeEngine();
+    const card = engine.getQueue({ code: 'zh' }).cards[0]!.card;
+    let now = NOW;
+
+    // Easy graduates straight out of the learning ladder into review.
+    await engine.grade(card.id, 4, { source: 'app', now });
+
+    for (let attempt = 0; attempt < 15; attempt += 1) {
+      const current = engine.getAllCards('zh').find((candidate) => candidate.id === card.id)!;
+      if (current.leech) break;
+
+      now = addDays(now, 1);
+      await engine.grade(card.id, 1, { source: 'app', now });
+      now = addDays(now, 1);
+      await engine.grade(card.id, 4, { source: 'app', now });
+    }
+
+    return { engine, store, cardId: card.id, lastNow: now };
+  }
+
+  it('surfaces a leech the learner can act on', async () => {
+    const { engine, cardId } = await makeLeech();
+    const struggling = engine.getStrugglingCards('zh');
+
+    expect(struggling.length).toBeGreaterThan(0);
+    expect(struggling.some((row) => row.card.id === cardId)).toBe(true);
+    expect(engine.getStats('zh').coverage.leeches).toBeGreaterThan(0);
+  });
+
+  it('starts a card over without rewriting history', async () => {
+    const { engine, cardId } = await makeLeech();
+    const logsBefore = engine.getStats('zh').retention.reviews;
+
+    await engine.resetCard(cardId);
+    const card = engine.getAllCards('zh').find((candidate) => candidate.id === cardId)!;
+
+    expect(card.state).toBe('new');
+    expect(card.reps).toBe(0);
+    expect(card.lapses).toBe(0);
+    expect(card.leech).toBeFalsy();
+    expect(card.stability).toBe(0);
+
+    // The log is what actually happened; deleting it would flatter retention.
+    expect(engine.getStats('zh').retention.reviews).toBe(logsBefore);
+  });
+
+  it('puts a reset card back in front of the learner', async () => {
+    const { engine, cardId } = await makeLeech();
+    await engine.resetCard(cardId);
+    expect(engine.getQueue({ code: 'zh' }).cards.some((pair) => pair.card.id === cardId)).toBe(true);
+  });
+
+  it('keeps a reset card suspended if that is where it was', async () => {
+    const { engine, cardId } = await makeLeech();
+    await engine.setCardSuspended(cardId, true);
+    await engine.resetCard(cardId);
+
+    const card = engine.getAllCards('zh').find((candidate) => candidate.id === cardId)!;
+    expect(card.suspended).toBe(true);
+  });
+
+  it('clears the flag for good, not until the next lapse', async () => {
+    const { engine, cardId } = await makeLeech();
+    await engine.clearLeech(cardId);
+
+    const card = engine.getAllCards('zh').find((candidate) => candidate.id === cardId)!;
+    expect(card.leech).toBe(false);
+    // Lapses go too: the scheduler re-raises the flag from the count, so leaving
+    // it would make the button appear to do nothing on the very next failure.
+    expect(card.lapses).toBe(0);
+    expect(engine.getStrugglingCards('zh').some((row) => row.card.id === cardId)).toBe(false);
+  });
+
+  it('leaves the schedule alone when only the flag is cleared', async () => {
+    const { engine, cardId } = await makeLeech();
+    const before = engine.getAllCards('zh').find((candidate) => candidate.id === cardId)!;
+
+    await engine.clearLeech(cardId);
+    const after = engine.getAllCards('zh').find((candidate) => candidate.id === cardId)!;
+
+    expect(after.due).toBe(before.due);
+    expect(after.stability).toBe(before.stability);
+    expect(after.reps).toBe(before.reps);
+  });
+
+  it('ignores an unknown card id', async () => {
+    const { engine } = await makeEngine();
+    await expect(engine.resetCard('nope:recognition')).resolves.toBeUndefined();
+    await expect(engine.clearLeech('nope:recognition')).resolves.toBeUndefined();
+  });
+});
+
+describe('notes on a word', () => {
+  it('saves a note and gives it back', async () => {
+    const { engine } = await makeEngine();
+    await engine.setEntryNote('zh-nihao', '  Sounds like "knee how"  ');
+    expect(engine.getEntry('zh-nihao')?.mnemonic).toBe('Sounds like "knee how"');
+  });
+
+  it('survives a relaunch', async () => {
+    const { engine, store } = await makeEngine();
+    await engine.setEntryNote('zh-nihao', 'knee how');
+
+    const reopened = await StudyEngine.create({ store, seedEntries: SEED_ENTRIES, clock: fixedClock(NOW) });
+    expect(reopened.getEntry('zh-nihao')?.mnemonic).toBe('knee how');
+  });
+
+  it('removes the note when it is emptied rather than storing a blank', async () => {
+    const { engine } = await makeEngine();
+    await engine.setEntryNote('zh-nihao', 'knee how');
+    await engine.setEntryNote('zh-nihao', '   ');
+    expect(engine.getEntry('zh-nihao')?.mnemonic).toBeUndefined();
+  });
+
+  it('changes nothing else about the word', async () => {
+    const { engine } = await makeEngine();
+    const before = engine.getEntry('zh-nihao')!;
+    await engine.setEntryNote('zh-nihao', 'knee how');
+    const after = engine.getEntry('zh-nihao')!;
+
+    expect(after.target).toBe(before.target);
+    expect(after.meanings).toEqual(before.meanings);
+    expect(after.levelIds).toEqual(before.levelIds);
+    expect(after.tones).toEqual(before.tones);
+  });
+
+  it('does not disturb the cards that already exist for it', async () => {
+    const { engine } = await makeEngine();
+    const card = engine.getQueue({ code: 'zh' }).cards.find((pair) => pair.entry.id === 'zh-nihao')!.card;
+    await engine.grade(card.id, 3, { source: 'app' });
+    const graded = engine.getAllCards('zh').find((candidate) => candidate.id === card.id)!;
+
+    await engine.setEntryNote('zh-nihao', 'knee how');
+
+    const after = engine.getAllCards('zh').find((candidate) => candidate.id === card.id)!;
+    expect(after.reps).toBe(graded.reps);
+    expect(after.due).toBe(graded.due);
+  });
+
+  it('ignores an unknown word', async () => {
+    const { engine } = await makeEngine();
+    await expect(engine.setEntryNote('zh-nope', 'hello')).resolves.toBeUndefined();
+  });
+});

@@ -178,8 +178,14 @@ Details, including the iOS target setup and how to verify the wiring:
 
 The app ships a starter deck per language (~30 entries each) covering the first level of
 each track and exercising every card kind, including tone drills and script drills. It
-is a starting point, not a syllabus — full official word lists are imported:
-[docs/DATA.md](docs/DATA.md).
+is a starting point, not a syllabus.
+
+Full word lists go in through **Settings → Vocabulary → Add or back up words**, which
+takes a pasted CSV or JSON (and a file on the web). Every row is validated and reported
+with its row number before anything is committed, so a list with a mistyped level id
+says so rather than importing cleanly and producing cards that never appear in a queue.
+The same screen exports the deck — including your own notes — as JSON to import back.
+Column order and the shape of each field: [docs/DATA.md](docs/DATA.md).
 
 ## Accuracy of the exam data
 

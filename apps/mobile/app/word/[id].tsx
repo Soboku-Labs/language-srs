@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   cardRetrievability,
+  describeStruggle,
   findExamLevel,
   formatInterval,
   kindLabel,
@@ -38,6 +39,11 @@ export default function WordScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, revision, id]);
 
+  const allStruggling = useMemo(() => {
+    return engine.getStrugglingCards();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, revision]);
+
   if (!row) {
     return (
       <Screen>
@@ -52,6 +58,7 @@ export default function WordScreen() {
   const level = findExamLevel(entry.levelIds[0] ?? '');
   const suspended = row.status === 'suspended';
   const dueCard = cards.find((card) => !card.suspended && row.dueNow > 0);
+  const struggling = allStruggling.filter((candidate) => candidate.entry.id === entry.id);
 
   return (
     <Screen>
@@ -108,15 +115,60 @@ export default function WordScreen() {
         </Section>
       </Rise>
 
-      {entry.mnemonic ? (
-        <Rise index={3}>
-          <Section title="Hook">
-            <Caption muted={false}>{entry.mnemonic}</Caption>
+      {/*
+        The note is the learner's own, and it is the single most effective thing
+        they can do about a word that keeps slipping — which is why the rescue
+        actions below sit next to it rather than on a separate screen.
+      */}
+      <Rise index={3}>
+        <Section title="Your note">
+          <NoteEditor
+            value={entry.mnemonic ?? ''}
+            onSave={(note) => void mutate((instance) => instance.setEntryNote(entry.id, note))}
+          />
+        </Section>
+      </Rise>
+
+      {struggling.length > 0 ? (
+        <Rise index={4}>
+          <Section title="Not sticking">
+            {struggling.map((row) => (
+              <View key={row.card.id} style={styles.struggleRow}>
+                <Text style={styles.struggleKind}>{kindLabel(row.card.kind)}</Text>
+                <Text style={styles.struggleText}>{describeStruggle(row)}</Text>
+              </View>
+            ))}
+            <Row style={styles.wrapRow}>
+              {/*
+                Two different repairs, and the difference matters. Starting over
+                throws away a schedule that has learned the word is hard and
+                therefore keeps bringing it back forever. Clearing the flag keeps
+                the schedule and says the learner has handled it — usually by
+                writing the note above.
+              */}
+              <TextButton
+                label="Start these over"
+                onPress={() =>
+                  void mutate(async (instance) => {
+                    for (const row of struggling) await instance.resetCard(row.card.id);
+                  })
+                }
+              />
+              <TextButton
+                label="I've handled it"
+                color={theme.colors.inkMuted}
+                onPress={() =>
+                  void mutate(async (instance) => {
+                    for (const row of struggling) await instance.clearLeech(row.card.id);
+                  })
+                }
+              />
+            </Row>
           </Section>
         </Rise>
       ) : null}
 
-      <Rise index={4}>
+      <Rise index={5}>
         <Row style={styles.actions}>
           {dueCard ? (
             <TextButton
@@ -138,6 +190,46 @@ export default function WordScreen() {
         </Row>
       </Rise>
     </Screen>
+  );
+}
+
+/**
+ * A note the learner writes themselves.
+ *
+ * Saved explicitly rather than on every keystroke. Each save rewrites the entry
+ * and notifies every screen watching the engine, and doing that per character
+ * would rebuild the deck under the cursor.
+ *
+ * The button appears only once the text differs from what is stored, so the
+ * common case — opening a word to read it — shows no controls at all.
+ */
+function NoteEditor({ value, onSave }: { value: string; onSave: (note: string) => void }) {
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const [draft, setDraft] = useState(value);
+
+  // A different word arrived under the same component, or the save landed.
+  useEffect(() => setDraft(value), [value]);
+
+  const dirty = draft.trim() !== value.trim();
+
+  return (
+    <>
+      <TextInput
+        value={draft}
+        onChangeText={setDraft}
+        placeholder="A memory hook, a correction, anything that makes it stick"
+        placeholderTextColor={theme.colors.inkFaint}
+        multiline
+        style={styles.note}
+      />
+      {dirty ? (
+        <Row style={styles.wrapRow}>
+          <TextButton label="Save note" onPress={() => onSave(draft)} />
+          <TextButton label="Cancel" color={theme.colors.inkMuted} onPress={() => setDraft(value)} />
+        </Row>
+      ) : null}
+    </>
   );
 }
 
@@ -229,5 +321,26 @@ const createStyles = (theme: ResolvedTheme) => ({
   },
 
   actions: { gap: spacing.md },
+  wrapRow: { flexWrap: 'wrap' as const, gap: spacing.lg },
   spacer: { flex: 1 },
+
+  note: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.control,
+    padding: spacing.md,
+    color: theme.colors.ink,
+    fontSize: typography.caption,
+    lineHeight: 20,
+    minHeight: 64,
+    textAlignVertical: 'top' as const,
+  },
+
+  struggleRow: {
+    flexDirection: 'row' as const,
+    gap: spacing.md,
+    alignItems: 'baseline' as const,
+    paddingVertical: spacing.xs,
+  },
+  struggleKind: { color: theme.colors.ink, fontSize: typography.caption, width: 84 },
+  struggleText: { color: theme.colors.inkMuted, fontSize: typography.caption, flex: 1, lineHeight: 18 },
 });

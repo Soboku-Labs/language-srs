@@ -1,9 +1,28 @@
 import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
-import { findExamLevel, getExaminedSkills, getLanguageProfile } from '@language-srs/core';
+import { useRouter } from 'expo-router';
+import {
+  describeStruggle,
+  findExamLevel,
+  getExaminedSkills,
+  getLanguageProfile,
+  kindLabel,
+  type KindRetention,
+} from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
-import { Caption, DetailRow, Pill, ProgressBar, Row, Screen, Section, Stat, Title } from '../src/components/ui';
-import { Rise } from '../src/motion/components';
+import {
+  Caption,
+  DetailRow,
+  Pill,
+  ProgressBar,
+  Row,
+  Screen,
+  Section,
+  Stat,
+  TextButton,
+  Title,
+} from '../src/components/ui';
+import { Press, Rise } from '../src/motion/components';
 import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTheme } from '../src/theme';
 
 /**
@@ -17,6 +36,7 @@ export default function StatsScreen() {
   const { engine, revision } = useEngine();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
+  const router = useRouter();
 
   const view = useMemo(() => {
     const profile = engine.getProfile();
@@ -26,11 +46,31 @@ export default function StatsScreen() {
       level: findExamLevel(profile.targetLevelId),
       stats: engine.getStats(),
       readiness: engine.getReadiness(),
+      struggling: engine.getStrugglingCards(),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, revision]);
 
-  const { profile, level, stats, readiness } = view;
+  const { profile, level, stats, readiness, struggling } = view;
+  const weakest = stats.retentionByKind[0];
+
+  /**
+   * One row per word, not per card.
+   *
+   * A word with five cards that are all going badly was listing the same word
+   * five times, which reads as five separate problems and pushes everything else
+   * off the list. The cards are already sorted worst-first, so the first one for
+   * a word is the one worth naming.
+   */
+  const strugglingWords = useMemo(() => {
+    const byEntry = new Map<string, (typeof struggling)[number] & { cardCount: number }>();
+    for (const row of struggling) {
+      const seen = byEntry.get(row.entry.id);
+      if (seen) seen.cardCount += 1;
+      else byEntry.set(row.entry.id, { ...row, cardCount: 1 });
+    }
+    return [...byEntry.values()];
+  }, [struggling]);
   const peak = Math.max(1, ...stats.forecast.map((day) => day.due));
   const scheduled = stats.forecast.reduce((total, day) => total + day.due, 0);
 
@@ -114,17 +154,81 @@ export default function StatsScreen() {
         )}
         <DetailRow label="Current streak" value={`${stats.streak.current} days`} />
         <DetailRow label="Longest streak" value={`${stats.streak.longest} days`} />
-        {stats.coverage.leeches > 0 ? (
-          <>
-            <DetailRow label="Leeches" value={String(stats.coverage.leeches)} />
-            <Caption>
-              Leeches have lapsed repeatedly. Usually the card is badly worded rather than the word being hard —
-              rewriting the gloss beats grinding them.
-            </Caption>
-          </>
-        ) : null}
       </Section>
       </Rise>
+
+      {/*
+        These exams are sectioned by skill and the queue already mirrors that mix,
+        so one overall retention figure averages away the only thing it could have
+        told the learner: that their reading is fine and their listening is not.
+      */}
+      {stats.retentionByKind.length > 1 ? (
+        <Rise index={4}>
+          <Section title="By skill">
+            {stats.retentionByKind.map((row) => (
+              <View key={row.kind} style={styles.skillRow}>
+                <Text style={styles.skillLabel}>{kindLabel(row.kind)}</Text>
+                <View style={styles.skillTrack}>
+                  <View
+                    style={[
+                      styles.skillFill,
+                      {
+                        width: `${Math.max(2, Math.round(row.trueRetention * 100))}%`,
+                        backgroundColor:
+                          row.trueRetention >= profile.desiredRetention
+                            ? theme.colors.good
+                            : theme.colors.caution,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.skillValue}>{Math.round(row.trueRetention * 100)}%</Text>
+              </View>
+            ))}
+            <Caption>{describeWeakestSkill(stats.retentionByKind, profile.desiredRetention)}</Caption>
+            {/* The weakest skill is only useful if something can be done about it
+                in the same breath, and the review screen already takes a kind. */}
+            {weakest && weakest.trueRetention < profile.desiredRetention ? (
+              <TextButton
+                label={`Drill ${kindLabel(weakest.kind).toLowerCase()}`}
+                onPress={() => router.push(`/review?mode=cram&kind=${weakest.kind}`)}
+              />
+            ) : null}
+          </Section>
+        </Rise>
+      ) : null}
+
+      {/*
+        A count of your worst cards that you cannot act on is worse than no count,
+        so the number now comes with the way to deal with them.
+      */}
+      {strugglingWords.length > 0 ? (
+        <Rise index={5}>
+          <Section title="Fighting you">
+            {strugglingWords.slice(0, 6).map((row) => (
+              <Press
+                key={row.entry.id}
+                onPress={() => router.push(`/word/${encodeURIComponent(row.entry.id)}`)}
+                accessibilityRole="button"
+                style={styles.struggleRow}
+              >
+                <Text style={styles.struggleTarget}>{row.entry.target}</Text>
+                <Text style={styles.struggleWhy} numberOfLines={1}>
+                  {row.cardCount > 1 ? `${row.cardCount} cards · ` : ''}
+                  {describeStruggle(row)}
+                </Text>
+              </Press>
+            ))}
+            {strugglingWords.length > 6 ? (
+              <Caption>and {strugglingWords.length - 6} more</Caption>
+            ) : null}
+            <Caption>
+              Usually the card is badly worded rather than the word being hard. Open one to add a note, start
+              it over, or set it aside.
+            </Caption>
+          </Section>
+        </Rise>
+      ) : null}
 
       {level ? (
         <Rise index={4}>
@@ -173,6 +277,24 @@ function describeCalibration(gap: number): string {
   return `You are recalling ${Math.round(-gap * 100)} points better than predicted. Lowering target retention would cut your daily load.`;
 }
 
+/**
+ * Name the weakest skill, or say there isn't one.
+ *
+ * A list of percentages is a reading exercise; the sentence under it is the part
+ * that tells the learner what to do on the days they only have twenty minutes.
+ */
+function describeWeakestSkill(rows: KindRetention[], desired: number): string {
+  const weakest = rows[0];
+  if (!weakest) return '';
+
+  if (weakest.trueRetention >= desired) {
+    return `Every skill is at or above your ${Math.round(desired * 100)}% target.`;
+  }
+
+  const gap = Math.round((desired - weakest.trueRetention) * 100);
+  return `${kindLabel(weakest.kind)} is ${gap} points below your target — the weakest of ${rows.length} skills.`;
+}
+
 const createStyles = (theme: ResolvedTheme) => ({
   headline: { gap: spacing.sm },
   stats: { justifyContent: 'space-between' as const },
@@ -182,4 +304,35 @@ const createStyles = (theme: ResolvedTheme) => ({
   chartBarArea: { flex: 1, width: '100%' as const, justifyContent: 'flex-end' as const },
   chartBar: { width: '100%' as const, borderRadius: theme.radius.control, minHeight: 3 },
   chartLabel: { color: theme.colors.inkFaint, fontSize: typography.micro },
+
+  skillRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  skillLabel: { color: theme.colors.ink, fontSize: typography.caption, width: 84 },
+  skillTrack: {
+    flex: 1,
+    height: 3,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surfaceRaised,
+    overflow: 'hidden' as const,
+  },
+  skillFill: { height: '100%' as const, borderRadius: theme.radius.pill },
+  skillValue: {
+    color: theme.colors.inkMuted,
+    fontSize: typography.micro,
+    width: 34,
+    textAlign: 'right' as const,
+  },
+
+  struggleRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'baseline' as const,
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  struggleTarget: { color: theme.colors.ink, fontSize: typography.body, fontWeight: weight.medium },
+  struggleWhy: { color: theme.colors.inkMuted, fontSize: typography.caption, flex: 1 },
 });

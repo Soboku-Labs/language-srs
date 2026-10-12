@@ -1,7 +1,9 @@
 import { cardRetrievability } from '../srs/scheduler';
 import type { Card, DateOnly, Timestamp } from '../types/card';
+import type { CardKind } from '../types/exam';
 import type { ReviewLog } from '../types/review';
 import { addDays, studyDayOf, toDateOnly, toEpochMs } from '../utils/date';
+import { parseCardId } from '../utils/id';
 
 /** Consecutive study days ending today (or yesterday, if today is unstarted). */
 export interface StreakInfo {
@@ -230,4 +232,71 @@ export function meanRetrievability(cards: Card[], now: Timestamp): number {
   const active = cards.filter((card) => card.state === 'review' && !card.suspended);
   if (active.length === 0) return 0;
   return active.reduce((sum, card) => sum + cardRetrievability(card, now), 0) / active.length;
+}
+
+export interface KindRetention {
+  kind: CardKind;
+  /** Gradings of review-state cards of this kind in the window. */
+  reviews: number;
+  /** Share of those the learner recalled. */
+  trueRetention: number;
+}
+
+/**
+ * True retention, split by card kind.
+ *
+ * These exams are sectioned by skill and the queue already mirrors that mix, so
+ * a single overall retention number averages away the only thing it could have
+ * told the learner: that their reading is fine and their listening is not. One
+ * number says "you are at 84%" and leaves nothing to do; this says which section
+ * of the paper is going to hurt.
+ *
+ * The kind comes from the card id rather than from the card itself, so this needs
+ * only the log — which matters because logs outlive the cards they describe.
+ * Learning-state gradings are excluded for the same reason as in
+ * `computeRetention`: a card on a one-minute step has not been retained over an
+ * interval, and counting it inflates the figure until it means nothing.
+ *
+ * Kinds with too few gradings to mean anything are dropped rather than reported
+ * as 0% or 100%, which is what two reviews of one listening card would otherwise
+ * produce.
+ */
+export function computeRetentionByKind(
+  logs: ReviewLog[],
+  options: { windowDays?: number; now?: Timestamp; minimumReviews?: number } = {},
+): KindRetention[] {
+  const windowDays = options.windowDays ?? 30;
+  const minimumReviews = options.minimumReviews ?? 5;
+  const cutoff = options.now ? toEpochMs(addDays(options.now, -windowDays)) : 0;
+
+  const byKind = new Map<CardKind, { reviews: number; recalled: number }>();
+
+  for (const log of logs) {
+    if (log.stateBefore !== 'review') continue;
+    if (toEpochMs(log.reviewedAt) < cutoff) continue;
+
+    let kind: CardKind;
+    try {
+      kind = parseCardId(log.cardId).kind;
+    } catch {
+      // A log whose card id predates the current scheme tells us nothing about
+      // which skill it exercised, and guessing would put it in the wrong bucket.
+      continue;
+    }
+
+    const tally = byKind.get(kind) ?? { reviews: 0, recalled: 0 };
+    tally.reviews += 1;
+    if (log.rating > 1) tally.recalled += 1;
+    byKind.set(kind, tally);
+  }
+
+  return [...byKind.entries()]
+    .filter(([, tally]) => tally.reviews >= minimumReviews)
+    .map(([kind, tally]) => ({
+      kind,
+      reviews: tally.reviews,
+      trueRetention: tally.recalled / tally.reviews,
+    }))
+    // Weakest first: the list is read to find what to fix.
+    .sort((a, b) => a.trueRetention - b.trueRetention || a.kind.localeCompare(b.kind));
 }

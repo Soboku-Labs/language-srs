@@ -114,6 +114,10 @@ export type {
   StudyQueue,
 } from './session/queue';
 
+// Triage — the words that are fighting the learner
+export { describeStruggle, findStrugglingCards } from './triage';
+export type { FindStrugglingOptions, StruggleReason, StrugglingCard } from './triage';
+
 // Deck — the learner's words, for browsing rather than studying
 export { countByStatus, filterDeck, sortDeck, summariseDeck } from './deck';
 export type { DeckEntry, DeckFilter, DeckSort, DeckStatus, SummariseDeckOptions } from './deck';
@@ -122,11 +126,19 @@ export type { DeckEntry, DeckFilter, DeckSort, DeckStatus, SummariseDeckOptions 
 export {
   computeCoverage,
   computeRetention,
+  computeRetentionByKind,
   computeStreak,
   forecastReviews,
   meanRetrievability,
 } from './stats/metrics';
-export type { CoverageStats, ForecastDay, RetentionStats, StreakInfo } from './stats/metrics';
+export type {
+  CoverageStats,
+  CoverageTargets,
+  ForecastDay,
+  KindRetention,
+  RetentionStats,
+  StreakInfo,
+} from './stats/metrics';
 export { computeExamReadiness, suggestDailyNewLimit } from './stats/readiness';
 export type { ExamReadiness, ReadinessVerdict } from './stats/readiness';
 

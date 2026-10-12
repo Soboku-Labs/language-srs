@@ -130,11 +130,16 @@ export default function SettingsScreen() {
                 value={`${available.toLocaleString()} word${available === 1 ? '' : 's'}`}
               />
               {shortfall > 0 ? (
-                <Caption>
-                  {available === 0
-                    ? 'No words for this level yet. Import a word list to start it.'
-                    : `${shortfall.toLocaleString()} of the exam's words are not in your deck yet. Import a word list to close the gap.`}
-                </Caption>
+                <>
+                  <Caption>
+                    {available === 0
+                      ? 'No words for this level yet.'
+                      : `${shortfall.toLocaleString()} of the exam's words are not in your deck yet.`}
+                  </Caption>
+                  {/* The advice used to end at "import a word list" with no way to
+                      do it. The button is the point of saying any of this. */}
+                  <TextButton label="Add words" onPress={() => router.push('/import')} />
+                </>
               ) : null}
               {track && !track.targetsAreOfficial ? (
                 <Caption>{track.authority} publishes no word list, so this is an estimate.</Caption>
@@ -220,6 +225,11 @@ export default function SettingsScreen() {
         <Caption>
           Higher retention means shorter intervals and more reviews. 90% is where most learners get the best return.
         </Caption>
+      </Section>
+
+      <Section title="Vocabulary">
+        <DetailRow label={`Words for ${language.name}`} value={String(engine.getEntries(code).length)} />
+        <TextButton label="Add or back up words" onPress={() => router.push('/import')} />
       </Section>
 
       <Section title="Account">

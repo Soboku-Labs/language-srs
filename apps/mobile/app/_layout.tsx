@@ -84,6 +84,7 @@ function ThemedNavigator() {
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="languages" options={{ title: 'Languages' }} />
         <Stack.Screen name="words" options={{ title: 'Words' }} />
+        <Stack.Screen name="import" options={{ title: 'Add words' }} />
         {/* Titled by the word itself once loaded would need the entry here; the
             generic title keeps the header stable while the screen resolves. */}
         <Stack.Screen name="word/[id]" options={{ title: 'Word' }} />

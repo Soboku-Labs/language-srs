@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Language SRS</title>
+    <meta name="description" content="Exam-aligned spaced repetition for Mandarin, Japanese, Korean and Vietnamese." />
+    <!--
+      Painted before any JavaScript runs, from the same ink and canvas the
+      palettes use, so a slow connection shows the app's background rather than
+      a white flash that then turns dark.
+    -->
+    <meta name="color-scheme" content="light dark" />
+    <style>
+      :root { color-scheme: light dark; }
+      html, body { margin: 0; height: 100%; background: #FBFAF8; }
+      @media (prefers-color-scheme: dark) { html, body { background: #0B0B0C; } }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

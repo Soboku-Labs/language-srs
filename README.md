@@ -59,6 +59,12 @@ silently broke the exercise.
 ## Layout
 
 ```
+apps/web/                 The website: React + Vite, no React Native runtime
+  src/screens/            one file per screen
+  src/ui.tsx              the Suboku primitives as DOM
+  src/styles.css          the whole stylesheet; colours are CSS variables
+  src/router.tsx          a hand-written router, because the route set is fixed
+
 packages/core/            @language-srs/core — all the domain logic, no React or DOM
   exams/                  HSK, JLPT, TOPIK and Vietnamese curricula
   srs/                    FSRS-4.5 scheduler + exam-date pressure
@@ -84,16 +90,44 @@ The split is the point: `packages/core` imports nothing platform-specific, so th
 scheduling behaviour on the web, on both phones, and on the home screen is the same
 code. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+### One core, separate apps
+
+The web app and the phone app are now separate programs over a shared domain core,
+rather than one codebase rendered three ways.
+
+The reason is weight. Shipping web, iOS and Android from one React Native codebase
+put react-native-web, react-dom, expo-router and Reanimated into the browser —
+about 80% of a 1.3MB payload — to render a website. Splitting the web out drops it
+to 352KB (109KB gzipped) and cuts time-to-usable on a throttled mid-tier phone from
+~4.0s to ~1.4s.
+
+Nothing was duplicated to get there. `packages/core` is pure TypeScript, so the
+scheduler, the exam curricula, the queue builder, the answer generation, the deck,
+the triage and the journey are the *same code* in both apps — one implementation,
+one test suite, no chance of the two drifting on something as unforgiving as a
+review schedule. What differs is only what genuinely differs: the storage adapter,
+the motion, the routing and the widgets.
+
+`apps/mobile` remains the iOS and Android app. Taking those fully native too would
+mean deciding how the TypeScript core crosses into Swift and Kotlin; hand-porting a
+spaced-repetition scheduler into three languages is how a learner's phone and
+laptop quietly disagree about when a word is due.
+
 ## Running it
 
 ```bash
 npm install
 
 npm test          # unit tests over the core domain
-npm run typecheck # core + app
+npm run typecheck # core + web + mobile
 
-npm run web       # dev server in the browser
-npm run web:build # static export to apps/mobile/dist
+npm run web        # Vite dev server
+npm run web:build  # static build to apps/web/dist
+npm run web:pages  # the same, prefixed and prepared for GitHub Pages
+
+npm run mobile:start  # Expo, for iOS and Android
+npm run ios
+npm run android
 ```
 
 ### Accounts

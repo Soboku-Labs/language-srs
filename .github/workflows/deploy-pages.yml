@@ -43,8 +43,9 @@ jobs:
         run: npm run typecheck
 
       # Sets the /language-srs sub-path, then writes .nojekyll and 404.html.
-      # Without .nojekyll, Pages' Jekyll step drops the _expo/ bundle directory
-      # and the site serves a blank page.
+      # The 404 copy is what makes deep links work: the router uses real paths,
+      # Pages has no rewrite rules, and it serves 404.html for anything
+      # unmatched — so that file has to be the app.
       - name: Build web
         run: npm run web:pages
 
@@ -52,7 +53,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/mobile/dist
+          path: apps/web/dist
 
   deploy:
     needs: build

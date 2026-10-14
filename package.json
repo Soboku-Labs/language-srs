@@ -2,7 +2,7 @@
   "name": "language-srs",
   "version": "0.1.0",
   "private": true,
-  "description": "Exam-aligned spaced repetition for Mandarin, Japanese, Korean and Vietnamese, with home-screen widgets. Runs on web, iOS and Android from one codebase.",
+  "description": "Exam-aligned spaced repetition for Mandarin, Japanese, Korean and Vietnamese. One shared domain core; a native web app and native phone apps on top.",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -14,13 +14,15 @@
     "core:build": "npm run build --workspace @language-srs/core",
     "core:test": "npm run test --workspace @language-srs/core",
     "test": "npm run test --workspace @language-srs/core",
-    "typecheck": "npm run typecheck --workspace @language-srs/core && npm run typecheck --workspace @language-srs/mobile",
-    "web": "npm run web --workspace @language-srs/mobile",
-    "web:build": "npm run build:web --workspace @language-srs/mobile",
+    "typecheck": "npm run typecheck --workspace @language-srs/core && npm run typecheck --workspace @language-srs/web && npm run typecheck --workspace @language-srs/mobile",
+    "web": "npm run dev --workspace @language-srs/web",
+    "web:build": "npm run build --workspace @language-srs/web",
+    "web:pages": "npm run build:pages --workspace @language-srs/web",
+    "web:preview": "npm run preview --workspace @language-srs/web",
     "ios": "npm run ios --workspace @language-srs/mobile",
     "android": "npm run android --workspace @language-srs/mobile",
     "prebuild": "npm run prebuild --workspace @language-srs/mobile",
-    "web:pages": "npm run build:pages --workspace @language-srs/mobile"
+    "mobile:start": "npm run start --workspace @language-srs/mobile"
   },
   "devDependencies": {
     "typescript": "~5.9.2"

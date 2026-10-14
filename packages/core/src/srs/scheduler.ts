@@ -23,6 +23,15 @@ export interface GradeOptions {
   source?: ReviewSource;
   /** Injectable randomness so fuzzed intervals are reproducible in tests. */
   rng?: () => number;
+  /**
+   * The id to give the review log, instead of minting one.
+   *
+   * For replaying a grading that already happened somewhere else — a client
+   * pushing an offline batch to a server. The id travels with the grading, so
+   * both sides end up with the same log rather than two logs of the same event,
+   * and a retried push is recognisable as a repeat rather than counted twice.
+   */
+  logId?: string;
 }
 
 /**
@@ -233,7 +242,7 @@ export function gradeCard(card: Card, rating: Rating, options: GradeOptions = {}
   };
 
   const log: ReviewLog = {
-    id: reviewLogId(Date.parse(now)),
+    id: options.logId ?? reviewLogId(Date.parse(now)),
     cardId: card.id,
     entryId: card.entryId,
     reviewedAt: now,

@@ -1,0 +1,28 @@
+{
+  "name": "@mon/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The generated contract, the domain mapping in both directions, and the client every interface talks to the backend through.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.16.0",
+    "@connectrpc/connect": "^2.2.0",
+    "@mon/core": "*"
+  },
+  "devDependencies": {
+    "@connectrpc/connect-node": "^2.2.0",
+    "@mon/server": "*",
+    "typescript": "~5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

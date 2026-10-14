@@ -2,7 +2,7 @@
   "name": "mon",
   "version": "0.1.0",
   "private": true,
-  "description": "Mon — exam-aligned spaced repetition for Mandarin, Japanese, Korean and Vietnamese. One shared domain core behind a backend; web and phone apps are interfaces.",
+  "description": "Mon \u2014 exam-aligned spaced repetition for Mandarin, Japanese, Korean and Vietnamese. One shared domain core behind a backend; web and phone apps are interfaces.",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -13,8 +13,8 @@
   "scripts": {
     "core:build": "npm run build --workspace @mon/core",
     "core:test": "npm run test --workspace @mon/core",
-    "test": "npm run test --workspace @mon/core && npm run test --workspace @mon/server",
-    "typecheck": "npm run typecheck --workspace @mon/core && npm run typecheck --workspace @mon/server && npm run typecheck --workspace @mon/web && npm run typecheck --workspace @mon/mobile",
+    "test": "npm run test --workspace @mon/core && npm run test --workspace @mon/api && npm run test --workspace @mon/server",
+    "typecheck": "npm run typecheck --workspace @mon/core && npm run typecheck --workspace @mon/api && npm run typecheck --workspace @mon/server && npm run typecheck --workspace @mon/web && npm run typecheck --workspace @mon/mobile",
     "web": "npm run dev --workspace @mon/web",
     "web:build": "npm run icons && npm run build --workspace @mon/web",
     "web:pages": "npm run icons && npm run build:pages --workspace @mon/web",
@@ -28,7 +28,8 @@
     "icons": "node scripts/generate-icons.mjs",
     "proto:lint": "buf lint",
     "proto:breaking": "buf breaking --against '.git#branch=main'",
-    "proto:generate": "buf generate"
+    "proto:generate": "buf generate",
+    "api:test": "npm run test --workspace @mon/api"
   },
   "devDependencies": {
     "@bufbuild/buf": "^1.73.0",

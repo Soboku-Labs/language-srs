@@ -1,7 +1,7 @@
 import type { ConnectRouter } from '@connectrpc/connect';
 import type { Account, StudyEngine } from '@mon/core';
+import { pb } from '@mon/api';
 import type { Accounts } from '../accounts.ts';
-import * as pb from '../gen/mon/v1/mon_pb.ts';
 import { authService } from './auth.ts';
 import { studyService } from './study.ts';
 

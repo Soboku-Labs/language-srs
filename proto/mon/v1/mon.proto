@@ -103,9 +103,10 @@ message Card {
   CardKind kind = 5;
   CardState state = 6;
 
-  // FSRS memory state. Sent so a client can render strength without asking
-  // again, never so it can compute an interval — that stays server-side, which
-  // is the whole point of centralising it.
+  // FSRS memory state. Sent so a client can render strength, cache the card and
+  // sync it — never so it can decide an interval. That rule is a matter of
+  // review, not of withholding bytes: a client that needs to persist a card
+  // needs the whole card, and a half-sent one is a card that comes back wrong.
   double stability = 7;
   double difficulty = 8;
   string due = 9;  // RFC 3339
@@ -114,6 +115,16 @@ message Card {
   bool suspended = 12;
   string buried_until = 13;
   bool leech = 14;
+
+  // The rest of the record. Nothing here is interesting to draw, and all of it
+  // is required to store a card and hand it back unchanged: `step` is where a
+  // learning card stands in its ladder, and dropping it on a round trip would
+  // silently restart every card mid-learning.
+  int32 step = 15;
+  double scheduled_days = 16;
+  string last_reviewed_at = 17;
+  double elapsed_ms = 18;
+  string created_at = 19;
 }
 
 // A card with its entry, so drawing one needs no second call.
@@ -362,6 +373,22 @@ message Grade {
   Rating rating = 2;
   string graded_at = 3;  // RFC 3339; the server's clock if empty
   int32 duration_ms = 4;
+
+  /*
+   * A client-minted id, which is what makes a retry safe.
+   *
+   * Without it the offline path has a hole big enough to lose a learner's
+   * schedule through: a connection that times out *after* the server applied the
+   * batch leaves the client unable to tell success from failure, and the only
+   * options are to drop the reviews or to send them again and count them twice.
+   * Twice is worse — it inflates the streak, skews retention, and pushes every
+   * card in the batch further out than the learner earned.
+   *
+   * With an id the server recognises what it has already applied and reports it
+   * as a duplicate, so retrying until something acknowledges is simply correct.
+   * Clients should send the review log id they generated locally.
+   */
+  string id = 5;
 }
 
 message SubmitGradesRequest {
@@ -380,6 +407,10 @@ message SubmitGradesResponse {
   repeated GradeFailure failed = 2;
   DailyGoal goal = 3;
   Journey journey = 4;
+  // Gradings this server had already applied, recognised by `Grade.id`. Counted
+  // apart from `applied` so a client can tell "your retry worked the first time"
+  // from "nothing was recorded", and reported as a success either way.
+  int32 duplicates = 5;
 }
 
 enum DeckStatus {
@@ -521,6 +552,71 @@ message CardActionResponse {
   Card card = 2;
 }
 
+// ---------------------------------------------------------------------- sync
+
+// One grading as it happened, for the clients that keep a local copy.
+//
+// Logs are append-only and uniquely identified, which is what makes syncing them
+// tractable: a device can ask for everything after a cursor, apply what it gets,
+// and arrive at the same history as every other device without anyone resolving
+// a conflict.
+message ReviewLogEntry {
+  string id = 1;
+  string card_id = 2;
+  string entry_id = 3;
+  string reviewed_at = 4;
+  Rating rating = 5;
+  int32 duration_ms = 6;
+  string source = 7;  // app | widget
+  CardState state_before = 8;
+  CardState state_after = 9;
+  double stability_before = 10;
+  double stability_after = 11;
+  double difficulty_before = 12;
+  double difficulty_after = 13;
+  double elapsed_days = 14;
+  double scheduled_days = 15;
+  double predicted_retrievability = 16;
+}
+
+message PullStateRequest {
+  // The cursor from the last pull. Everything after it is sent.
+  //
+  // Empty asks for the whole history, which is what a new device needs and what
+  // a learner signing in on a second machine is actually asking for.
+  string since = 1;
+  int32 limit = 2;
+}
+
+// The account's state, for a client that keeps its own copy.
+//
+// ## Why cards come back whole rather than being replayed
+//
+// Card state is a pure function of the reviews applied to it, so in principle a
+// client could replay the log and arrive at the same place. It cannot, and the
+// reason is `applyFuzz`: the scheduler spreads due dates with an RNG so a
+// hundred cards learned on one evening do not all come back on the same one.
+// Two devices replaying the same reviews would land a day or two apart, forever,
+// with neither of them wrong.
+//
+// So the server's cards win. The log still comes down, because streaks,
+// retention and the per-kind breakdown are computed from it and a device that
+// only ever had its own half would under-report both.
+message PullStateResponse {
+  repeated Card cards = 1;
+  repeated StudyProfile profiles = 2;
+  LanguageCode active_language = 3;
+  // Vocabulary the learner imported. Theirs, and in no app build — so it is the
+  // part of a deck that is actually lost when a device is.
+  repeated LexicalEntry entries = 4;
+  repeated ReviewLogEntry reviews = 5;
+  // Send this as `since` next time. Opaque on purpose; it happens to be a
+  // timestamp today and a client that parses it will break when it is not.
+  string cursor = 6;
+  // More reviews are waiting beyond `limit`. Pull again with the new cursor.
+  bool more = 7;
+}
+
 // ------------------------------------------------------------------ services
 
 service AuthService {
@@ -542,4 +638,12 @@ service StudyService {
   rpc ImportVocabulary(ImportVocabularyRequest) returns (ImportVocabularyResponse);
   rpc SetNote(SetNoteRequest) returns (SetNoteResponse);
   rpc CardAction(CardActionRequest) returns (CardActionResponse);
+
+  // Sync, for a client that keeps its own copy of the deck.
+  //
+  // There is no matching Push: pushing is what the existing RPCs already do.
+  // Gradings go up through SubmitGrades with their real timestamps, imported
+  // words through ImportVocabulary, settings through UpdateProfile. A second
+  // way to write the same state would be a second thing to keep correct.
+  rpc PullState(PullStateRequest) returns (PullStateResponse);
 }

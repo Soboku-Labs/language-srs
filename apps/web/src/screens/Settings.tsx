@@ -7,6 +7,7 @@ import {
   suggestDailyNewLimit,
   toDateOnly,
 } from '@mon/core';
+import { SyncStatus } from '../components/SyncStatus';
 import { useAuth, useEngine } from '../providers';
 import { useRouter } from '../router';
 import { Caption, Choice, DetailRow, Rise, Row, Screen, Section, TextButton } from '../ui';
@@ -225,6 +226,7 @@ export function Settings() {
               A local profile on this device. Progress is not carried to your other devices.
             </Caption>
           ) : null}
+          <SyncStatus />
           <TextButton
             label={account?.provider === 'device' ? 'Sign in to an account' : 'Sign out'}
             muted={account?.provider !== 'device'}

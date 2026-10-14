@@ -9,14 +9,21 @@
 # builds without the buf binary present, and makes "the proto changed but
 # nobody regenerated" a visible conflict rather than a mystery at runtime.
 #
+# It lands in `packages/api` rather than in the server, because the server is not
+# the only thing that speaks this contract. The web app needs the same message
+# types, and — more to the point — the same enum tables, in the opposite
+# direction. Two copies of "CARD_KIND_READING means 'reading'" is how one of them
+# ends up meaning 'writing'.
+#
 # Run: npm run proto:generate
 version: v2
 clean: true
 plugins:
   - local: protoc-gen-es
-    out: apps/server/src/gen
+    out: packages/api/src/gen
     opt:
       - target=ts
-      # The server imports its own modules with explicit extensions, because it
-      # typechecks as ESM. Generated code has to match or tsc rejects it.
-      - import_extension=.ts
+      # Extensionless, matching `@mon/core`. The web app and the Expo app both
+      # consume this package and neither enables `allowImportingTsExtensions`, so
+      # a `.ts` in a generated import is an error in two builds at once.
+      - import_extension=none

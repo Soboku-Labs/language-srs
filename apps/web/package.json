@@ -12,6 +12,8 @@
     "build:pages": "WEB_BASE_URL=${WEB_BASE_URL:-/language-srs/} npm run build && node scripts/prepare-pages.mjs dist"
   },
   "dependencies": {
+    "@connectrpc/connect-web": "^2.2.0",
+    "@mon/api": "*",
     "@mon/core": "*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

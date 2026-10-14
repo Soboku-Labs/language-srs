@@ -8,7 +8,7 @@ import type {
   Rating,
   StudyMode,
 } from '@mon/core';
-import * as pb from '../gen/mon/v1/mon_pb.ts';
+import * as pb from './gen/mon/v1/mon_pb';
 
 /**
  * The enum seam.
@@ -103,6 +103,14 @@ export function cardKindFromPb(value: pb.CardKind): CardKind | undefined {
   return required(CARD_KIND_REVERSE, value, 'kind');
 }
 
+/** Where a kind is part of the data rather than a filter — a card off the wire. */
+export function cardKindFromPbStrict(value: pb.CardKind): CardKind {
+  if (value === pb.CardKind.UNSPECIFIED) {
+    throw new ConnectError('kind is required.', Code.InvalidArgument);
+  }
+  return required(CARD_KIND_REVERSE, value, 'kind');
+}
+
 // ---------------------------------------------------------------- card state
 
 const CARD_STATE: Record<CardState, pb.CardState> = {
@@ -111,8 +119,16 @@ const CARD_STATE: Record<CardState, pb.CardState> = {
   review: pb.CardState.REVIEW,
   relearning: pb.CardState.RELEARNING,
 };
+const CARD_STATE_REVERSE = invert(CARD_STATE);
 
 export const cardStateToPb = (state: CardState): pb.CardState => CARD_STATE[state];
+
+export function cardStateFromPb(value: pb.CardState): CardState {
+  if (value === pb.CardState.UNSPECIFIED) {
+    throw new ConnectError('state is required.', Code.InvalidArgument);
+  }
+  return required(CARD_STATE_REVERSE, value, 'state');
+}
 
 // -------------------------------------------------------------------- rating
 
@@ -157,7 +173,18 @@ const ANSWER_MODE: Record<AnswerMode, pb.AnswerMode> = {
   self: pb.AnswerMode.SELF,
 };
 
+const ANSWER_MODE_REVERSE = invert(ANSWER_MODE);
+
 export const answerModeToPb = (mode: AnswerMode): pb.AnswerMode => ANSWER_MODE[mode];
+
+export function answerModeFromPb(value: pb.AnswerMode): AnswerMode {
+  // A question with no mode cannot be asked, so this one has no sensible
+  // default to fall back to.
+  if (value === pb.AnswerMode.UNSPECIFIED) {
+    throw new ConnectError('mode is required.', Code.InvalidArgument);
+  }
+  return required(ANSWER_MODE_REVERSE, value, 'mode');
+}
 
 // --------------------------------------------------------------- deck status
 

@@ -1,7 +1,6 @@
 import { Code, ConnectError, type HandlerContext, type ServiceImpl } from '@connectrpc/connect';
+import { pb, sessionToPb } from '@mon/api';
 import type { Accounts } from '../accounts.ts';
-import * as pb from '../gen/mon/v1/mon_pb.ts';
-import { sessionToPb } from './convert.ts';
 import { toConnectError } from './errors.ts';
 
 /** The bearer token on a request, if there is one. */

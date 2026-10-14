@@ -1,5 +1,6 @@
 import { Code, ConnectError, type HandlerContext, type ServiceImpl } from '@connectrpc/connect';
 import {
+  DuplicateGradeError,
   filterDeck,
   isLanguageCode,
   parseVocabularyCsv,
@@ -10,30 +11,29 @@ import {
   type StudyEngine,
   type StudyProfile,
 } from '@mon/core';
-import * as pb from '../gen/mon/v1/mon_pb.ts';
-import { bearerFrom } from './auth.ts';
 import {
+  cardKindFromPb,
   cardToPb,
   deckEntryToPb,
+  deckStatusFromPb,
   entryToPb,
   goalToPb,
   importIssueToPb,
   journeyToPb,
-  profileToPb,
-  questionToPb,
-  readinessToPb,
-  statsToPb,
-  strugglingToPb,
-} from './convert.ts';
-import {
-  cardKindFromPb,
-  deckStatusFromPb,
   languageFromPb,
   languageFromPbStrict,
   languageToPb,
+  pb,
+  profileToPb,
+  questionToPb,
   ratingFromPb,
+  readinessToPb,
+  reviewLogToPb,
+  statsToPb,
+  strugglingToPb,
   studyModeFromPb,
-} from './enums.ts';
+} from '@mon/api';
+import { bearerFrom } from './auth.ts';
 import { toConnectError } from './errors.ts';
 
 /** What every study RPC is handed once the token has been checked. */
@@ -153,6 +153,8 @@ export function studyService(options: StudyServiceOptions): ServiceImpl<typeof p
       rows.sort((left, right) => left.at.localeCompare(right.at) || left.index - right.index);
 
       let applied = 0;
+      let duplicates = 0;
+
       for (const { grade, at } of rows) {
         try {
           if (!grade.cardId) throw new ConnectError('Missing card_id.', Code.InvalidArgument);
@@ -164,15 +166,30 @@ export function studyService(options: StudyServiceOptions): ServiceImpl<typeof p
             source: 'app',
             now: at,
             ...(grade.durationMs > 0 ? { durationMs: grade.durationMs } : {}),
+            // The client's own review id, which is what makes a retry safe.
+            ...(grade.id ? { logId: grade.id } : {}),
           });
           applied += 1;
         } catch (cause) {
+          /*
+           * A grading already recorded is a success, not a failure.
+           *
+           * A client retrying a push it could not confirm is doing exactly the
+           * right thing, and the only honest answer is "already counted".
+           * Reporting it as a failure would leave the client choosing between
+           * dropping the review and retrying forever.
+           */
+          if (cause instanceof DuplicateGradeError) {
+            duplicates += 1;
+            continue;
+          }
           failed.push({ cardId: grade.cardId, reason: (cause as Error).message });
         }
       }
 
       return {
         applied,
+        duplicates,
         failed,
         goal: goalToPb(engine.getDailyGoal()),
         journey: journeyToPb(engine.getJourney()),
@@ -330,6 +347,67 @@ export function studyService(options: StudyServiceOptions): ServiceImpl<typeof p
       const card = engine.getAllCards().find((candidate) => candidate.id === request.cardId);
       return { ok: true, ...(card ? { card: cardToPb(card) } : {}) };
     },
+
+    /**
+     * The account's state, for a client that keeps its own copy.
+     *
+     * Cards come back whole rather than being replayed from the log, because
+     * card state is not reproducible: the scheduler fuzzes due dates so a
+     * hundred cards learned on one evening do not all return on one evening.
+     * Two devices replaying the same reviews would land a day or two apart,
+     * forever, with neither of them wrong — so one side has to be the answer,
+     * and this is it.
+     *
+     * The log comes down too, paged, because streaks and retention are computed
+     * from it and a device holding only its own half under-reports both.
+     */
+    async pullState(request, { engine }) {
+      if (request.limit < 0) {
+        throw new ConnectError('limit cannot be negative.', Code.InvalidArgument);
+      }
+
+      const limit =
+        request.limit > 0 ? Math.min(request.limit, MAX_PULL_REVIEWS) : DEFAULT_PULL_REVIEWS;
+      const since = parseCursor(request.since);
+
+      /*
+       * Strictly after the cursor, ordered, and keyed on more than the instant.
+       *
+       * The obvious cursor is the `reviewedAt` of the last review sent, and it
+       * drops reviews: two gradings can share an instant — a replayed offline
+       * batch, or a fast learner on a 1ms clock tick — and `reviewedAt > since`
+       * skips the second one permanently. So the cursor is the instant *and* the
+       * id, compared as a pair, which is unique because ids are.
+       */
+      const ordered = engine.getReviewLogs().map((log) => ({ log, key: cursorFor(log) }));
+      ordered.sort((left, right) => left.key.localeCompare(right.key));
+
+      const pending = since ? ordered.filter((row) => row.key > since) : ordered;
+      const page = pending.slice(0, limit);
+      const more = pending.length > page.length;
+
+      /*
+       * Cards, profiles and entries come down on every page, not just the first.
+       *
+       * Sending them once per pull sequence would save bytes on the one pull that
+       * has several pages, and it cannot be done correctly: the server has no way
+       * to know which call is a client's first, and cards are exactly the thing
+       * that changed since the last sync. Repeating a few hundred cards across
+       * the rare multi-page backfill is the cheaper mistake.
+       */
+      return {
+        cards: engine.studiedLanguages.flatMap((code) => engine.getAllCards(code)).map(cardToPb),
+        profiles: engine.studiedLanguages.map((code) => profileToPb(engine.getProfile(code))),
+        activeLanguage: languageToPb(engine.activeLanguage),
+        entries: engine.importedEntries.map(entryToPb),
+        reviews: page.map((row) => reviewLogToPb(row.log)),
+        // The last review sent, or the cursor the client already had when there
+        // was nothing new. Never empty once a client has synced, because an
+        // empty cursor means "send me everything".
+        cursor: page[page.length - 1]?.key ?? request.since,
+        more,
+      };
+    },
   };
 
   return wrap(options, handlers);
@@ -370,6 +448,39 @@ function wrap(
   // confined to this line; `handlers` above is fully checked, which is where a
   // mistake would actually be made.
   return Object.fromEntries(entries) as ServiceImpl<typeof pb.StudyService>;
+}
+
+/**
+ * How many reviews a pull page carries.
+ *
+ * The default is generous because the common case is a handful. The cap exists
+ * for the learner returning after a month offline with thousands: one response
+ * with all of them is a response that times out, and then gets asked for again.
+ */
+const DEFAULT_PULL_REVIEWS = 500;
+const MAX_PULL_REVIEWS = 2000;
+
+/** `reviewedAt` plus the id, so two reviews at one instant are still ordered. */
+const cursorFor = (log: { reviewedAt: string; id: string }): string => `${log.reviewedAt}|${log.id}`;
+
+/**
+ * Read a cursor, tolerating the shape it used to have.
+ *
+ * A bare timestamp is what an older client sends, and what this server itself
+ * sent before the id was added. Accepting it means an app that has not been
+ * updated re-pulls a few reviews it already has rather than failing — and
+ * duplicates are free, because reviews merge by id.
+ */
+function parseCursor(since: string): string | undefined {
+  if (!since) return undefined;
+
+  const [at] = since.split('|');
+  if (!at || Number.isNaN(Date.parse(at))) {
+    throw new ConnectError(`Unreadable cursor: ${since}`, Code.InvalidArgument);
+  }
+  // A bare timestamp sorts before every composite key at that instant, so an old
+  // cursor behaves as "everything from this moment on".
+  return since.includes('|') ? since : `${at}|`;
 }
 
 function requireCardId(request: { cardId: string }): string {

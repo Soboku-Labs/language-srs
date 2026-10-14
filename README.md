@@ -67,10 +67,17 @@ silently broke the exercise.
 ```
 proto/mon/v1/mon.proto    The contract: language-neutral, linted, versioned
 
+packages/api/             The contract, generated, plus the client
+  src/gen/                generated from the proto, committed
+  src/enums.ts            enum tables, one per enum, inverted mechanically
+  src/convert.ts          domain to wire, for the backend
+  src/decode.ts           wire to domain, for a client with its own copy
+  src/client.ts           bearer token, one renewal at a time, one retry
+  src/sync.ts             push what this device did, take what the backend says
+
 apps/server/              The backend: the core behind Connect
   src/app.ts              dispatch, CORS, per-account engines, two listeners
-  src/connect/            the two services; enums and messages mapped once
-  src/gen/                generated from the proto, committed
+  src/connect/            the two services, over the same core
   src/accounts.ts         scrypt passwords, revocable tokens
   src/store.ts            the storage port on a filesystem, atomic writes
   src/routes/             the older JSON surface, served as the fallback
@@ -164,6 +171,26 @@ proved wrong — in
 
 `apps/mobile` is the current Expo app and still builds iOS and Android. It stays
 until the native clients replace it.
+
+### Syncing, and why the web app still schedules locally
+
+Signing in carries progress between devices. Gradings go up as a batch with their
+real timestamps, and the backend's card state comes back down — because the
+scheduler fuzzes due dates, so two devices replaying the same reviews would land
+a day or two apart and one of them has to be the answer.
+
+The web app keeps running `packages/core` itself rather than calling the API for
+every screen, and that is deliberate. The thing worth preventing is a second
+*implementation* of FSRS, not a second process running the same one: a hand-port
+into Swift and another into Kotlin is three chances to disagree silently, while
+the web app imports the identical source the backend does. Calling over the
+network instead would buy the same answers at the cost of a loading state on every
+screen and an app that stops working in a tunnel.
+
+Retries are safe: each grading carries the review id the client minted, and the
+backend reports one it has already applied as a duplicate rather than counting it
+twice. Without that, a connection that drops *after* the server committed leaves
+a client choosing between losing reviews and inflating the learner's streak.
 
 ## Running it
 

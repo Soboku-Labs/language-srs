@@ -1,7 +1,7 @@
+import { ConnectAuthProvider } from '@mon/api';
 import {
   AuthStore,
   DeviceAccountProvider,
-  HttpAuthProvider,
   PrefixedStore,
   SEED_ENTRIES,
   STORAGE_KEYS,
@@ -9,6 +9,7 @@ import {
   type Account,
   type AuthProvider as AuthProviderPort,
   type AuthProviderId,
+  type AuthSession,
   type Credentials,
   type KeyValueStore,
   type LanguageCode,
@@ -25,6 +26,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { apiTransport } from './api';
 import { webStore } from './storage';
 
 /**
@@ -38,13 +40,22 @@ import { webStore } from './storage';
  * of storage the engine reads, and the engine is rebuilt when that changes.
  */
 
-const AUTH_URL = import.meta.env.VITE_AUTH_URL as string | undefined;
-
 interface AuthValue {
   account?: Account;
   isSignedIn: boolean;
   store: KeyValueStore;
   providers: AuthProviderPort[];
+  /**
+   * The live session, for the sync layer.
+   *
+   * Exposed rather than copied, so there is one record of which token is
+   * current. A second copy is a copy that is stale the moment a token is
+   * renewed, and the symptom would be a sync that works until it quietly
+   * doesn't.
+   */
+  session?: AuthSession;
+  /** Renew the session. The sync client calls this instead of refreshing itself. */
+  refresh(): Promise<boolean>;
   signIn(provider: AuthProviderId, credentials?: Credentials): Promise<void>;
   register(provider: AuthProviderId, credentials: Credentials): Promise<void>;
   signOut(): Promise<void>;
@@ -75,8 +86,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     void (async () => {
+      /*
+       * The email provider is offered only when a backend is configured.
+       *
+       * An app that shows a password field with nothing behind it is lying to
+       * the person typing into it — so without `VITE_API_URL` the sign-in screen
+       * offers the device account and says why that is all there is.
+       */
       const providers: AuthProviderPort[] = [new DeviceAccountProvider()];
-      if (AUTH_URL) providers.push(new HttpAuthProvider({ baseUrl: AUTH_URL }));
+      const transport = apiTransport();
+      if (transport) providers.push(new ConnectAuthProvider(transport));
 
       const store = await AuthStore.create({ store: webStore, providers, onChanged: bump });
       // One quiet attempt to renew an expired token. Failure is not a sign-out:
@@ -99,6 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isSignedIn: auth.isSignedIn,
       store: storeFor(auth.storagePrefix),
       providers: auth.providers,
+      ...(auth.currentSession ? { session: auth.currentSession } : {}),
+      refresh: () => auth.refresh(),
       signIn: async (provider, credentials) => void (await auth.signIn(provider, credentials)),
       register: async (provider, credentials) => void (await auth.register(provider, credentials)),
       signOut: async () => auth.signOut(),

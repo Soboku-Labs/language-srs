@@ -10,19 +10,35 @@ import type {
   JourneyStage,
   LexicalEntry,
   Question,
+  ReviewLog,
   StrugglingCard,
   StudyProfile,
 } from '@mon/core';
 import { describeStruggle } from '@mon/core';
-import type { Session } from '../accounts.ts';
-import * as pb from '../gen/mon/v1/mon_pb.ts';
+import * as pb from './gen/mon/v1/mon_pb';
 import {
   answerModeToPb,
   cardKindToPb,
   cardStateToPb,
   deckStatusToPb,
   languageToPb,
-} from './enums.ts';
+  ratingToPb,
+} from './enums';
+
+/**
+ * A session, structurally.
+ *
+ * The backend's `Session` is declared in its own account store, which this
+ * package must not depend on — the browser bundles this file, and nothing in a
+ * browser should be able to reach for scrypt. The server's type satisfies this
+ * one by shape, so the coupling runs the right way.
+ */
+export interface SessionLike {
+  account: Account;
+  token: string;
+  refreshToken: string;
+  expiresAt: string;
+}
 
 /**
  * Domain to wire.
@@ -55,7 +71,7 @@ export function accountToPb(account: Account): MessageInitShape<typeof pb.Accoun
   };
 }
 
-export function sessionToPb(session: Session): MessageInitShape<typeof pb.SessionSchema> {
+export function sessionToPb(session: SessionLike): MessageInitShape<typeof pb.SessionSchema> {
   return {
     account: accountToPb(session.account),
     token: session.token,
@@ -102,6 +118,35 @@ export function cardToPb(card: Card): MessageInitShape<typeof pb.CardSchema> {
     suspended: card.suspended ?? false,
     buriedUntil: card.buriedUntil ?? '',
     leech: card.leech ?? false,
+    // The rest of the record, so a card survives a round trip. `step` is where a
+    // learning card stands in its ladder; dropping it would restart every card
+    // mid-learning on the way back.
+    step: card.step,
+    scheduledDays: card.scheduledDays,
+    lastReviewedAt: card.lastReviewedAt ?? '',
+    elapsedMs: card.elapsedMs,
+    createdAt: card.createdAt,
+  };
+}
+
+export function reviewLogToPb(log: ReviewLog): MessageInitShape<typeof pb.ReviewLogEntrySchema> {
+  return {
+    id: log.id,
+    cardId: log.cardId,
+    entryId: log.entryId,
+    reviewedAt: log.reviewedAt,
+    rating: ratingToPb(log.rating),
+    durationMs: log.durationMs,
+    source: log.source,
+    stateBefore: cardStateToPb(log.stateBefore),
+    stateAfter: cardStateToPb(log.stateAfter),
+    stabilityBefore: log.stabilityBefore,
+    stabilityAfter: log.stabilityAfter,
+    difficultyBefore: log.difficultyBefore,
+    difficultyAfter: log.difficultyAfter,
+    elapsedDays: log.elapsedDays,
+    scheduledDays: log.scheduledDays,
+    predictedRetrievability: log.predictedRetrievability,
   };
 }
 

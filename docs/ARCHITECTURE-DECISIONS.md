@@ -8,14 +8,43 @@ decisions are.
 ```
 proto/mon/v1/mon.proto     the contract — language-neutral, versioned, linted
 packages/core/             the domain: FSRS, curricula, queue, answers, journey
+packages/api/              the generated contract, the mapping, and the client
 apps/server/               the backend: core behind Connect, serving the proto
 apps/web/                  an interface
 apps/mobile/               an interface (Expo today; SwiftUI + Compose next)
 ```
 
-The clients render. They own navigation, motion, a local cache and the queue of
-unsent gradings — and nothing else. A client that computes an interval has
-reintroduced the problem this arrangement exists to prevent.
+## The rule, stated properly
+
+An earlier version of this file said: *the clients render, and a client that
+computes an interval has reintroduced the problem this arrangement exists to
+prevent.* That is nearly right and the imprecision matters, because the web app
+is a deliberate exception to it and reading the old rule would make that look
+like a violation.
+
+**The thing to avoid is a second *implementation* of the scheduler, not a second
+*process* that runs it.** Three hand-ports of FSRS — TypeScript, Swift, Kotlin —
+is three chances for a learner's phone and laptop to disagree about when a word
+is due, silently, and no test suite catches drift between codebases that were
+never meant to be compared. That is the failure mode.
+
+So:
+
+- **A client that can run `packages/core` itself does.** The web app imports the
+  same source the backend imports. There is no port, so there is nothing to
+  drift. Calling over the network instead would buy identical answers at the cost
+  of a loading state on every screen and an app that stops working in a tunnel.
+- **A client that would need a port calls over the network.** SwiftUI and Compose
+  cannot run TypeScript, so they render what the API gives them and own no
+  scheduling logic at all.
+
+Either way every client owns the same things and nothing more: navigation,
+motion, a local cache, and the queue of unsent gradings.
+
+The one thing the backend is authoritative about for *every* client, including the
+web app, is **card state** — because `applyFuzz` spreads due dates with an RNG,
+so replaying the same reviews on two devices lands them a day or two apart and
+somebody has to be the answer. See `packages/core/src/sync`.
 
 ## gRPC, and the browser problem
 
@@ -101,7 +130,10 @@ intervals nobody notices are wrong until a learner's retention quietly degrades.
 3. **Build the SwiftUI and Compose clients** against it. This is where the
    remaining product work actually is, and it can start now: the endpoint is
    real, `buf generate` produces Swift and Kotlin from the same file, and
-   `connect-swift` / `connect-kotlin` speak what this server serves.
+   `connect-swift` / `connect-kotlin` speak what this server serves. The shape to
+   copy is `packages/api` — the token handling, the push-then-pull ordering and
+   the idempotent retry are all decisions a native client would otherwise have to
+   rediscover, and two of them were only found by getting them wrong here first.
 4. **Port the core to Rust only if step 2 or 3 shows a reason** — a deployment
    constraint, or wanting offline scheduling inside the native apps without a
    TypeScript runtime. Port it behind the same `.proto`, with the existing tests
@@ -139,3 +171,10 @@ because Node is slow, because Node is not the slow part.
 - Questions are assembled **once**, in `buildQuestion`. The server, the web app
   and the Expo app all call it. Three copies of "which wrong answers are
   plausible" would drill three different exams.
+- The enum tables exist **once**, in `packages/api`, and the reverse direction is
+  derived from the forward one rather than written out. Two hand-written copies is
+  how `CARD_KIND_READING` ends up decoding to `'writing'` in exactly one
+  direction — a bug that drills the wrong skill and that no test would think to
+  look for.
+- Pushing happens **before** pulling, always. The other order overwrites a
+  just-graded card with the server's pre-grading copy.

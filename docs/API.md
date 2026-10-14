@@ -86,7 +86,7 @@ curl -X POST http://localhost:8787/mon.v1.StudyService/GetState \
 
 `StudyService`: `GetState`, `GetQueue`, `SubmitGrades`, `GetDeck`,
 `GetStruggling`, `UpdateProfile`, `SetActiveLanguage`, `ImportVocabulary`,
-`SetNote`, `CardAction`.
+`SetNote`, `CardAction`, `PullState`.
 
 Three things are worth knowing about the shapes, because they are decisions
 rather than conventions:
@@ -180,7 +180,7 @@ scheduler sees the real timestamps rather than the moment the signal returned �
 which matters, because grading an hour's worth of cards at one instant tells FSRS
 the learner waited an hour between each.
 
-Two rules, both load-bearing:
+Three rules, all load-bearing:
 
 - **Applied in time order**, whatever order the batch arrives in, because the
   scheduler's output depends on the order and an offline queue arrives in
@@ -190,15 +190,66 @@ Two rules, both load-bearing:
 - **Reported per card**, so one unknown id does not discard the other nineteen
   reviews a learner did on the train. A rating the server cannot read is reported
   the same way rather than failing the batch.
+- **Idempotent on `id`**, which is what makes a retry safe. Send the review log
+  id you generated locally. Without it the offline path has a hole big enough to
+  lose a schedule through: a connection that times out *after* the server applied
+  the batch leaves the client unable to tell success from failure, and the only
+  choices are to drop the reviews or to count them twice. Twice is worse — it
+  inflates the streak, skews retention, and pushes every card further out than
+  the learner earned.
 
 ```json
 { "applied": 19,
+  "duplicates": 2,
   "failed": [{ "cardId": "deleted:recognition", "reason": "Unknown card" }],
   "goal": { … }, "journey": { … } }
 ```
 
+`duplicates` counts gradings this server had already applied. It is a **success**,
+reported separately so a client can tell "your retry worked the first time" from
+"nothing was recorded".
+
 `goal` and `journey` come back with every batch, so a client refreshes the day's
 ring and the rank without a second call.
+
+## Syncing a client that keeps its own copy
+
+`SubmitGrades` is the push half. `PullState` is the other one, and together they
+are the whole sync protocol — there is no `PushState`, because pushing is what the
+existing RPCs already do: gradings through `SubmitGrades`, imported words through
+`ImportVocabulary`, settings through `UpdateProfile`. A second way to write the
+same state would be a second thing to keep correct.
+
+```
+PullState({ since: cursor, limit: 500 })
+  -> { cards, profiles, activeLanguage, entries, reviews, cursor, more }
+```
+
+**Push before you pull.** The other order looks equivalent and loses work: the
+pull overwrites local cards with the server's, and the server has not seen this
+device's reviews yet — so a card the learner just graded is replaced by its
+pre-grading state.
+
+**Cards come back whole, and the server's win.** Card state looks like a pure
+function of the reviews applied to it, so a client could in principle replay the
+log and skip the transfer. It cannot: the scheduler fuzzes due dates so a hundred
+cards learned on one evening do not all return on one evening, and two devices
+replaying the same reviews land a day or two apart, forever, with neither of them
+wrong. One side has to be the answer and the server is the one every device can
+reach.
+
+**Reviews are a union, by id.** Append-only and uniquely identified, so there is
+no conflict to resolve. They come down as well as up because streaks, retention
+and the per-kind breakdown are computed from them, and a device holding only its
+own half under-reports a learner's streak — which is the one number people
+actually mind being wrong.
+
+The cursor is **opaque**. It is `reviewedAt|id` today and a client that parses it
+will break when it is not. The id is in there because two gradings can share an
+instant, and a timestamp-only cursor skips the second one permanently.
+
+`@mon/api` implements all of this — see `sync()` — so a client calls one function
+rather than reimplementing the ordering rules.
 
 ## Errors
 
@@ -234,6 +285,10 @@ Only what is genuinely platform-specific:
 - platform features — text-to-speech, haptics, home-screen widgets
 
 Everything else — what is due, in what order, how options are generated, what a
-word is worth, when a rank is earned — comes from here. A client that starts
-computing an interval has reintroduced the problem this architecture exists to
-prevent.
+word is worth, when a rank is earned — comes from here.
+
+The thing to avoid is a second *implementation* of the scheduler, not a second
+process that runs it. A SwiftUI or Compose client cannot run `packages/core`, so
+it renders what this API gives it; the web app can, so it does, and syncs through
+`PullState` instead. Both arrangements have one FSRS in one language, which is
+the whole point. `docs/ARCHITECTURE-DECISIONS.md` has the full rule.

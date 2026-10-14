@@ -119,11 +119,14 @@ export function TextButton({
   label,
   onClick,
   muted = false,
+  disabled = false,
   color,
 }: {
   label: string;
   onClick: () => void;
   muted?: boolean;
+  /** For an action already under way, so a second tap cannot start it twice. */
+  disabled?: boolean;
   color?: string;
 }) {
   return (
@@ -131,6 +134,7 @@ export function TextButton({
       type="button"
       className={`link${muted ? ' link--muted' : ''}`}
       onClick={onClick}
+      disabled={disabled}
       {...(color ? { style: { color } } : {})}
     >
       {label}

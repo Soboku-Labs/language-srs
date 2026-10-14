@@ -16,6 +16,7 @@ import {
   forecastReviews,
 } from './stats/metrics';
 import { computeExamReadiness, type ExamReadiness } from './stats/readiness';
+import { mergeRemoteState, type MergeResult, type RemoteState } from './sync';
 import { readJson, writeJson, type KeyValueStore } from './storage/port';
 import {
   DEFAULT_STUDY_PROFILE,
@@ -26,13 +27,31 @@ import {
 } from './types/card';
 import type { CardKind } from './types/exam';
 import { LANGUAGE_CODES, getLanguageProfile, type LanguageCode } from './types/language';
-import type { GradeResult, Rating, ReviewSource } from './types/review';
+import type { GradeResult, Rating, ReviewLog, ReviewSource } from './types/review';
 import { endOfStudyDay, systemClock, type Clock } from './utils/date';
 import { buildWidgetSnapshot, buildWidgetTimeline, pickSpotlight, type WidgetSnapshot, type WidgetTimeline } from './widget/payload';
 import { applyPendingGrades, type PendingWidgetGrade } from './widget/pending';
 
 const STORAGE_VERSION = 1;
 const KEY_PREFIX = `srs:v${STORAGE_VERSION}`;
+
+/**
+ * A grading that was already recorded.
+ *
+ * Its own type rather than a plain Error because the caller has to treat it as a
+ * *success*: a client retrying a push it could not confirm is doing the right
+ * thing, and the honest answer is "already counted", not "failed". A server that
+ * reported this as an error would make the client drop reviews or retry forever.
+ */
+export class DuplicateGradeError extends Error {
+  readonly logId: string;
+
+  constructor(logId: string) {
+    super(`Grading ${logId} is already recorded.`);
+    this.name = 'DuplicateGradeError';
+    this.logId = logId;
+  }
+}
 
 export const STORAGE_KEYS = {
   meta: `${KEY_PREFIX}:meta`,
@@ -98,7 +117,7 @@ export class StudyEngine {
   private meta: EngineMeta;
   private cards: Card[];
   private logs: import('./types/review').ReviewLog[];
-  private importedEntries: LexicalEntry[];
+  private imported: LexicalEntry[];
   private pending: PendingWidgetGrade[];
   private readonly entriesById = new Map<string, LexicalEntry>();
   private readonly clock: Clock;
@@ -119,7 +138,7 @@ export class StudyEngine {
     this.meta = state.meta;
     this.cards = state.cards;
     this.logs = state.logs;
-    this.importedEntries = state.importedEntries;
+    this.imported = state.importedEntries;
     this.pending = state.pending;
     this.reindexEntries();
   }
@@ -406,14 +425,30 @@ export class StudyEngine {
     await this.notifyChanged();
   }
 
-  /** Grade a card and persist the result. */
+  /**
+   * Grade a card and persist the result.
+   *
+   * `logId` replays a grading that already happened elsewhere, keeping the id it
+   * was given, so a client and a server end up with one review rather than two
+   * records of the same event — and so a retried push is recognisable as a
+   * repeat. A grading with an id already in the log is a no-op and says so.
+   */
   async grade(
     cardId: string,
     rating: Rating,
-    options: { durationMs?: number; source?: ReviewSource; now?: Timestamp } = {},
+    options: {
+      durationMs?: number;
+      source?: ReviewSource;
+      now?: Timestamp;
+      logId?: string;
+    } = {},
   ): Promise<GradeResult> {
     const index = this.cards.findIndex((card) => card.id === cardId);
     if (index === -1) throw new Error(`Unknown card: ${cardId}`);
+
+    if (options.logId && this.hasReviewLog(options.logId)) {
+      throw new DuplicateGradeError(options.logId);
+    }
 
     const card = this.cards[index]!;
     const profile = this.getProfile(card.languageCode);
@@ -424,6 +459,7 @@ export class StudyEngine {
       ...(profile.examDate ? { examDate: profile.examDate } : {}),
       ...(options.durationMs !== undefined ? { durationMs: options.durationMs } : {}),
       source: options.source ?? 'app',
+      ...(options.logId ? { logId: options.logId } : {}),
     });
 
     this.undoStack.push({ card, logId: result.log.id });
@@ -597,11 +633,11 @@ export class StudyEngine {
     const { mnemonic: _dropped, ...withoutNote } = entry;
     const updated: LexicalEntry = trimmed ? { ...entry, mnemonic: trimmed } : withoutNote;
 
-    const existing = this.importedEntries.filter((candidate) => candidate.id !== entryId);
-    this.importedEntries = [...existing, updated];
+    const existing = this.imported.filter((candidate) => candidate.id !== entryId);
+    this.imported = [...existing, updated];
     this.reindexEntries();
 
-    await writeJson(this.options.store, STORAGE_KEYS.entries, this.importedEntries);
+    await writeJson(this.options.store, STORAGE_KEYS.entries, this.imported);
     await this.notifyChanged();
   }
 
@@ -791,7 +827,7 @@ export class StudyEngine {
    */
   async importEntries(entries: LexicalEntry[]): Promise<{ added: number; replaced: number }> {
     const bySeedId = new Set((this.options.seedEntries ?? []).map((entry) => entry.id));
-    const existing = new Map(this.importedEntries.map((entry) => [entry.id, entry]));
+    const existing = new Map(this.imported.map((entry) => [entry.id, entry]));
 
     let added = 0;
     let replaced = 0;
@@ -802,13 +838,89 @@ export class StudyEngine {
       existing.set(entry.id, entry);
     }
 
-    this.importedEntries = [...existing.values()];
+    this.imported = [...existing.values()];
     this.reindexEntries();
-    await writeJson(this.options.store, STORAGE_KEYS.entries, this.importedEntries);
+    await writeJson(this.options.store, STORAGE_KEYS.entries, this.imported);
     await this.syncCards();
     await this.notifyChanged();
 
     return { added, replaced };
+  }
+
+  // ---------------------------------------------------------------- sync
+
+  /**
+   * Every review this device holds, oldest first.
+   *
+   * A copy, because the array is the source for streaks, retention and undo, and
+   * handing out the live one invites a caller to sort it.
+   */
+  getReviewLogs(): ReviewLog[] {
+    return [...this.logs];
+  }
+
+  /**
+   * Vocabulary the learner imported, as distinct from what shipped in the app.
+   *
+   * The distinction matters for syncing: seed decks are in every build, so
+   * sending them would be telling the app its own contents, while an imported
+   * word list exists nowhere else and is the part of a deck genuinely lost with
+   * a device.
+   */
+  get importedEntries(): LexicalEntry[] {
+    return [...this.imported];
+  }
+
+  /** Whether a grading is already recorded, by log id. The duplicate check for a replayed push. */
+  hasReviewLog(logId: string): boolean {
+    return this.logs.some((log) => log.id === logId);
+  }
+
+  /**
+   * Take the backend's version of this account's state.
+   *
+   * The server's cards replace the local ones outright; reviews and imported
+   * entries are merged by id. `packages/core/src/sync` explains why those rules
+   * differ — the short version is that card state is not reproducible from the
+   * log, because the scheduler fuzzes due dates, so somebody has to be the
+   * answer and the server is the one every device can reach.
+   *
+   * Cards are *not* regenerated afterwards for the languages the server sent,
+   * which is deliberate: `syncCards` would re-derive which cards should exist
+   * from the local profile and could delete a card the server just sent for a
+   * level this device has not heard of. It runs only for the profiles that came
+   * down, after they are stored.
+   */
+  async applyRemoteState(remote: RemoteState): Promise<MergeResult> {
+    const merged = mergeRemoteState(
+      { cards: this.cards, logs: this.logs, entries: this.imported },
+      remote,
+    );
+
+    this.cards = merged.cards;
+    this.logs = merged.logs;
+    this.imported = merged.entries;
+
+    for (const profile of remote.profiles) {
+      this.meta.profiles[profile.languageCode] = profile;
+    }
+    if (remote.activeLanguage) this.meta.activeLanguage = remote.activeLanguage;
+
+    this.reindexEntries();
+    this.trimLogs();
+
+    await this.persistMeta();
+    await this.persistCards();
+    await this.persistLogs();
+    await writeJson(this.options.store, STORAGE_KEYS.entries, this.imported);
+
+    // Now that the profiles are stored, fill in any card the merged deck is
+    // missing — a word that arrived with the entries, or a level the learner
+    // moved to on another device.
+    await this.syncCards();
+    await this.notifyChanged();
+
+    return merged.result;
   }
 
   // ---------------------------------------------------------------- persistence
@@ -817,7 +929,7 @@ export class StudyEngine {
     this.entriesById.clear();
     for (const entry of this.options.seedEntries ?? []) this.entriesById.set(entry.id, entry);
     // Imported entries win, so a learner can correct a shipped definition.
-    for (const entry of this.importedEntries) this.entriesById.set(entry.id, entry);
+    for (const entry of this.imported) this.entriesById.set(entry.id, entry);
   }
 
   private trimLogs(): void {
@@ -846,7 +958,7 @@ export class StudyEngine {
     this.cards = [];
     this.logs = [];
     this.pending = [];
-    this.importedEntries = [];
+    this.imported = [];
     this.meta = { version: STORAGE_VERSION, activeLanguage: 'zh', profiles: {}, schedulerConfig: {} };
     this.reindexEntries();
 

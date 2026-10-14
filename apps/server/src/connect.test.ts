@@ -10,7 +10,7 @@ import {
 } from '@connectrpc/connect-node';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app.ts';
-import * as pb from './gen/mon/v1/mon_pb.ts';
+import { pb } from '@mon/api';
 
 /**
  * The Connect API, exercised over a real socket with a generated client.

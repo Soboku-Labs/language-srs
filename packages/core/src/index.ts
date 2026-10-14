@@ -287,6 +287,10 @@ export {
 export type { Clock } from './utils/date';
 export { cardId, parseCardId, reviewLogId } from './utils/id';
 
+// Sync — what moves between a device and the backend, and which side wins
+export { mergeRemoteState, prunePushed, unpushedReviews } from './sync';
+export type { MergeResult, RemoteState } from './sync';
+
 // Engine
-export { STORAGE_KEYS, StudyEngine } from './engine';
+export { DuplicateGradeError, STORAGE_KEYS, StudyEngine } from './engine';
 export type { StudyEngineOptions } from './engine';

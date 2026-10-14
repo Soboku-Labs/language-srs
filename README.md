@@ -59,6 +59,12 @@ silently broke the exercise.
 ## Layout
 
 ```
+apps/server/              The backend: one HTTP API over the core
+  src/app.ts              routing, auth check, per-account engines
+  src/accounts.ts         scrypt passwords, revocable tokens
+  src/store.ts            the storage port on a filesystem, atomic writes
+  src/routes/             auth and study
+
 apps/web/                 The website: React + Vite, no React Native runtime
   src/screens/            one file per screen
   src/ui.tsx              the Suboku primitives as DOM
@@ -108,10 +114,23 @@ one test suite, no chance of the two drifting on something as unforgiving as a
 review schedule. What differs is only what genuinely differs: the storage adapter,
 the motion, the routing and the widgets.
 
-`apps/mobile` remains the iOS and Android app. Taking those fully native too would
-mean deciding how the TypeScript core crosses into Swift and Kotlin; hand-porting a
-spaced-repetition scheduler into three languages is how a learner's phone and
-laptop quietly disagree about when a word is due.
+### Native clients, one brain
+
+The phones are going native — SwiftUI and Jetpack Compose — and the scheduler is
+not being ported to get there. `apps/server` runs `packages/core` behind an HTTP
+API, so a native client renders what it is given and owns no scheduling logic at
+all. Nobody writes FSRS in Swift, nobody writes it again in Kotlin, and the two
+cannot drift.
+
+The obvious objection to centralising it is offline, and it is a real one: a
+spaced-repetition app that stops working on the Underground is a worse app. So
+grading takes a *batch*, each entry carrying the instant it actually happened. A
+client records reviews locally and replays them on reconnect, and the scheduler
+sees the real timestamps rather than the moment the signal returned. The contract
+is in [docs/API.md](docs/API.md).
+
+`apps/mobile` is the current Expo app and still builds iOS and Android. It stays
+until the native clients replace it.
 
 ## Running it
 
@@ -124,6 +143,9 @@ npm run typecheck # core + web + mobile
 npm run web        # Vite dev server
 npm run web:build  # static build to apps/web/dist
 npm run web:pages  # the same, prefixed and prepared for GitHub Pages
+
+npm run server     # the API on :8787, data in ./data
+npm run server:test
 
 npm run mobile:start  # Expo, for iOS and Android
 npm run ios

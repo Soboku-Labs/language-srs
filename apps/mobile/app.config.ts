@@ -53,7 +53,20 @@ const config: ExpoConfig = {
   },
 
   plugins: [
-    'expo-router',
+    /**
+     * Route-level code splitting, web only.
+     *
+     * The web bundle is one file containing every screen, so opening the
+     * dashboard downloads and parses the review session, the deck browser, the
+     * import parser and the stats charts before anything renders. Async routes
+     * make each screen its own chunk, fetched when it is first visited.
+     *
+     * Web only, and only in production: on native a single bundle is what you
+     * want (there is no network between the app and its own code, and splitting
+     * costs a round trip through the JS bridge), and in development the extra
+     * requests slow Fast Refresh down for no benefit.
+     */
+    ['expo-router', { asyncRoutes: { web: 'production', default: false } }],
     [
       'expo-splash-screen',
       {

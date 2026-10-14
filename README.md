@@ -120,6 +120,37 @@ Each account reads its own slice of storage (`PrefixedStore`). The device profil
 deliberately keeps the unprefixed keys, so upgrading to this version does not look
 like your progress was deleted.
 
+### Web performance, and why not Vite
+
+The web build is Metro, the same bundler the iOS and Android builds use. That is not
+inertia: Vite cannot bundle for React Native's native targets, and expo-router is built
+on Metro's `require.context` and Expo's Babel transformer, so moving the website to Vite
+means either dropping the phones or running two bundlers against one codebase.
+
+It would also not have helped. Measured by source map, the bundle was roughly 80%
+framework — expo-router, Reanimated, react-native-web and react-dom — and about 12% our
+own code. A different bundler does not make react-native-web smaller. The payload is the
+cost of shipping one codebase to web, iOS and Android, so that is where the savings had
+to come from:
+
+- **Route-level code splitting** (`asyncRoutes: { web: 'production' }`). Each screen is
+  its own chunk, fetched on first visit. Worth about 3% on its own, because the
+  framework ends up in the chunk every route shares — but it grows as screens are added.
+- **No Reanimated on the web.** `src/motion/components.web.tsx` and `tokens.web.ts`
+  implement the same seven components on the Web Animations API, and Metro prefers
+  `.web` for the web bundle. Reanimated earns its weight on a phone, where it runs
+  animations off the JS thread; in a browser there is no bridge to avoid and it is a
+  large polyfill for `Element.animate`. This is the big one.
+
+First load went from 2,164KB to 1,258KB raw (505KB to 338KB gzipped), and time to a
+usable screen on a throttled mid-tier phone from ~4.0s to ~3.0s. The phones are
+untouched — they keep Reanimated and a single bundle, which is what you want where there
+is no network between the app and its own code.
+
+The remaining weight is react-native-web plus react-dom plus expo-router. Shrinking that
+further means giving up the shared codebase, which is a product decision rather than a
+build one.
+
 ### Deploying the web build
 
 Pushing to `main` builds and publishes to GitHub Pages via

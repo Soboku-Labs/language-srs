@@ -1,8 +1,10 @@
 import { generateCards } from './cards/factory';
 import { SEED_ENTRIES } from './data/seed';
 import { findExamTrack, getExamTrack, getLevelIdsInScope } from './exams';
+import { getJourney, type Journey } from './journey';
+import { getDailyGoal, type DailyGoal } from './session/goal';
 import { buildStudyQueue, countTodaysWork, type StudyQueue } from './session/queue';
-import { DEFAULT_SCHEDULER_CONFIG, type SchedulerConfig } from './srs/params';
+import { DEFAULT_SCHEDULER_CONFIG, resolveSchedulerConfig, type SchedulerConfig } from './srs/params';
 import { gradeCard } from './srs/scheduler';
 import {
   groupLogsIntoSessions,
@@ -11,9 +13,16 @@ import {
   type StudySessionRecord,
 } from './sessions';
 import { mergeStudySessions as mergeSessionRecords } from './auth/sync';
-import { computeCoverage, computeRetention, computeStreak, forecastReviews } from './stats/metrics';
+import {
+  computeCoverage,
+  computeRetention,
+  computeRetentionByKind,
+  computeStreak,
+  forecastReviews,
+} from './stats/metrics';
 import { computeExamReadiness, type ExamReadiness } from './stats/readiness';
 import { readJson, writeJson, type KeyValueStore } from './storage/port';
+import { findStrugglingCards, type StrugglingCard } from './triage';
 import {
   DEFAULT_STUDY_PROFILE,
   type Card,
@@ -468,6 +477,9 @@ export class StudyEngine {
     return {
       streak: computeStreak(this.logs, now, profile.dayStartHour),
       retention: computeRetention(this.logs, 30, now),
+      // Per skill as well as overall: 88% hides "comfortable recognising a word
+      // and losing its tones", which is the part a learner can act on.
+      retentionByKind: computeRetentionByKind(this.logs, { windowDays: 30, now }),
       coverage: computeCoverage(cards, level?.vocabularyTarget ?? 0),
       forecast: forecastReviews(cards, now, 14, profile.dayStartHour),
       today: countTodaysWork(this.logs, now, profile.dayStartHour),
@@ -476,6 +488,58 @@ export class StudyEngine {
 
   getReadiness(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): ExamReadiness {
     return computeExamReadiness(this.getAllCards(code), this.getProfile(code), now);
+  }
+
+  /**
+   * What today asked for, and how much of it is left.
+   *
+   * Separate from the queue because the queue is a list and this is a finish
+   * line. The target counts the work the day actually contains — what is done,
+   * what is due, and the new cards still to come — and deliberately excludes
+   * re-reps of learning cards, because a goal that grows every time you press
+   * Again is a goal that recedes as you approach it.
+   */
+  getDailyGoal(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): DailyGoal {
+    const profile = this.getProfile(code);
+    return getDailyGoal({
+      breakdown: this.getQueue({ code, now }).breakdown,
+      done: countTodaysWork(this.logs, now, profile.dayStartHour),
+    });
+  }
+
+  /**
+   * Where the learner stands on their language's ladder.
+   *
+   * Derived from words known — every card in review at a week's stability or
+   * better — so it moves when memory sticks and not when time is spent. An hour
+   * of pressing Again earns nothing, which is the point: the rank means
+   * something because it cannot be farmed.
+   */
+  getJourney(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): Journey {
+    return getJourney(code, this.getStats(code, now).coverage.entriesKnown);
+  }
+
+  /**
+   * The words that are fighting the learner.
+   *
+   * Lapsing, failing, or already flagged as a leech. Surfaced because the
+   * alternative is a deck that quietly gets harder: a handful of words a learner
+   * has forgotten eight times will keep returning forever, and FSRS is right to
+   * keep showing them, which is exactly why somebody has to be told they can
+   * reset or suspend them.
+   */
+  getStrugglingCards(
+    code: LanguageCode = this.meta.activeLanguage,
+    options: { limit?: number; since?: Timestamp } = {},
+  ): StrugglingCard[] {
+    return findStrugglingCards({
+      cards: this.getAllCards(code),
+      entries: this.entriesById,
+      logs: this.logs,
+      leechThreshold: resolveSchedulerConfig(this.meta.schedulerConfig).leechThreshold,
+      ...(options.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options.since !== undefined ? { since: options.since } : {}),
+    });
   }
 
   // ---------------------------------------------------------------- sittings

@@ -12,6 +12,7 @@ import { Settings } from './screens/Settings';
 import { Languages } from './screens/Languages';
 import { Import } from './screens/Import';
 import { SignIn } from './screens/SignIn';
+import { StorageWarning } from './components/StorageWarning';
 import { Caption, Screen, TextButton, Title } from './ui';
 
 /**
@@ -81,6 +82,8 @@ function Chrome() {
 
   return (
     <>
+      {/* Above the header, because unsaved work outranks knowing where you are. */}
+      <StorageWarning />
       {titled ? (
         <header className="chrome">
           <button type="button" className="chrome__back" onClick={back} aria-label="Go back">

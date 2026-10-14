@@ -186,6 +186,13 @@ if (laptopOwn < laptopGraded + laptopMore) {
 // Reviews in an unprefixed slice after signing in mean they were written for
 // nobody: no account owns them and no sync will ever carry them.
 if (strayPhone.length > 0) failures.push(`reviews outside the account's slice: ${strayPhone.join(', ')}`);
+// The unsaved-work warning is the loudest thing in the app. It appearing during
+// an ordinary session would be crying wolf, which costs more than it is worth.
+for (const [label, device] of [['laptop', laptop], ['phone', phone]]) {
+  if ((await device.locator('.alert').count()) > 0) {
+    failures.push(`the ${label} is showing the storage warning during a normal session`);
+  }
+}
 if (problems.length > 0) failures.push(`page errors:\n  ${problems.join('\n  ')}`);
 
 console.log(failures.length === 0 ? '\nPASS' : `\nFAIL\n- ${failures.join('\n- ')}`);

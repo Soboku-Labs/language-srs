@@ -1,10 +1,13 @@
 import { useMemo } from 'react';
 import {
+  describePlace,
   findExamLevel,
   getLanguageProfile,
   kindLabel,
   type CardKind,
 } from '@language-srs/core';
+import { LanguageArt } from '../components/LanguageArt';
+import { TeacherSays } from '../components/Teacher';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
 import { BigButton, Caption, Rise, Row, Screen, Stat, TextButton, Title } from '../ui';
@@ -36,6 +39,8 @@ export function Dashboard() {
   }, [engine, revision]);
 
   const { profile, language, level, queue, stats, readiness, journey, goal } = view;
+  // The calendar day, as the seed for the teacher's greeting.
+  const today = engine.now().slice(0, 10);
   const waiting = queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning;
 
   return (
@@ -46,7 +51,7 @@ export function Dashboard() {
           <span className="header__text">
             <Title>{language.name}</Title>
             <Caption>
-              {level?.shortName}
+              {level?.shortName} · {describePlace(profile.languageCode)}
               {profile.examDate ? ` · ${describeCountdown(readiness.daysToExam)}` : ''}
             </Caption>
           </span>
@@ -57,7 +62,8 @@ export function Dashboard() {
       </Rise>
 
       <Rise index={1}>
-        <div className="hero">
+        <div className="hero hero--placed">
+          <LanguageArt code={profile.languageCode} className="hero__art" />
           {goal.complete ? (
             <>
               {/*
@@ -103,8 +109,24 @@ export function Dashboard() {
         />
       </Rise>
 
-      {/* The long loop. Tapping it opens the whole ladder on the progress screen. */}
+      {/*
+        The teacher, under the button rather than above it.
+
+        It is an invitation, not an instruction, so it sits after the thing it is
+        inviting you to do. Seeded by the day: the line is the same every time
+        you open the app this morning and different tomorrow, which is the
+        difference between a greeting and a slot machine.
+      */}
       <Rise index={3}>
+        <TeacherSays
+          code={profile.languageCode}
+          mood={waiting > 0 ? 'greeting' : 'idle'}
+          seed={today}
+        />
+      </Rise>
+
+      {/* The long loop. Tapping it opens the whole ladder on the progress screen. */}
+      <Rise index={4}>
         <RankBand journey={journey} onClick={() => navigate('/stats')} />
       </Rise>
 
@@ -119,7 +141,7 @@ export function Dashboard() {
         button anyway would be the worst version of this screen — a promise the
         app cannot keep.
       */}
-      <Rise index={4}>
+      <Rise index={5}>
         <div className="modes">
           <ModeLink
             label="Words"
@@ -134,7 +156,7 @@ export function Dashboard() {
         </div>
       </Rise>
 
-      <Rise index={5}>
+      <Rise index={6}>
         <Row between>
           <Stat label="day streak" value={String(stats.streak.current)} />
           {/*
@@ -149,7 +171,7 @@ export function Dashboard() {
         </Row>
       </Rise>
 
-      <Rise index={6}>
+      <Rise index={7}>
         <Row center>
           <TextButton label="Progress" onClick={() => navigate('/stats')} />
           <TextButton label="Settings" muted onClick={() => navigate('/settings')} />

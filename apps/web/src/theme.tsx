@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import {
   getLanguageTheme,
   getToneColor,
@@ -24,6 +24,18 @@ import {
 
 interface ThemeValue {
   languageCode: LanguageCode;
+  /**
+   * The palette's own mode, not the operating system's preference.
+   *
+   * Every theme in the core is `light`, and deliberately: "one room, four inks"
+   * — the palettes share one paper ground and differ only in the accent, because
+   * an earlier version with dark variants meant switching from Japanese to
+   * Mandarin turned the lights off mid-session.
+   *
+   * This used to watch `prefers-color-scheme` and report that instead, which was
+   * a listener doing nothing and a value that lied: it would have said `dark`
+   * while every colour on screen stayed light.
+   */
   mode: ThemeMode;
   theme: LanguageTheme;
   /** `theme.colors`, under the name the screens ask for. */
@@ -32,23 +44,6 @@ interface ThemeValue {
 }
 
 const ThemeContext = createContext<ThemeValue | undefined>(undefined);
-
-/** Follows the OS, and keeps following it if the setting changes mid-session. */
-function useColorScheme(): ThemeMode {
-  const [mode, setMode] = useState<ThemeMode>(() =>
-    window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
-  );
-
-  useEffect(() => {
-    const query = window.matchMedia?.('(prefers-color-scheme: dark)');
-    if (!query) return;
-    const onChange = (event: MediaQueryListEvent) => setMode(event.matches ? 'dark' : 'light');
-    query.addEventListener('change', onChange);
-    return () => query.removeEventListener('change', onChange);
-  }, []);
-
-  return mode;
-}
 
 /**
  * The theme's colours, under the names the stylesheet already uses.
@@ -85,7 +80,6 @@ export function ThemeProvider({
   languageCode: LanguageCode;
   children: ReactNode;
 }) {
-  const mode = useColorScheme();
   const theme = useMemo(() => getLanguageTheme(languageCode), [languageCode]);
 
   useEffect(() => {
@@ -112,12 +106,12 @@ export function ThemeProvider({
   const value = useMemo<ThemeValue>(
     () => ({
       languageCode,
-      mode,
+      mode: theme.mode,
       theme,
       palette: theme.colors,
       toneColor: (tone: number) => getToneColor(theme, tone),
     }),
-    [languageCode, mode, theme],
+    [languageCode, theme],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

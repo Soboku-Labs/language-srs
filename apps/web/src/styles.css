@@ -553,3 +553,167 @@ a { color: var(--accent); }
 .language__endonym { color: var(--ink-muted); font-weight: var(--weight-regular); }
 .language__tagline { font-size: var(--text-caption); color: var(--ink-muted); }
 .language__check { color: var(--accent); font-size: var(--text-heading); }
+
+/* ---------------------------------------------------------------- the place
+ *
+ * The drawings, the teacher and the palette identities — the parts of the
+ * design that say *which* language this is rather than how the app works.
+ */
+
+/*
+ * The art.
+ *
+ * `preserveAspectRatio` anchors it to the bottom of its box, because every motif
+ * is drawn standing on the ground line at y=96; letting it centre would float a
+ * pagoda in the middle of the card.
+ */
+.art { display: block; width: 100%; height: auto; }
+
+/*
+ * Layers arrive in the order you would draw them: sky, buildings, then the small
+ * bright thing. The only motion in the drawing — nothing loops, nothing floats.
+ */
+.art--animate .art__layer {
+  opacity: 0;
+  animation: art-layer 320ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(var(--layer, 0) * 110ms);
+}
+
+@keyframes art-layer {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/*
+ * The drawing behind the day's count.
+ *
+ * Absolutely positioned so the hero keeps the height it had — the screen gains a
+ * sense of place without gaining a block, and the number stays the first thing
+ * read. Faint enough to sit under text, and inert to the pointer.
+ */
+.hero--placed { position: relative; isolation: isolate; }
+.hero__art {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: -1;
+  opacity: 0.3;
+  pointer-events: none;
+  /*
+   * Fades out well before the count.
+   *
+   * The pagoda's upper tiers reach about two thirds of the way up the hero and
+   * were crossing "cards today" at full strength, which made the label harder to
+   * read than a label should ever be. The drawing is a watermark; where it
+   * competes with text, the text wins.
+   */
+  mask-image: linear-gradient(to top, #000 32%, transparent 78%);
+  -webkit-mask-image: linear-gradient(to top, #000 32%, transparent 78%);
+}
+
+/* ------------------------------------------------------------- the teacher */
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex: none;
+  font-weight: var(--weight-medium);
+  /* The glyph is a portrait, so it is centred optically rather than on its box. */
+  line-height: 1;
+}
+.avatar--small { width: 30px; height: 30px; font-size: calc(16px * var(--glyph-scale, 1)); }
+.avatar--medium { width: 42px; height: 42px; font-size: calc(22px * var(--glyph-scale, 1)); }
+.avatar--large { width: 64px; height: 64px; font-size: calc(34px * var(--glyph-scale, 1)); }
+
+/*
+ * One line from the teacher.
+ *
+ * A row rather than a speech bubble: a bubble would make it an interruption, and
+ * this is meant to be read once and lived with every morning.
+ */
+.says { display: flex; align-items: center; gap: var(--space-md); }
+.says__text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.says__line { font-size: var(--text-body); color: var(--ink); }
+.says__name { font-size: var(--text-micro); color: var(--ink-faint); }
+
+.teacher { display: flex; align-items: flex-start; gap: var(--space-md); }
+.teacher__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.teacher__name { font-size: var(--text-body); font-weight: var(--weight-medium); }
+.teacher__romanised { color: var(--ink-faint); font-weight: var(--weight-regular); }
+.teacher__method { font-size: var(--text-caption); color: var(--ink-muted); line-height: 1.45; }
+
+/* ------------------------------------------------------- the language cards */
+
+.places { display: flex; flex-direction: column; gap: var(--space-lg); }
+
+/*
+ * One language, as a place.
+ *
+ * Every colour here comes from `--place-accent`, set per card from that
+ * language's own theme — so four cards read as four places rather than as one
+ * palette applied four times.
+ */
+.place {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  text-align: left;
+  padding: 0 0 var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+.place:hover { border-color: var(--place-accent); }
+.place:active { transform: scale(0.995); }
+.place--chosen { border-color: var(--place-accent); }
+
+/* The drawing is the card's lid: full bleed, on its own wash. */
+.place__art { background: var(--place-wash); padding-top: var(--space-md); }
+
+.place__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg) 0;
+}
+.place__name { flex: 1; font-size: var(--text-title); font-weight: var(--weight-medium); }
+.place__endonym { color: var(--ink-faint); font-weight: var(--weight-regular); }
+.place__check { color: var(--place-accent); font-weight: var(--weight-strong); }
+
+.place__where {
+  padding: 0 var(--space-lg);
+  font-size: var(--text-caption);
+  color: var(--place-accent);
+  font-weight: var(--weight-medium);
+}
+.place__line {
+  padding: 0 var(--space-lg);
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
+  line-height: 1.5;
+}
+
+.place .teacher { padding: var(--space-sm) var(--space-lg) 0; }
+
+.place__palette {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg) 0;
+  font-size: var(--text-micro);
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+.place__swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 2px;
+  border-radius: 3px;
+  background: var(--place-accent);
+}
+.place__palette b { color: var(--ink-muted); font-weight: var(--weight-medium); }

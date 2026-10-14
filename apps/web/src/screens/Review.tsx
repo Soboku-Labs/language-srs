@@ -17,6 +17,7 @@ import {
   type LexicalEntry,
   type Rating,
 } from '@language-srs/core';
+import { TeacherSays } from '../components/Teacher';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
 import { BigButton, Caption, Rise, Row, Screen, TextButton, Title, ToneText } from '../ui';
@@ -302,6 +303,19 @@ export function Review() {
               : EMPTY_COPY}
           </Caption>
         </div>
+
+        {/*
+          Closed by somebody rather than by a progress bar.
+
+          Seeded by the session's own count, so the line is fixed for this
+          sitting instead of changing if the screen re-renders — and so two
+          sessions in a row are not met with the same sentence.
+        */}
+        {session.reviewed > 0 ? (
+          <Rise index={0}>
+            <TeacherSays code={engine.activeLanguage} mood="finished" seed={session.reviewed} />
+          </Rise>
+        ) : null}
 
         {/*
           The one celebration in the app, and it fires only when a stage was

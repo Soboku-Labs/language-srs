@@ -4,31 +4,35 @@ import { webStore } from './storage';
 /**
  * Who is using this browser.
  *
- * A local profile and nothing more. It names the learner, separates two people
- * sharing a laptop, and gives the storage a prefix — and it says exactly that
- * rather than implying a security property it does not have.
+ * Two kinds of account, and the difference is what happens when you open the app
+ * somewhere else:
  *
- * ## Why this is not the core's problem
+ * - **A device profile** names whoever is sitting here and separates two people
+ *   sharing a laptop. Nothing leaves the browser. It says exactly that rather
+ *   than implying a security property it does not have.
+ * - **An account** is the same thing plus a server, so the deck, every card's
+ *   schedule and the whole review history follow you to your phone.
  *
- * The backend has accounts, and `@language-srs/core` has the validation rules
- * and response shapes for them. What it does not have is a client that signs in,
- * because signing in needs a transport and the core has none by design — it runs
- * in a browser, on two phones and inside two native widgets.
- *
- * So this is deliberately the *device* half only. Signing in to the server from
- * the web app needs a contract for `main`'s API, which does not exist yet, and
- * a password field with nothing behind it is a lie told to whoever types into
- * it. When that contract lands, an email provider goes beside this one and the
- * sign-in screen grows a form; nothing here has to change.
+ * The device profile is not a lesser option. For somebody studying on one
+ * machine it is the right one, and the app is complete without ever signing in.
  */
 
 const ACCOUNT_KEY = 'srs:v1:account';
 
-export interface LocalAccount {
+export interface StoredAccount {
   id: string;
   displayName: string;
   createdAt: string;
+  /** Present for a server account; absent for a device profile. */
+  email?: string;
+  /** The bearer token, for a server account. */
+  token?: string;
+  /** When the token stops being accepted. */
+  expiresAt?: string;
 }
+
+/** Whether this account's progress is carried off the device. */
+export const isRemote = (account: StoredAccount | undefined): boolean => Boolean(account?.token);
 
 /** A readable id, because it ends up in a storage prefix somebody may have to read. */
 function newId(): string {
@@ -36,12 +40,12 @@ function newId(): string {
   return [...random].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function loadAccount(): Promise<LocalAccount | undefined> {
+export async function loadAccount(): Promise<StoredAccount | undefined> {
   const raw = await webStore.get(ACCOUNT_KEY);
   if (!raw) return undefined;
 
   try {
-    const parsed = JSON.parse(raw) as LocalAccount;
+    const parsed = JSON.parse(raw) as StoredAccount;
     return parsed.id ? parsed : undefined;
   } catch {
     // A corrupt record is not worth a crash on launch; the learner signs in
@@ -50,30 +54,34 @@ export async function loadAccount(): Promise<LocalAccount | undefined> {
   }
 }
 
-export async function createAccount(displayName: string): Promise<LocalAccount> {
-  const account: LocalAccount = {
-    id: newId(),
-    displayName: displayName.trim() || 'This device',
-    createdAt: new Date().toISOString(),
-  };
-
+export async function saveAccount(account: StoredAccount): Promise<StoredAccount> {
   await webStore.set(ACCOUNT_KEY, JSON.stringify(account));
   return account;
 }
 
-export async function signOutAccount(): Promise<void> {
+export async function createDeviceAccount(displayName: string): Promise<StoredAccount> {
+  return saveAccount({
+    id: newId(),
+    displayName: displayName.trim() || 'This device',
+    createdAt: new Date().toISOString(),
+  });
+}
+
+export async function forgetAccount(): Promise<void> {
   await webStore.remove(ACCOUNT_KEY);
 }
 
 /**
  * Where an account's study data lives.
  *
- * The first account on a device keeps the unprefixed keys. That is not tidiness
- * — it is the account a learner already has, and moving its keys on the first
- * launch after accounts shipped would have read to them as their progress being
- * deleted.
+ * Keyed by account id, so two people on one laptop keep separate decks — and so
+ * signing out and back in finds the same deck rather than an empty one.
+ *
+ * A server account is prefixed by its *server* id, which is what makes the same
+ * account on two browsers resolve to the same slice: the deck that syncs down
+ * lands where the deck that syncs up came from.
  */
-export function storeFor(account: LocalAccount | undefined): KeyValueStore {
+export function storeFor(account: StoredAccount | undefined): KeyValueStore {
   if (!account) return webStore;
 
   const cached = stores.get(account.id);

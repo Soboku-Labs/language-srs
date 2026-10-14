@@ -15,7 +15,8 @@
     "@language-srs/core": "*",
     "@tanstack/react-virtual": "^3.14.19",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "@language-srs/client": "*"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",

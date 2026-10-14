@@ -16,7 +16,16 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { createAccount, loadAccount, signOutAccount, storeFor, type LocalAccount } from './accounts';
+import { api, deviceName, hasBackend } from './api';
+import {
+  createDeviceAccount,
+  forgetAccount,
+  isRemote,
+  loadAccount,
+  saveAccount,
+  storeFor,
+  type StoredAccount,
+} from './accounts';
 import { webStore } from './storage';
 
 /**
@@ -28,20 +37,34 @@ import { webStore } from './storage';
  * The account is local — see `accounts.ts` for why there is no email form yet.
  */
 
+export type AuthMode = 'register' | 'signIn';
+
 interface AuthValue {
-  account?: LocalAccount;
+  account?: StoredAccount;
   isSignedIn: boolean;
+  /** True when this account's progress is carried off the device. */
+  synced: boolean;
+  /** False when this build has no backend, so the UI offers no password field. */
+  canSignIn: boolean;
   /** The slice of storage this account's engine reads and writes. */
   store: KeyValueStore;
-  /** Start using the app under a name. */
-  signIn(displayName?: string): Promise<void>;
+  /** The bearer token, for the sync layer. */
+  token?: string;
+  /** Use the app on this device only. */
+  useThisDevice(displayName?: string): Promise<void>;
+  /** Create or join a server account. Throws `ApiRequestError` for the form to read. */
+  authenticate(
+    mode: AuthMode,
+    credentials: { email: string; password: string; displayName?: string },
+    onWaking?: () => void,
+  ): Promise<void>;
   signOut(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [account, setAccount] = useState<LocalAccount | undefined>();
+  const [account, setAccount] = useState<StoredAccount | undefined>();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -63,12 +86,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       ...(account ? { account } : {}),
       isSignedIn: Boolean(account),
+      synced: isRemote(account),
+      canSignIn: hasBackend,
       store: storeFor(account),
-      signIn: async (displayName) => {
-        setAccount(await createAccount(displayName ?? 'This device'));
+      ...(account?.token ? { token: account.token } : {}),
+
+      useThisDevice: async (displayName) => {
+        setAccount(await createDeviceAccount(displayName ?? 'This device'));
       },
+
+      /*
+       * Sign in, and adopt the server's id as this account's storage prefix.
+       *
+       * That is the part that makes an account mean anything: the same account
+       * on a second browser resolves to the same slice of storage, so the deck
+       * that syncs down lands where the deck that syncs up came from.
+       */
+      authenticate: async (mode, credentials, onWaking) => {
+        const device = deviceName();
+        const result =
+          mode === 'register'
+            ? await api().register(
+                {
+                  email: credentials.email,
+                  password: credentials.password,
+                  ...(credentials.displayName ? { displayName: credentials.displayName } : {}),
+                  device,
+                },
+                onWaking,
+              )
+            : await api().signIn({ email: credentials.email, password: credentials.password, device }, onWaking);
+
+        setAccount(
+          await saveAccount({
+            id: result.user.id,
+            displayName: result.user.displayName,
+            createdAt: result.user.createdAt,
+            email: result.user.email,
+            token: result.token,
+            expiresAt: result.expiresAt,
+          }),
+        );
+      },
+
       signOut: async () => {
-        await signOutAccount();
+        /*
+         * Told, then forgotten — and never blocked on being told.
+         *
+         * Signing out has to work with no network: somebody handing their laptop
+         * over cannot be asked to wait for a server. The token is revoked when
+         * the request lands and expires on its own if it never does.
+         *
+         * The deck stays behind under this account's own prefix, so signing back
+         * in finds it rather than an empty one.
+         */
+        const token = account?.token;
+        if (token) void api().signOut(token).catch(() => undefined);
+        await forgetAccount();
         setAccount(undefined);
       },
     }),

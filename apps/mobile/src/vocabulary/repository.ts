@@ -9,7 +9,7 @@ import {
   type LexicalEntry,
   type VocabularyManifest,
 } from '@language-srs/core';
-import { ApiClient, ApiRequestError } from '../auth/client';
+import { ApiRequestError, createApiClient, type ApiClient } from '../auth/client';
 
 /**
  * Getting the syllabus onto the device.
@@ -52,7 +52,7 @@ export class VocabularyRepository {
 
   constructor(
     private readonly store: KeyValueStore,
-    private readonly api: ApiClient = new ApiClient(),
+    private readonly api: ApiClient = createApiClient(),
   ) {}
 
   /** The starter deck, for a device that has never reached the server. */

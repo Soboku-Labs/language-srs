@@ -160,6 +160,10 @@ export type {
 export { countByStatus, filterDeck, sortDeck, summariseDeck } from './deck';
 export type { DeckEntry, DeckFilter, DeckSort, DeckStatus, SummariseDeckOptions } from './deck';
 
+// Sync — how two devices reconcile when both have studied
+export { mergeStateValues } from './sync';
+export type { StateMergeResult } from './sync';
+
 // Triage — the words that are fighting the learner
 export { describeStruggle, findStrugglingCards } from './triage';
 export type { FindStrugglingOptions, StruggleReason, StrugglingCard } from './triage';

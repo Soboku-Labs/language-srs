@@ -7,6 +7,7 @@ import {
   suggestDailyNewLimit,
   toDateOnly,
 } from '@language-srs/core';
+import { SyncStatus } from '../components/SyncStatus';
 import { useAuth, useEngine } from '../providers';
 import { useRouter } from '../router';
 import { Caption, Choice, DetailRow, Rise, Row, Screen, Section, TextButton } from '../ui';
@@ -22,7 +23,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function Settings() {
   const { engine, revision, mutate } = useEngine();
-  const { account, signOut } = useAuth();
+  const { account, synced, canSignIn, signOut } = useAuth();
   const { navigate } = useRouter();
 
   const code = engine.activeLanguage;
@@ -218,17 +219,35 @@ export function Settings() {
 
       <Rise index={6}>
         <Section title="Account">
-          <DetailRow label="Using this device as" value={account?.displayName ?? 'Not signed in'} />
-          <Caption>
-            A local profile in this browser. Progress is not carried to your other devices, and
-            nothing is sent anywhere.
-          </Caption>
+          <DetailRow
+            label={synced ? 'Signed in as' : 'Using this device as'}
+            value={account?.displayName ?? 'Not signed in'}
+          />
+          {account?.email ? <DetailRow label="Email" value={account.email} /> : null}
+
+          {synced ? (
+            <SyncStatus />
+          ) : (
+            <>
+              <Caption>
+                A local profile in this browser. Progress is not carried to your other devices, and
+                nothing is sent anywhere.
+              </Caption>
+              {canSignIn ? (
+                <TextButton
+                  label="Create an account to sync"
+                  onClick={() => navigate('/sign-in')}
+                />
+              ) : null}
+            </>
+          )}
+
           <TextButton
             label="Sign out"
             muted
             onClick={() => {
               // The deck stays behind, under this account's own storage prefix,
-              // so signing back in with the same name finds it again.
+              // so signing back in finds it again rather than an empty one.
               void signOut();
             }}
           />

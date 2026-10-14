@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { Platform } from 'react-native';
 import { readJson, writeJson, type AuthSessionInfo, type PublicUser } from '@language-srs/core';
 import { appStore } from '../storage/adapter';
-import { ApiClient, ApiRequestError } from './client';
+import { ApiRequestError, createApiClient, type ApiClient } from './client';
 
 /**
  * Who is signed in.
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<StoredSession | undefined>();
   const [offline, setOffline] = useState(false);
 
-  const api = useMemo(() => new ApiClient(), []);
+  const api = useMemo(() => createApiClient(), []);
   const deviceName = useMemo(describeDevice, []);
 
   /**

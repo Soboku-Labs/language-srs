@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useAuth, useEngine, AuthProvider, EngineProvider } from './providers';
+import { SyncProvider } from './sync';
 import { RouterProvider, matchPath, useRouter } from './router';
 import { ThemeProvider } from './theme';
 import { Dashboard } from './screens/Dashboard';
@@ -17,7 +18,8 @@ import { Caption, Screen, TextButton, Title } from './ui';
  * The app shell.
  *
  * Auth wraps the engine, because which account you are decides which slice of
- * storage the engine reads. Theme is innermost because it follows the active
+ * storage the engine reads. Sync sits inside both — it needs an account and an
+ * engine and renders neither. Theme is innermost because it follows the active
  * language, which is engine state.
  */
 export function App() {
@@ -25,7 +27,9 @@ export function App() {
     <RouterProvider>
       <AuthProvider>
         <EngineProvider>
-          <Themed />
+          <SyncProvider>
+            <Themed />
+          </SyncProvider>
         </EngineProvider>
       </AuthProvider>
     </RouterProvider>

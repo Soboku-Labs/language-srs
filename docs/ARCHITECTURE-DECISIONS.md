@@ -84,6 +84,108 @@ the win was never HTTP/2 — it was binary protobuf instead of JSON, and
 thing that needed a second listener is the thing nothing in this product uses
 yet.
 
+## TanStack, library by library
+
+TanStack is a family, not a framework, and the useful question is which members
+earn a place in a local-first SPA. One does, on measurement. The rest do not, and
+the reasons differ enough to be worth writing down.
+
+### TanStack Virtual — adopted
+
+The deck screen renders one row per word and this app's own curriculum goes to
+HSK 7–9, which is about eleven thousand of them. Measured in Chromium, tapping
+"Words" and waiting for the list to paint:
+
+| words  | rows   | DOM nodes | before    | after |
+| ------ | ------ | --------- | --------- | ----- |
+| 2,500  | 2,532  | 15,192    | 147ms     | 29ms  |
+| 5,000  | 5,032  | 30,192    | 399ms     | —     |
+| 11,000 | 11,032 | 66,192    | **1,222ms** | 51ms |
+
+Worse than linear, and 1.2 seconds is a freeze rather than a delay. Now flat in
+deck size, at 114 DOM nodes instead of 66,192.
+
+Two things worth recording about how that was measured, because the first attempt
+got it wrong in both directions:
+
+- **Scrolling was never the problem.** Fifteen thousand static rows scroll at a
+  steady 17ms frame with nothing dropped. The instinct that a long list must be
+  janky to scroll was simply false here, and optimising for it would have been
+  optimising nothing.
+- **The first measurement said 2,044ms and was measuring the wrong thing.** It
+  navigated by reloading the page, so it timed an SPA bootstrap plus generating
+  ten thousand cards — neither of which any rendering library touches. Measured
+  as a learner actually experiences it, by tapping through, the real figure was
+  147ms.
+
+Small decks are left as a plain list. A windowed list cannot be reached by Tab,
+and at eleven thousand rows tabbing was never a usable way to find anything;
+at twenty-seven it is, and windowing would buy a few milliseconds for the cost of
+keyboard access. Both paths share the same row component, so the only thing that
+differs is the container.
+
+### TanStack Query — not adopted
+
+This is the member everyone reaches for, and the one that fits this app worst.
+
+Query manages **server state you read and render**: caching by key, deduplication,
+stale-while-revalidate, refetch on focus. This app has almost none. Every screen
+reads a synchronous local engine — `engine.getQueue()` returns immediately — which
+is the entire point of the local-first design. Putting Query in front of that
+would add an async boundary and a loading state to data already in memory.
+
+The one genuinely networked thing is `sync()`, and it is a poor fit for a
+different reason: it returns nothing renderable. It pushes reviews, takes the
+backend's answer, and mutates the engine. Modelling that as a cache entry to get
+Query's retry and focus-refetch would mean abusing a data cache for a side
+effect — and the features worth having there (dedupe, refetch-on-focus) are
+*query* features, which a mutation does not get anyway.
+
+What `sync.tsx` hand-rolls instead is about forty lines: a ref to stop two syncs
+overlapping, focus and online listeners, a debounce after studying, and an error
+phase. That is a fair amount of reimplementation and it is still the smaller
+cost — the alternative is a dependency whose central abstraction does not
+describe what is happening.
+
+**This would change** the day a screen renders something the backend owns and the
+client does not keep. Nothing does today.
+
+### TanStack Router — not adopted
+
+Nine routes, fixed, in a hand-written 142-line router. TanStack Router would
+bring typed params, validated search params, loaders and code splitting, for
+roughly 35KB and a generated route tree.
+
+The one real pull is search-param validation: the review screen is opened by
+home-screen widget deep links carrying `?card=…&reveal=1`, and those are parsed
+by hand today. Typed and validated would genuinely be better — for one screen.
+Everything else on the list is something a fixed route set does not need, and
+loaders in particular are for async route data this app does not have.
+
+Replacing a working router with a codegen step to improve one screen's parameter
+parsing is the Vite question again: it measures well on a feature matrix and
+changes nothing a learner can feel.
+
+### TanStack Table — not adopted
+
+The deck has sorting, filtering and status counts, which sounds exactly like
+Table's job. It is not, because that logic lives in `packages/core` — `sortDeck`,
+`filterDeck`, `countByStatus` — where **the backend uses it too**: `GetDeck`
+filters server-side so three clients cannot disagree about what matches a query.
+Moving it into a client-side table library would either duplicate it or strand
+the server without it.
+
+### TanStack Form — not adopted
+
+Three fields on the sign-in screen. Settings is steppers and choices, not a form.
+
+### TanStack Start — not adopted, and worth being explicit
+
+Start is a full-stack SSR framework, and SSR is actively wrong here. The app is a
+static SPA that works offline with its data in the browser; there is nothing for a
+server to render, because on first paint the server knows nothing about the
+learner. It also ships to GitHub Pages, which has no server to run it.
+
 ## Is the backend worth rewriting in Rust or Go?
 
 Probably — but for reasons worth naming correctly, and not yet.
@@ -178,3 +280,6 @@ because Node is slow, because Node is not the slow part.
   look for.
 - Pushing happens **before** pulling, always. The other order overwrites a
   just-graded card with the server's pre-grading copy.
+- A dependency is adopted on a measurement, not on a feature list. TanStack
+  Virtual is in because 1,222ms was measured and then became 51ms; the rest of
+  the family is out for reasons written down above rather than left implicit.

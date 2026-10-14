@@ -3,10 +3,10 @@ import {
   countByStatus,
   filterDeck,
   sortDeck,
-  type DeckEntry,
   type DeckSort,
   type DeckStatus,
 } from '@mon/core';
+import { DeckList } from '../components/DeckList';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
 import { Caption, Choice, Rise, Row, Screen } from '../ui';
@@ -100,53 +100,11 @@ export function Words() {
       {rows.length === 0 ? (
         <Caption>{query ? `Nothing matches “${query}”.` : 'No words here yet.'}</Caption>
       ) : (
-        <ul className="deck">
-          {rows.map((row) => (
-            <WordRow
-              key={row.entry.id}
-              row={row}
-              onClick={() => navigate(`/word/${encodeURIComponent(row.entry.id)}`)}
-            />
-          ))}
-        </ul>
+        <DeckList
+          rows={rows}
+          onSelect={(entryId) => navigate(`/word/${encodeURIComponent(entryId)}`)}
+        />
       )}
     </Screen>
-  );
-}
-
-/**
- * One word.
- *
- * The strength bar is the weakest of the word's cards rather than their mean: a
- * word whose meaning is solid and whose tones are gone is not half-known, it is
- * a word you will get wrong. A word with nothing studied gets no bar at all —
- * an empty track on every row of a fresh deck is "no data" said thirty times.
- */
-function WordRow({ row, onClick }: { row: DeckEntry; onClick: () => void }) {
-  return (
-    <li>
-      <button type="button" className="deck__row" onClick={onClick}>
-        <span className="deck__text">
-          <span className="deck__target">{row.entry.target}</span>
-          <span className="deck__meaning">
-            {row.entry.reading} · {row.entry.meanings.join(', ')}
-          </span>
-        </span>
-        <span className="deck__right">
-          {row.dueNow > 0 ? <span className="deck__due">{row.dueNow} due</span> : null}
-          {row.weakest !== undefined ? (
-            <span className="track deck__track">
-              <span
-                className="track__fill"
-                style={{
-                  width: `${Math.max(2, Math.round(row.weakest * 100))}%`,
-                  ...(row.status === 'suspended' ? { background: 'var(--ink-faint)' } : {}),
-                }}
-              />
-            </span>
-          ) : null}
-        </span>
-      </button>
-    </li>
   );
 }

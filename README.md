@@ -87,6 +87,8 @@ apps/web/                 The website: React + Vite, no React Native runtime
   src/ui.tsx              the Suboku primitives as DOM
   src/styles.css          the whole stylesheet; colours are CSS variables
   src/router.tsx          a hand-written router, because the route set is fixed
+  src/sync.tsx            push on a debounce, pull on focus
+  src/components/DeckList.tsx  windowed above 150 rows; 11,000 words paint flat
 
 packages/core/            @mon/core — all the domain logic, no React or DOM
   exams/                  HSK, JLPT, TOPIK and Vietnamese curricula

@@ -461,6 +461,11 @@ a { color: var(--accent); }
 
 .deck { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .deck > li + li { border-top: 1px solid var(--surface-raised); }
+/* A windowed row is absolutely positioned, so the sibling selector above cannot
+   reach it; each row carries its own divider instead. */
+.deck__window-row + .deck__window-row,
+.deck__window-row { border-top: 1px solid var(--surface-raised); }
+.deck__window-row[data-index='0'] { border-top: none; }
 .deck__row {
   display: flex;
   align-items: center;

@@ -1,0 +1,27 @@
+{
+  "name": "@language-srs/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The web app: React and Vite, with no React Native runtime.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:pages": "WEB_BASE_URL=${WEB_BASE_URL:-/language-srs/} npm run build && node scripts/prepare-pages.mjs dist"
+  },
+  "dependencies": {
+    "@language-srs/core": "*",
+    "@tanstack/react-virtual": "^3.14.19",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.9.2",
+    "vite": "^7.1.0"
+  }
+}

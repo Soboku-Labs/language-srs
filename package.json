@@ -14,7 +14,7 @@
     "core:build": "npm run build --workspace @language-srs/core",
     "core:test": "npm run test --workspace @language-srs/core",
     "test": "npm run test --workspace @language-srs/core && npm run test --workspace @language-srs/server",
-    "typecheck": "npm run typecheck --workspace @language-srs/core && npm run typecheck --workspace @language-srs/server && npm run typecheck --workspace @language-srs/mobile",
+    "typecheck": "npm run typecheck --workspace @language-srs/core && npm run typecheck --workspace @language-srs/server && npm run typecheck --workspace @language-srs/web && npm run typecheck --workspace @language-srs/mobile",
     "web": "npm run web --workspace @language-srs/mobile",
     "web:build": "npm run build:web --workspace @language-srs/mobile",
     "ios": "npm run ios --workspace @language-srs/mobile",
@@ -23,7 +23,9 @@
     "web:pages": "npm run build:pages --workspace @language-srs/mobile",
     "server": "npm run start --workspace @language-srs/server",
     "server:dev": "npm run dev --workspace @language-srs/server",
-    "server:test": "npm run test --workspace @language-srs/server"
+    "server:test": "npm run test --workspace @language-srs/server",
+    "web:vite": "npm run dev --workspace @language-srs/web",
+    "web:vite:build": "npm run build --workspace @language-srs/web"
   },
   "devDependencies": {
     "typescript": "~5.9.2"

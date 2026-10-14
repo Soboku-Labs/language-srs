@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Mon">
+  <title>Mon</title>
+  <rect width="512" height="512" rx="0" fill="#FBFAF8"/>
+  <text x="50%" y="50%" fill="#111113" font-size="271.5648"
+        font-family="'Noto Sans SC','Noto Sans JP','PingFang SC','Hiragino Sans','Microsoft YaHei',sans-serif"
+        font-weight="500" text-anchor="middle" dominant-baseline="central">門</text>
+</svg>

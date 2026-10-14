@@ -5,7 +5,7 @@ import { HttpError } from '../app.ts';
  * Authentication.
  *
  * The paths and the response shape match `HttpAuthProvider` in
- * `@language-srs/core` exactly — that client was written against this contract
+ * `@mon/core` exactly — that client was written against this contract
  * before a server existed, so this is the other half of it rather than a new
  * design.
  */

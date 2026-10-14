@@ -8,7 +8,7 @@ import {
   getLanguageTheme,
   resolvePalette,
   type LanguageCode,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { Caption, Screen } from '../src/components/ui';
 import { Press, Rise } from '../src/motion/components';

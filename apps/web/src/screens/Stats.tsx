@@ -6,7 +6,7 @@ import {
   getLadder,
   kindLabel,
   type KindRetention,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
 import { Caption, DetailRow, Pill, ProgressBar, Rise, Row, Screen, Section, Stat, TextButton, Title } from '../ui';

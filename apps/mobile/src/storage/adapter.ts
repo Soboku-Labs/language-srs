@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { KeyValueStore } from '@language-srs/core';
+import type { KeyValueStore } from '@mon/core';
 
 /**
  * The app's implementation of the core storage port.

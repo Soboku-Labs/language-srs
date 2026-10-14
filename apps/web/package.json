@@ -1,5 +1,5 @@
 {
-  "name": "@language-srs/web",
+  "name": "@mon/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,10 +9,10 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build:pages": "WEB_BASE_URL=/language-srs/ npm run build && node scripts/prepare-pages.mjs dist"
+    "build:pages": "WEB_BASE_URL=${WEB_BASE_URL:-/language-srs/} npm run build && node scripts/prepare-pages.mjs dist"
   },
   "dependencies": {
-    "@language-srs/core": "*",
+    "@mon/core": "*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

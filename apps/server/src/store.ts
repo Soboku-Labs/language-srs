@@ -1,6 +1,6 @@
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { KeyValueStore } from '@language-srs/core';
+import type { KeyValueStore } from '@mon/core';
 
 /**
  * The storage port, on a filesystem.

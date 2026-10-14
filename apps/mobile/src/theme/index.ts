@@ -1,7 +1,7 @@
 /**
  * Layout tokens for the Suboku system.
  *
- * Colours and radii come from `@language-srs/core`; this is the geometry.
+ * Colours and radii come from `@mon/core`; this is the geometry.
  *
  * The scale is tighter than the version it replaced. Restraint in a type system
  * comes from using fewer sizes, not from making them smaller — six steps that are

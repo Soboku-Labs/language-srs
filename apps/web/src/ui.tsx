@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTheme } from './theme';
-import type { LanguageCode } from '@language-srs/core';
+import type { LanguageCode } from '@mon/core';
 
 /**
  * The Suboku primitives.

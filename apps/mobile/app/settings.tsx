@@ -7,7 +7,7 @@ import {
   getLanguageProfile,
   suggestDailyNewLimit,
   toDateOnly,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/auth/AuthProvider';
 import { useEngine } from '../src/engine/EngineProvider';

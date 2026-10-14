@@ -1,7 +1,7 @@
 // Metro configuration for a monorepo.
 //
 // Without this, Metro watches only apps/mobile and cannot resolve
-// @language-srs/core from packages/core — the workspace symlink points outside
+// @mon/core from packages/core — the workspace symlink points outside
 // the project root, which Metro ignores by default.
 const path = require('node:path');
 const { getDefaultConfig } = require('expo/metro-config');

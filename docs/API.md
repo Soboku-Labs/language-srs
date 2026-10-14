@@ -26,7 +26,7 @@ version intact rather than half a card list.
 
 ## Authentication
 
-Paths and response shape match `HttpAuthProvider` in `@language-srs/core`, which
+Paths and response shape match `HttpAuthProvider` in `@mon/core`, which
 was written against this contract before the server existed.
 
 | Route | Body | Returns |

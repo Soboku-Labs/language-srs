@@ -1,4 +1,4 @@
-import { LANGUAGE_CODES, getLanguageProfile, resolvePalette } from '@language-srs/core';
+import { LANGUAGE_CODES, getLanguageProfile, resolvePalette } from '@mon/core';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
 import { Caption, Rise, Screen } from '../ui';

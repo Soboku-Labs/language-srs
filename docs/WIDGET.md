@@ -54,7 +54,7 @@ applyPendingGrades() through real FSRS
   → republish snapshot ───────────────▶ widget_snapshot
 ```
 
-The container is an **App Group** on iOS (`group.com.languagesrs.app`) and
+The container is an **App Group** on iOS (`group.com.subokulabs.mon`) and
 **SharedPreferences** on Android. Identifiers are declared once in `app.config.ts` and
 threaded into Info.plist and the Android manifest by the config plugin, so changing the
 bundle id cannot leave the two halves pointing at different containers.

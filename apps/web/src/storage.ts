@@ -1,4 +1,4 @@
-import type { KeyValueStore } from '@language-srs/core';
+import type { KeyValueStore } from '@mon/core';
 
 /**
  * The storage port, backed by localStorage.
@@ -25,7 +25,7 @@ export const webStore: KeyValueStore = {
     } catch (cause) {
       // Quota exceeded is worth surfacing — it means the deck has outgrown the
       // origin's allowance and the next write will lose data.
-      console.warn('language-srs: could not persist', key, cause);
+      console.warn('mon: could not persist', key, cause);
     }
   },
   async remove(key) {

@@ -1,9 +1,9 @@
 {
-  "name": "@language-srs/server",
+  "name": "@mon/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "The backend: one HTTP API over @language-srs/core, so the native clients render rather than reimplement.",
+  "description": "The backend: one HTTP API over @mon/core, so the native clients render rather than reimplement.",
   "main": "./src/index.ts",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/index.js --banner:js=\"import{createRequire}from'node:module';const require=createRequire(import.meta.url);\"",
@@ -13,7 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@language-srs/core": "*"
+    "@mon/core": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

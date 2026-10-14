@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
-import type { Account } from '@language-srs/core';
+import type { Account } from '@mon/core';
 import type { FileStore } from './store.ts';
 
 const scryptAsync = promisify(scrypt) as (

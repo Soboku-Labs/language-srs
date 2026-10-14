@@ -14,7 +14,7 @@ import {
   type LanguageCode,
   type Rating,
   type ReviewSource,
-} from '@language-srs/core';
+} from '@mon/core';
 import {
   createContext,
   useCallback,
@@ -32,7 +32,7 @@ import { webStore } from './storage';
  *
  * Both ports from the Expo app with the React Native removed; the logic is
  * unchanged because it was never platform-specific — which is the whole point of
- * keeping it in `@language-srs/core` and only the wiring here.
+ * keeping it in `@mon/core` and only the wiring here.
  *
  * Auth sits above the engine, because which account you are decides which slice
  * of storage the engine reads, and the engine is rebuilt when that changes.

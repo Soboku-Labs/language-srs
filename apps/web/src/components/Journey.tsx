@@ -1,4 +1,4 @@
-import type { DailyGoal, Journey, JourneyStage } from '@language-srs/core';
+import type { DailyGoal, Journey, JourneyStage } from '@mon/core';
 
 /**
  * The two loops, on the web.

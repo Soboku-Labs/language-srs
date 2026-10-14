@@ -4,7 +4,7 @@ import {
   getLanguageProfile,
   kindLabel,
   type CardKind,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
 import { BigButton, Caption, Rise, Row, Screen, Stat, TextButton, Title } from '../ui';

@@ -4,7 +4,7 @@
  * Web has localStorage, native has AsyncStorage, the widget has an App Group
  * container, and tests have a Map. Rather than teach the domain about any of
  * them, everything goes through this port and each platform supplies an adapter.
- * That is what lets `@language-srs/core` stay free of React, React Native and
+ * That is what lets `@mon/core` stay free of React, React Native and
  * DOM imports, and be exercised in plain Node.
  */
 export interface KeyValueStore {

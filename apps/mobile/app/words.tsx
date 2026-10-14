@@ -8,7 +8,7 @@ import {
   type DeckEntry,
   type DeckSort,
   type DeckStatus,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { Caption, Row, Screen } from '../src/components/ui';
 import { Press } from '../src/motion/components';

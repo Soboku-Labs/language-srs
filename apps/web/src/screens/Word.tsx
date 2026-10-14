@@ -6,7 +6,7 @@ import {
   formatInterval,
   kindLabel,
   type Card,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
 import { BigButton, Caption, Rise, Row, Screen, Section, TextButton, Title, ToneText } from '../ui';

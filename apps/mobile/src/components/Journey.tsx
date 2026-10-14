@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform, Text, View } from 'react-native';
-import type { DailyGoal, Journey } from '@language-srs/core';
+import type { DailyGoal, Journey } from '@mon/core';
 import { Press } from '../motion/components';
 import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTheme } from '../theme';
 

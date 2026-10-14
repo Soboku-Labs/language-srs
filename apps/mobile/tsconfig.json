@@ -7,7 +7,7 @@
     "jsx": "react-jsx",
     "paths": {
       "@/*": ["./src/*"],
-      "@language-srs/core": ["../../packages/core/src/index.ts"]
+      "@mon/core": ["../../packages/core/src/index.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],

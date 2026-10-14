@@ -21,7 +21,7 @@ import {
   type LexicalEntry,
   type Rating,
   type StudyMode,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
 import { BigButton, Caption, Rise, Row, Screen, TextButton, Title, ToneText } from '../ui';

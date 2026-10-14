@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import { SEED_ENTRIES, StudyEngine, type LanguageCode, type Rating, type ReviewSource } from '@language-srs/core';
+import { SEED_ENTRIES, StudyEngine, type LanguageCode, type Rating, type ReviewSource } from '@mon/core';
 import { useAuth } from '../auth/AuthProvider';
 import { widgetBridge } from '../../modules/widget-bridge';
 

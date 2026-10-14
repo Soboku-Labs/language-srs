@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
-import { SEED_ENTRIES, StudyEngine, type Account } from '@language-srs/core';
+import { SEED_ENTRIES, StudyEngine, type Account } from '@mon/core';
 import { Accounts, AuthError } from './accounts.ts';
 import { FileStore } from './store.ts';
 import { authRoutes } from './routes/auth.ts';
@@ -9,7 +9,7 @@ import { studyRoutes } from './routes/study.ts';
 /**
  * The backend.
  *
- * One service over `@language-srs/core`, so the clients render and never
+ * One service over `@mon/core`, so the clients render and never
  * reimplement. That is the whole point: a scheduler hand-ported into Swift and
  * again into Kotlin is three chances for a learner's phone and laptop to
  * disagree about when a word is due, and the disagreement would be silent.

@@ -6,7 +6,7 @@ import {
   type DeckEntry,
   type DeckSort,
   type DeckStatus,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
 import { Caption, Choice, Rise, Row, Screen } from '../ui';

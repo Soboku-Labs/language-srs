@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AuthError, type AuthErrorCode } from '@language-srs/core';
+import { AuthError, type AuthErrorCode } from '@mon/core';
 import { useAuth } from '../src/auth/AuthProvider';
 import { BigButton, Caption, Screen, Section, TextButton, Title } from '../src/components/ui';
 import { Rise } from '../src/motion/components';
@@ -66,7 +66,7 @@ export default function SignInScreen() {
     <Screen>
       <Rise index={0}>
         <View style={styles.header}>
-          <Title>Language SRS</Title>
+          <Title>Mon</Title>
           <Caption>
             An account carries your progress between your phone and the web. It is not required.
           </Caption>

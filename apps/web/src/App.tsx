@@ -72,7 +72,7 @@ function Chrome() {
   }, [isSignedIn, path, navigate]);
 
   useEffect(() => {
-    document.title = titled ? `${titled.title} · Language SRS` : 'Language SRS';
+    document.title = titled ? `${titled.title} · Mon` : 'Mon';
   }, [titled]);
 
   return (

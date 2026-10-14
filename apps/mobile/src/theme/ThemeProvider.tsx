@@ -8,7 +8,7 @@ import {
   type Palette,
   type ThemeMode,
   type ThemeRadius,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../engine/EngineProvider';
 
 export interface ResolvedTheme {

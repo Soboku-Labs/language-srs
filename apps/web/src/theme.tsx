@@ -6,12 +6,12 @@ import {
   type LanguageCode,
   type Palette,
   type ThemeMode,
-} from '@language-srs/core';
+} from '@mon/core';
 
 /**
  * The Suboku system, as CSS.
  *
- * The palettes themselves stay in `@language-srs/core` — they are shared with the
+ * The palettes themselves stay in `@mon/core` — they are shared with the
  * native widgets, so they cannot live in a web app. What lives here is the
  * mapping onto custom properties, which is the part that is genuinely a browser
  * concern.

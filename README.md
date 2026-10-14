@@ -1,8 +1,14 @@
-# language-srs
+# Mon · 門
 
-Exam-aligned spaced repetition for **Mandarin, Japanese, Korean and Vietnamese**, with
-home-screen widgets. One shared core, running natively on iOS and Android and as a
-static web app — from a single codebase.
+Exam-aligned spaced repetition for **Mandarin, Japanese, Korean and Vietnamese**.
+
+門 is the everyday word for a door in three of them — 门 *mén*, 門 *mon*, 문 *mun* —
+and in Vietnamese **môn** is the live Sino-Vietnamese word for a subject of study:
+*nhập môn* is "an introduction to a field", exactly as 入門 is in the other three.
+One word, the same idea in all four, standard in each. The glyph is the icon.
+
+One domain core behind one backend; the web app and the phone apps are interfaces
+over it. Home-screen widgets on iOS and Android.
 
 A [Suboku Labs](https://github.com/suboku-labs) product, built on the Suboku design
 system: one neutral canvas, one accent, and nothing on screen that has not earned its
@@ -45,7 +51,7 @@ reduced to the part that was actually carrying the identity. A test asserts that
 nothing except the accent and the tone ramp varies between languages, so it cannot
 quietly become four systems again.
 
-The palettes live in `@language-srs/core` as data, not in the React layer, so the app
+The palettes live in `@mon/core` as data, not in the React layer, so the app
 and both native widgets render one definition. The widget payload carries *both* modes,
 letting the home screen follow its own appearance rather than whichever mode the app
 was last in.
@@ -59,7 +65,9 @@ silently broke the exercise.
 ## Layout
 
 ```
-apps/server/              The backend: one HTTP API over the core
+proto/mon/v1/mon.proto    The contract: language-neutral, linted, versioned
+
+apps/server/              The backend: one API over the core
   src/app.ts              routing, auth check, per-account engines
   src/accounts.ts         scrypt passwords, revocable tokens
   src/store.ts            the storage port on a filesystem, atomic writes
@@ -71,7 +79,7 @@ apps/web/                 The website: React + Vite, no React Native runtime
   src/styles.css          the whole stylesheet; colours are CSS variables
   src/router.tsx          a hand-written router, because the route set is fixed
 
-packages/core/            @language-srs/core — all the domain logic, no React or DOM
+packages/core/            @mon/core — all the domain logic, no React or DOM
   exams/                  HSK, JLPT, TOPIK and Vietnamese curricula
   srs/                    FSRS-4.5 scheduler + exam-date pressure
   session/                queue building, daily caps, exam-weighted card mix
@@ -95,6 +103,20 @@ apps/mobile/              Expo app: iOS, Android and web from one codebase
 The split is the point: `packages/core` imports nothing platform-specific, so the
 scheduling behaviour on the web, on both phones, and on the home screen is the same
 code. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+### Icons
+
+Generated, never checked in:
+
+```bash
+npm run icons
+```
+
+One source glyph produces the favicon pair, the PWA maskable icon, the Apple touch
+icon, the web manifest, and the iOS, Android-adaptive and splash sources. It runs
+as part of `web:build`, `web:pages` and `prebuild`, so the icons cannot drift from
+the design — there is no bitmap to forget to re-export, and the iOS icon and the
+favicon are the same SVG with different padding rules.
 
 ### One core, separate apps
 

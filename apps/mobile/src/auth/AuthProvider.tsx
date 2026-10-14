@@ -10,7 +10,7 @@ import {
   type AuthProviderId,
   type Credentials,
   type KeyValueStore,
-} from '@language-srs/core';
+} from '@mon/core';
 import { appStore } from '../storage/adapter';
 
 /**

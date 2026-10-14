@@ -9,16 +9,16 @@ import type { ExpoConfig } from 'expo/config';
  * config plugins, because a mismatch produces a widget that renders the empty
  * state forever with no error anywhere to explain why.
  */
-export const BUNDLE_ID = 'com.languagesrs.app';
+export const BUNDLE_ID = 'com.subokulabs.mon';
 export const APP_GROUP = `group.${BUNDLE_ID}`;
-export const ANDROID_PREFS_NAME = 'language_srs_widget';
+export const ANDROID_PREFS_NAME = 'mon_widget';
 export const WIDGET_PAYLOAD_KEY = 'widget_snapshot';
 export const WIDGET_PENDING_KEY = 'widget_pending_grades';
-export const URL_SCHEME = 'languagesrs';
+export const URL_SCHEME = 'mon';
 
 const config: ExpoConfig = {
-  name: 'Language SRS',
-  slug: 'language-srs',
+  name: 'Mon',
+  slug: 'mon',
   version: '0.1.0',
   orientation: 'portrait',
   scheme: URL_SCHEME,

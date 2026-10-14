@@ -22,7 +22,7 @@ import {
   type LexicalEntry,
   type Rating,
   type StudyMode,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { GradeButtons, ReviewCard, speakEntry } from '../src/components/ReviewCard';
 import { ChoiceAnswer, TypedAnswer } from '../src/components/AnswerInput';

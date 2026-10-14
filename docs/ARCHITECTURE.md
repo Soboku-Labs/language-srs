@@ -16,7 +16,7 @@ interval for the same card, that is a bug with one place to look.
 
 ```
                     ┌─────────────────────────────────┐
-                    │      @language-srs/core          │
+                    │      @mon/core          │
                     │  exams · srs · session · stats   │
                     │  theme · widget payload · data   │
                     │      StudyEngine (facade)        │

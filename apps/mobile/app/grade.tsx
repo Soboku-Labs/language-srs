@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import type { Rating } from '@language-srs/core';
+import type { Rating } from '@mon/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { useTheme, useThemedStyles, type ResolvedTheme } from '../src/theme';
 

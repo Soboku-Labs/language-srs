@@ -1,5 +1,5 @@
 /**
- * @language-srs/core — platform-agnostic domain logic.
+ * @mon/core — platform-agnostic domain logic.
  *
  * Deliberately free of React, React Native and DOM imports. The web build, the
  * iOS app, the Android app and the home-screen widgets all consume this package,

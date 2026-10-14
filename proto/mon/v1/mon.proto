@@ -1,0 +1,526 @@
+syntax = "proto3";
+
+package mon.v1;
+
+// The Mon service contract.
+//
+// This file is the seam between the backend and every client. It is deliberately
+// the *first* thing written for the gRPC move, because it is the part that does
+// not change when the backend's language does: a Rust, Go or TypeScript server
+// implements this same file, and the Swift, Kotlin and web clients generate
+// against it. Picking the server language before the contract exists is how you
+// end up with an API shaped like its implementation.
+//
+// ## A note on browsers
+//
+// A browser cannot speak gRPC. HTTP/2 trailers are not exposed to JavaScript, so
+// gRPC-Web needs either a translating proxy (Envoy) or a server that speaks it
+// natively. Running an Envoy sidecar to serve one web app is a real operational
+// cost for no benefit the web app can feel.
+//
+// Connect (connectrpc.com) implements this same file over gRPC, gRPC-Web and
+// plain HTTP/JSON from one server with no proxy — so the phones get binary
+// gRPC over HTTP/2 and the browser gets something it can call directly. It has
+// Go, Rust, Node, Swift and Kotlin implementations. Recommended over raw gRPC
+// for this product's shape; the .proto is identical either way.
+
+// ---------------------------------------------------------------- vocabulary
+
+enum LanguageCode {
+  LANGUAGE_CODE_UNSPECIFIED = 0;
+  LANGUAGE_CODE_ZH = 1;  // Mandarin
+  LANGUAGE_CODE_JA = 2;  // Japanese
+  LANGUAGE_CODE_KO = 3;  // Korean
+  LANGUAGE_CODE_VI = 4;  // Vietnamese
+}
+
+enum CardKind {
+  CARD_KIND_UNSPECIFIED = 0;
+  CARD_KIND_RECOGNITION = 1;
+  CARD_KIND_PRODUCTION = 2;
+  CARD_KIND_LISTENING = 3;
+  CARD_KIND_READING = 4;
+  CARD_KIND_WRITING = 5;
+  CARD_KIND_GRAMMAR = 6;
+  CARD_KIND_TONE = 7;
+  CARD_KIND_SCRIPT = 8;
+}
+
+enum CardState {
+  CARD_STATE_UNSPECIFIED = 0;
+  CARD_STATE_NEW = 1;
+  CARD_STATE_LEARNING = 2;
+  CARD_STATE_REVIEW = 3;
+  CARD_STATE_RELEARNING = 4;
+}
+
+// 1 Again, 2 Hard, 3 Good, 4 Easy. Named rather than a bare int32 so a client
+// cannot send 7 and a server cannot wonder what it meant.
+enum Rating {
+  RATING_UNSPECIFIED = 0;
+  RATING_AGAIN = 1;
+  RATING_HARD = 2;
+  RATING_GOOD = 3;
+  RATING_EASY = 4;
+}
+
+enum StudyMode {
+  STUDY_MODE_UNSPECIFIED = 0;  // treated as DUE
+  STUDY_MODE_DUE = 1;
+  STUDY_MODE_LEARN = 2;
+  STUDY_MODE_CRAM = 3;
+}
+
+message ExampleSentence {
+  string target = 1;
+  string reading = 2;
+  string translation = 3;
+}
+
+message LexicalEntry {
+  string id = 1;
+  LanguageCode language_code = 2;
+  string target = 3;
+  string reading = 4;
+  repeated string meanings = 5;
+  string part_of_speech = 6;
+  repeated string level_ids = 7;
+  repeated ExampleSentence examples = 8;
+  // Per-syllable tone numbers. Empty for a non-tonal language.
+  repeated int32 tones = 9;
+  repeated string components = 10;
+  int32 frequency_rank = 11;
+  // The learner's own note. Theirs, not the deck's.
+  string mnemonic = 12;
+  repeated string tags = 13;
+}
+
+message Card {
+  string id = 1;  // "<entry_id>:<kind>"
+  string entry_id = 2;
+  LanguageCode language_code = 3;
+  string level_id = 4;
+  CardKind kind = 5;
+  CardState state = 6;
+
+  // FSRS memory state. Sent so a client can render strength without asking
+  // again, never so it can compute an interval — that stays server-side, which
+  // is the whole point of centralising it.
+  double stability = 7;
+  double difficulty = 8;
+  string due = 9;  // RFC 3339
+  int32 reps = 10;
+  int32 lapses = 11;
+  bool suspended = 12;
+  string buried_until = 13;
+  bool leech = 14;
+}
+
+// A card with its entry, so drawing one needs no second call.
+message CardWithEntry {
+  Card card = 1;
+  LexicalEntry entry = 2;
+}
+
+// ------------------------------------------------------------------- answers
+
+enum AnswerMode {
+  ANSWER_MODE_UNSPECIFIED = 0;
+  ANSWER_MODE_CHOICE = 1;
+  ANSWER_MODE_TYPED = 2;
+  ANSWER_MODE_TONE = 3;
+  ANSWER_MODE_SELF = 4;
+}
+
+message AnswerOption {
+  string id = 1;
+  string label = 2;
+  string sublabel = 3;
+  bool correct = 4;
+}
+
+// How a card should be asked, and with what options.
+//
+// Generated server-side so no client carries its own distractor logic — three
+// implementations of "which wrong answers are plausible" would drill three
+// different exams.
+message Question {
+  CardWithEntry card = 1;
+  AnswerMode mode = 2;
+  repeated AnswerOption options = 3;
+  // The interval each rating would produce, already formatted ("4d", "2mo"),
+  // because showing it is how a learner calibrates Good against Easy.
+  map<int32, string> interval_previews = 4;
+}
+
+// --------------------------------------------------------------- the journey
+
+message JourneyStage {
+  int32 index = 1;
+  string native = 2;      // 立春, 初段, ㄱ, Tý
+  string romanised = 3;   // empty where `native` is already Latin
+  string meaning = 4;
+  int32 words_required = 5;
+}
+
+message Journey {
+  LanguageCode language_code = 1;
+  string tradition = 2;
+  JourneyStage stage = 3;
+  JourneyStage next = 4;
+  int32 stage_number = 5;
+  int32 total_stages = 6;
+  int32 words_known = 7;
+  int32 words_into_stage = 8;
+  int32 words_to_next = 9;
+  double progress = 10;
+}
+
+message DailyGoal {
+  int32 target = 1;
+  int32 done = 2;
+  int32 remaining = 3;
+  bool complete = 4;
+  double progress = 5;
+  int32 drills_left = 6;
+}
+
+// ------------------------------------------------------------------- profile
+
+message StudyProfile {
+  LanguageCode language_code = 1;
+  string exam_track_id = 2;
+  string target_level_id = 3;
+  string exam_date = 4;  // YYYY-MM-DD, empty for none
+  int32 daily_new_limit = 5;
+  int32 daily_review_limit = 6;
+  double desired_retention = 7;
+  int32 day_start_hour = 8;
+}
+
+message Coverage {
+  int32 entries_started = 1;
+  int32 entries_known = 2;
+  // Two denominators, kept apart on purpose: `available` is what the deck holds
+  // and progress against it can reach 100%; `syllabus_target` is what the exam
+  // asks for and is usually much larger.
+  int32 available = 3;
+  int32 syllabus_target = 4;
+  double fraction = 5;
+  double syllabus_fraction = 6;
+  int32 new_cards = 7;
+  int32 learning_cards = 8;
+  int32 review_cards = 9;
+  int32 leeches = 10;
+}
+
+message KindRetention {
+  CardKind kind = 1;
+  int32 reviews = 2;
+  double true_retention = 3;
+}
+
+message Stats {
+  int32 current_streak = 1;
+  int32 longest_streak = 2;
+  Coverage coverage = 3;
+  double true_retention = 4;
+  double predicted_retention = 5;
+  double average_seconds_per_card = 6;
+  repeated KindRetention retention_by_kind = 7;
+  repeated ForecastDay forecast = 8;
+}
+
+message ForecastDay {
+  string day = 1;  // YYYY-MM-DD
+  int32 due = 2;
+}
+
+message Readiness {
+  string level_id = 1;
+  string level_name = 2;
+  string exam_date = 3;
+  int32 days_to_exam = 4;
+  double score = 5;
+  double coverage = 6;
+  double syllabus_coverage = 7;
+  int32 syllabus_shortfall = 8;
+  double projected_recall = 9;
+  int32 words_remaining = 10;
+  bool pace_is_sufficient = 11;
+  string verdict = 12;
+  string headline = 13;
+}
+
+// ---------------------------------------------------------------------- auth
+
+message Account {
+  string id = 1;
+  string display_name = 2;
+  string email = 3;
+  string created_at = 4;
+}
+
+message Session {
+  Account account = 1;
+  string token = 2;
+  string refresh_token = 3;
+  string expires_at = 4;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string display_name = 3;
+}
+
+message SignInRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+message SignOutRequest {}
+message SignOutResponse {}
+
+// A response message per RPC, even though all three currently carry the same
+// session. Sharing one would mean a field added for sign-in also appears on
+// register and refresh, and could never be removed from either.
+message RegisterResponse {
+  Session session = 1;
+}
+
+message SignInResponse {
+  Session session = 1;
+}
+
+message RefreshResponse {
+  Session session = 1;
+}
+
+// --------------------------------------------------------------------- study
+
+message GetStateRequest {
+  LanguageCode language_code = 1;
+}
+
+// Everything a home screen needs, in one call.
+//
+// Deliberately one round trip: a client assembling a dashboard from six
+// requests shows six loading states and fails in six ways.
+message GetStateResponse {
+  LanguageCode language_code = 1;
+  StudyProfile profile = 2;
+  DailyGoal goal = 3;
+  Journey journey = 4;
+  Stats stats = 5;
+  Readiness readiness = 6;
+  int32 available_words = 7;
+  repeated LanguageCode studied_languages = 8;
+}
+
+message GetQueueRequest {
+  LanguageCode language_code = 1;
+  StudyMode mode = 2;
+  CardKind kind = 3;  // UNSPECIFIED for no filter
+  int32 limit = 4;
+}
+
+message GetQueueResponse {
+  repeated Question questions = 1;
+  int32 due = 2;
+  int32 fresh = 3;
+  int32 learning = 4;
+  int32 held_by_cap = 5;
+  string next_due_at = 6;
+}
+
+// One grading, with the instant it actually happened.
+//
+// `graded_at` is what makes offline study possible: a client records reviews
+// with no signal and replays them later, and the scheduler sees the real
+// timestamps rather than the moment the connection returned. Grading an hour of
+// cards at one instant would otherwise tell FSRS the learner waited an hour
+// between each.
+message Grade {
+  string card_id = 1;
+  Rating rating = 2;
+  string graded_at = 3;  // RFC 3339; the server's clock if empty
+  int32 duration_ms = 4;
+}
+
+message SubmitGradesRequest {
+  repeated Grade grades = 1;
+}
+
+message GradeFailure {
+  string card_id = 1;
+  string reason = 2;
+}
+
+message SubmitGradesResponse {
+  int32 applied = 1;
+  // Reported per card rather than failing the batch: one unknown id must not
+  // discard the other nineteen reviews a learner did on the train.
+  repeated GradeFailure failed = 2;
+  DailyGoal goal = 3;
+  Journey journey = 4;
+}
+
+enum DeckStatus {
+  DECK_STATUS_UNSPECIFIED = 0;
+  DECK_STATUS_NEW = 1;
+  DECK_STATUS_LEARNING = 2;
+  DECK_STATUS_REVIEW = 3;
+  DECK_STATUS_SUSPENDED = 4;
+}
+
+message DeckEntry {
+  LexicalEntry entry = 1;
+  repeated Card cards = 2;
+  DeckStatus status = 3;
+  int32 due_now = 4;
+  // Recall for the *weakest* of its cards, not the mean: a word whose meaning is
+  // solid and whose tones are gone is a word you will get wrong.
+  double weakest = 5;
+  string next_due_at = 6;
+  bool in_scope = 7;
+}
+
+message GetDeckRequest {
+  LanguageCode language_code = 1;
+  string query = 2;
+  DeckStatus status = 3;
+}
+
+message GetDeckResponse {
+  repeated DeckEntry entries = 1;
+}
+
+message StrugglingCard {
+  Card card = 1;
+  LexicalEntry entry = 2;
+  string reason = 3;      // leech | lapsing | failing
+  string description = 4; // one line a learner can act on
+  int32 lapses = 5;
+  double failure_rate = 6;
+}
+
+message GetStrugglingRequest {
+  LanguageCode language_code = 1;
+  int32 limit = 2;
+}
+
+message GetStrugglingResponse {
+  repeated StrugglingCard cards = 1;
+}
+
+message UpdateProfileRequest {
+  LanguageCode language_code = 1;
+  StudyProfile profile = 2;
+  // Only these fields are written, so a client can send a whole profile and
+  // change one thing without racing another device over the rest.
+  repeated string update_mask = 3;
+}
+
+message UpdateProfileResponse {
+  StudyProfile profile = 1;
+}
+
+message SetActiveLanguageRequest {
+  LanguageCode language_code = 1;
+}
+
+message SetActiveLanguageResponse {
+  LanguageCode language_code = 1;
+}
+
+message ImportIssue {
+  int32 row = 1;
+  string field = 2;
+  string message = 3;
+  bool is_error = 4;
+}
+
+// Parsing happens server-side so no Swift client needs a CSV reader — or its
+// own opinion about what a malformed row means.
+message ImportVocabularyRequest {
+  oneof source {
+    string text = 1;
+    EntryList entries = 2;
+  }
+  string format = 3;  // csv | json, for `text`
+  LanguageCode language_code = 4;
+  string default_level_id = 5;
+}
+
+message EntryList {
+  repeated LexicalEntry entries = 1;
+}
+
+message ImportVocabularyResponse {
+  int32 added = 1;
+  int32 replaced = 2;
+  int32 accepted = 3;
+  int32 rejected = 4;
+  // With their row numbers. "6 rows skipped" is not something anyone can fix;
+  // "row 41: unknown exam level hsk3-9" is.
+  repeated ImportIssue issues = 5;
+}
+
+message SetNoteRequest {
+  string entry_id = 1;
+  string note = 2;
+}
+
+message SetNoteResponse {
+  LexicalEntry entry = 1;
+}
+
+enum CardAction {
+  CARD_ACTION_UNSPECIFIED = 0;
+  CARD_ACTION_SUSPEND = 1;
+  CARD_ACTION_UNSUSPEND = 2;
+  CARD_ACTION_BURY = 3;
+  // Back to new. For the word forgotten eight times, whose schedule has learned
+  // it is hard and will therefore keep returning forever.
+  CARD_ACTION_RESET = 4;
+  CARD_ACTION_CLEAR_LEECH = 5;
+  CARD_ACTION_UNDO_LAST_GRADE = 6;
+}
+
+message CardActionRequest {
+  string card_id = 1;
+  CardAction action = 2;
+}
+
+message CardActionResponse {
+  bool ok = 1;
+  Card card = 2;
+}
+
+// ------------------------------------------------------------------ services
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc SignIn(SignInRequest) returns (SignInResponse);
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+  rpc SignOut(SignOutRequest) returns (SignOutResponse);
+}
+
+// Everything under here needs a bearer token in the `authorization` metadata.
+service StudyService {
+  rpc GetState(GetStateRequest) returns (GetStateResponse);
+  rpc GetQueue(GetQueueRequest) returns (GetQueueResponse);
+  rpc SubmitGrades(SubmitGradesRequest) returns (SubmitGradesResponse);
+  rpc GetDeck(GetDeckRequest) returns (GetDeckResponse);
+  rpc GetStruggling(GetStrugglingRequest) returns (GetStrugglingResponse);
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+  rpc SetActiveLanguage(SetActiveLanguageRequest) returns (SetActiveLanguageResponse);
+  rpc ImportVocabulary(ImportVocabularyRequest) returns (ImportVocabularyResponse);
+  rpc SetNote(SetNoteRequest) returns (SetNoteResponse);
+  rpc CardAction(CardActionRequest) returns (CardActionResponse);
+}

@@ -8,7 +8,7 @@ import {
   type IntervalPreview,
   type LanguageCode,
   type Rating,
-} from '@language-srs/core';
+} from '@mon/core';
 import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTheme } from '../theme';
 import { Press, Rise } from '../motion/components';
 import { Caption, Card, Pill, Row } from './ui';

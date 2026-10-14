@@ -2,7 +2,7 @@
  * The app-to-widget bridge.
  *
  * Everything the home-screen widgets know comes through here. The app writes a
- * fully-formatted snapshot (built by `@language-srs/core`) into a container both
+ * fully-formatted snapshot (built by `@mon/core`) into a container both
  * processes can see — an App Group on iOS, SharedPreferences on Android — and
  * then asks the system to re-render.
  *
@@ -15,7 +15,7 @@
  * `isSupported` is false. Callers do not branch on platform; the dashboard simply
  * hides its widget-preview affordances when support is absent.
  */
-import type { PendingWidgetGrade, WidgetSnapshot } from '@language-srs/core';
+import type { PendingWidgetGrade, WidgetSnapshot } from '@mon/core';
 import WidgetBridgeModule from './src/WidgetBridgeModule';
 
 export interface WidgetBridge {

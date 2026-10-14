@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, Text, TextInput, View } from 'react-native';
-import type { AnswerCheck, AnswerOption } from '@language-srs/core';
+import type { AnswerCheck, AnswerOption } from '@mon/core';
 import { Press, Rise } from '../motion/components';
 import { BigButton, Caption } from './ui';
 import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTheme } from '../theme';

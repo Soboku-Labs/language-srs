@@ -1,0 +1,15 @@
+# The contract, linted and checked for breaking changes.
+#
+# `buf breaking` against the main branch is what stops a field number being
+# reused or a type changing underneath a shipped iOS build — the failure mode
+# protobuf exists to prevent, and the one nobody notices until a client in the
+# wild starts decoding garbage.
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

@@ -1,8 +1,8 @@
 {
-  "name": "language-srs",
+  "name": "mon",
   "version": "0.1.0",
   "private": true,
-  "description": "Exam-aligned spaced repetition for Mandarin, Japanese, Korean and Vietnamese. One shared domain core; a native web app and native phone apps on top.",
+  "description": "Mon \u2014 exam-aligned spaced repetition for Mandarin, Japanese, Korean and Vietnamese. One shared domain core behind a backend; web and phone apps are interfaces.",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -11,20 +11,21 @@
     "node": ">=20"
   },
   "scripts": {
-    "core:build": "npm run build --workspace @language-srs/core",
-    "core:test": "npm run test --workspace @language-srs/core",
-    "test": "npm run test --workspace @language-srs/core && npm run test --workspace @language-srs/server",
-    "typecheck": "npm run typecheck --workspace @language-srs/core && npm run typecheck --workspace @language-srs/server && npm run typecheck --workspace @language-srs/web && npm run typecheck --workspace @language-srs/mobile",
-    "web": "npm run dev --workspace @language-srs/web",
-    "web:build": "npm run build --workspace @language-srs/web",
-    "web:pages": "npm run build:pages --workspace @language-srs/web",
-    "web:preview": "npm run preview --workspace @language-srs/web",
-    "ios": "npm run ios --workspace @language-srs/mobile",
-    "android": "npm run android --workspace @language-srs/mobile",
-    "prebuild": "npm run prebuild --workspace @language-srs/mobile",
-    "mobile:start": "npm run start --workspace @language-srs/mobile",
-    "server": "npm run dev --workspace @language-srs/server",
-    "server:test": "npm run test --workspace @language-srs/server"
+    "core:build": "npm run build --workspace @mon/core",
+    "core:test": "npm run test --workspace @mon/core",
+    "test": "npm run test --workspace @mon/core && npm run test --workspace @mon/server",
+    "typecheck": "npm run typecheck --workspace @mon/core && npm run typecheck --workspace @mon/server && npm run typecheck --workspace @mon/web && npm run typecheck --workspace @mon/mobile",
+    "web": "npm run dev --workspace @mon/web",
+    "web:build": "npm run icons && npm run build --workspace @mon/web",
+    "web:pages": "npm run icons && npm run build:pages --workspace @mon/web",
+    "web:preview": "npm run preview --workspace @mon/web",
+    "ios": "npm run ios --workspace @mon/mobile",
+    "android": "npm run android --workspace @mon/mobile",
+    "prebuild": "npm run icons && npm run prebuild --workspace @mon/mobile",
+    "mobile:start": "npm run start --workspace @mon/mobile",
+    "server": "npm run dev --workspace @mon/server",
+    "server:test": "npm run test --workspace @mon/server",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "devDependencies": {
     "typescript": "~5.9.2"

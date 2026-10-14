@@ -144,7 +144,7 @@ function widgetInfoPlist(options: Resolved): string {
 <plist version="1.0">
 <dict>
   <key>CFBundleDisplayName</key>
-  <string>Language SRS</string>
+  <string>Mon</string>
   <key>CFBundleName</key>
   <string>${options.widgetName}</string>
   <key>CFBundleIdentifier</key>
@@ -202,7 +202,7 @@ const withIosWidgetTarget: ConfigPlugin<Resolved> = (config, options) =>
     // Idempotent: prebuild may run the mod more than once.
     if (project.pbxTargetByName(widgetName)) return modConfig;
 
-    const bundleId = `${config.ios?.bundleIdentifier ?? 'com.languagesrs.app'}.${widgetName}`;
+    const bundleId = `${config.ios?.bundleIdentifier ?? 'com.subokulabs.mon'}.${widgetName}`;
 
     const target = project.addTarget(widgetName, 'app_extension', widgetName, bundleId);
 
@@ -351,12 +351,12 @@ const withAndroidWidgetManifest: ConfigPlugin<Resolved> = (config, options) =>
     const receivers: { name: string; label: string; info: string }[] = [
       {
         name: '.widget.ReviewWidgetProvider',
-        label: 'Language SRS Review',
+        label: 'Mon Review',
         info: '@xml/review_widget_info',
       },
       {
         name: '.widget.SpotlightWidgetProvider',
-        label: 'Language SRS Word',
+        label: 'Mon Word',
         info: '@xml/spotlight_widget_info',
       },
     ];

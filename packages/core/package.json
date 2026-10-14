@@ -1,8 +1,8 @@
 {
-  "name": "@language-srs/core",
+  "name": "@mon/core",
   "version": "0.1.0",
   "private": true,
-  "description": "Platform-agnostic domain logic for language-srs: exam curricula, FSRS scheduling, session queues, stats and the widget payload contract.",
+  "description": "Platform-agnostic domain logic for Mon: exam curricula, FSRS scheduling, session queues, stats and the widget payload contract.",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

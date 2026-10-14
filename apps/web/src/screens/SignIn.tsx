@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AuthError, type AuthErrorCode } from '@language-srs/core';
+import { AuthError, type AuthErrorCode } from '@mon/core';
 import { useAuth } from '../providers';
 import { useRouter } from '../router';
 import { BigButton, Caption, Rise, Screen, Section, TextButton, Title } from '../ui';
@@ -63,7 +63,7 @@ export function SignIn() {
     <Screen>
       <Rise index={0}>
         <div className="stack--tight stack">
-          <Title>Language SRS</Title>
+          <Title>Mon</Title>
           <Caption>
             An account carries your progress between your phone and the web. It is not required.
           </Caption>

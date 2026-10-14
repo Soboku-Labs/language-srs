@@ -8,8 +8,8 @@ import {
   getLanguageProfile,
   kindLabel,
   type KindRetention,
-} from '@language-srs/core';
-import { getLadder } from '@language-srs/core';
+} from '@mon/core';
+import { getLadder } from '@mon/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { Ladder, RankBand } from '../src/components/Journey';
 import {

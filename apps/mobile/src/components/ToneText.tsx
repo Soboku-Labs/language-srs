@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, View } from 'react-native';
-import type { LanguageCode } from '@language-srs/core';
+import type { LanguageCode } from '@mon/core';
 import { useTheme, useThemedStyles, weight, type ResolvedTheme } from '../theme';
 
 /**

@@ -6,7 +6,7 @@ import {
   getLanguageProfile,
   suggestDailyNewLimit,
   toDateOnly,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useAuth, useEngine } from '../providers';
 import { useRouter } from '../router';
 import { Caption, Choice, DetailRow, Rise, Row, Screen, Section, TextButton } from '../ui';

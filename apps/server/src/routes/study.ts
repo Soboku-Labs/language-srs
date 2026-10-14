@@ -8,7 +8,7 @@ import {
   type LanguageCode,
   type Rating,
   type StudyMode,
-} from '@language-srs/core';
+} from '@mon/core';
 import { HttpError, type Handler, type RequestContext } from '../app.ts';
 
 /**

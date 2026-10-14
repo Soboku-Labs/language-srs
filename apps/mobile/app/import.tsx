@@ -11,7 +11,7 @@ import {
   type ImportIssue,
   type ImportResult,
   type LanguageCode,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { BigButton, Caption, Row, Screen, Section, TextButton } from '../src/components/ui';
 import { Press, Rise } from '../src/motion/components';

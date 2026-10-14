@@ -10,7 +10,7 @@ import {
   type ImportIssue,
   type ImportResult,
   type LanguageCode,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
 import { BigButton, Caption, Choice, Rise, Row, Screen, Section, TextButton } from '../ui';

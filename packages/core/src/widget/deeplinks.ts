@@ -12,7 +12,7 @@ import type { Rating } from '../types/review';
  * The path structure deliberately matches the Expo Router routes, so the same
  * path works as a custom-scheme link on device and as a plain URL on web.
  */
-export const APP_SCHEME = 'languagesrs';
+export const APP_SCHEME = 'mon';
 
 export interface DeepLinkOptions {
   /** Emit a web path instead of a custom-scheme URL. */

@@ -1,5 +1,5 @@
 {
-  "name": "@language-srs/mobile",
+  "name": "@mon/mobile",
   "version": "0.1.0",
   "private": true,
   "description": "The language-srs app: one Expo codebase targeting iOS, Android and the web, plus the native home-screen widgets.",
@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.8",
-    "@language-srs/core": "*",
+    "@mon/core": "*",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "expo": "~57.0.1",
     "expo-constants": "~57.0.8",
@@ -44,7 +44,7 @@
   "expo": {
     "install": {
       "exclude": [
-        "@language-srs/core"
+        "@mon/core"
       ]
     }
   }

@@ -16,4 +16,4 @@ const app = createApp({
 
 const port = Number(process.env.PORT ?? 8787);
 app.listen(port);
-console.log(`language-srs server on :${port}, data in ${process.env.DATA_DIR ?? './data'}`);
+console.log(`mon server on :${port}, data in ${process.env.DATA_DIR ?? './data'}`);

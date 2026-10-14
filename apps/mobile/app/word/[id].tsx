@@ -9,7 +9,7 @@ import {
   kindLabel,
   type Card,
   type DeckEntry,
-} from '@language-srs/core';
+} from '@mon/core';
 import { useEngine } from '../../src/engine/EngineProvider';
 import { speakEntry } from '../../src/components/ReviewCard';
 import { BigButton, Caption, Row, Screen, Section, TextButton, Title } from '../../src/components/ui';

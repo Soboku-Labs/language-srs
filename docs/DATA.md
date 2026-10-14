@@ -73,7 +73,7 @@ id,target,reading,meanings,levelIds,partOfSpeech,tones,components,examples,tags,
   without editing.
 
 ```ts
-import { parseVocabularyCsv } from '@language-srs/core';
+import { parseVocabularyCsv } from '@mon/core';
 
 const result = parseVocabularyCsv(csvText, {
   languageCode: 'ja',

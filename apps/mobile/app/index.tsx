@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { findExamLevel, getLanguageProfile, kindLabel, type CardKind } from '@language-srs/core';
+import { findExamLevel, getLanguageProfile, kindLabel, type CardKind } from '@mon/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { BigButton, Caption, Row, Screen, Stat, TextButton, Title } from '../src/components/ui';
 import { DayProgress, RankBand } from '../src/components/Journey';

@@ -4,17 +4,27 @@ import { useRouter } from 'expo-router';
 import { findExamLevel, getLanguageProfile, kindLabel, type CardKind } from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
 import { BigButton, Caption, Row, Screen, Stat, TextButton, Title } from '../src/components/ui';
+import { DayProgress, RankBand } from '../src/components/Journey';
 import { CountUp, Press, Rise } from '../src/motion/components';
 import { spacing, typography, useTheme, useThemedStyles, weight, type ResolvedTheme } from '../src/theme';
 
 /**
  * The dashboard.
  *
- * One question, answered immediately: is there anything to study, and how much.
+ * Two loops and one action.
  *
- * The session mix used to be shown here as a stacked colour bar with a legend. It
- * was the last decorative use of colour in the app, and it was restating something
- * a short line of text says better — so the bar went and the sentence stayed.
+ * The **day** is the hero: how much of today's work is left, as a count and a row
+ * of segments that fills. It ends. When it is clear the screen says so and stops
+ * asking, which is the whole difference between a daily goal and a treadmill.
+ *
+ * The **journey** sits under the action: the learner's rank on their language's
+ * own ladder, earned by words that have actually stuck. It moves on the scale of
+ * weeks, so it is quiet — but it is the reason to come back after the day is
+ * done, and it is the only ornament on the screen.
+ *
+ * What is deliberately absent: points, gems, tiers with no unit, anything that
+ * rises because the app was opened. Every number here is one the learner could
+ * check for themselves on another screen.
  */
 export default function Dashboard() {
   const { engine, revision } = useEngine();
@@ -31,6 +41,8 @@ export default function Dashboard() {
       queue: engine.getQueue(),
       stats: engine.getStats(),
       readiness: engine.getReadiness(),
+      journey: engine.getJourney(),
+      goal: engine.getDailyGoal(),
       // Counted from a learn-mode queue rather than from the mixed one: the
       // dashboard queue interleaves new cards with reviews under a combined
       // limit, so its `fresh` count is what today's session happens to include,
@@ -40,7 +52,7 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, revision]);
 
-  const { profile, language, level, queue, stats, readiness, freshRemaining } = view;
+  const { profile, language, level, queue, stats, readiness, freshRemaining, journey, goal } = view;
   const waiting = queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning;
 
   return (
@@ -60,30 +72,49 @@ export default function Dashboard() {
       </Rise>
 
       <Rise index={1} style={styles.hero}>
-        {waiting > 0 ? (
+        {goal.complete ? (
           <>
-            <CountUp value={waiting} style={styles.count} />
-            <Text style={styles.countLabel}>{waiting === 1 ? 'card waiting' : 'cards waiting'}</Text>
+            {/*
+              The close. A tick rather than a zero, because "0 cards waiting" is
+              an absence and this is an achievement — and nothing underneath it
+              proposes more work.
+            */}
+            <Text style={[styles.count, { color: theme.colors.good }]}>✓</Text>
+            <Text style={styles.countLabel}>
+              {goal.target > 0 ? 'Done for today' : 'Nothing due today'}
+            </Text>
+            <Caption>
+              {goal.drillsLeft > 0
+                ? `${goal.drillsLeft} drill${goal.drillsLeft === 1 ? '' : 's'} still on short steps`
+                : queue.nextDueAt
+                  ? `Next lands ${formatRelative(queue.nextDueAt)}`
+                  : 'Raise your daily new-card limit to keep going'}
+            </Caption>
           </>
         ) : (
           <>
-            <Text style={styles.count}>—</Text>
-            <Text style={styles.countLabel}>All caught up</Text>
-            <Caption>
-              {queue.nextDueAt
-                ? `More lands ${formatRelative(queue.nextDueAt)}`
-                : 'Raise your daily new-card limit to keep going'}
-            </Caption>
+            <CountUp value={goal.remaining} style={styles.count} />
+            <Text style={styles.countLabel}>
+              {goal.done > 0 ? `left of ${goal.target} today` : goal.remaining === 1 ? 'card today' : 'cards today'}
+            </Text>
           </>
         )}
+        <View style={styles.segmentsBox}>
+          <DayProgress goal={goal} />
+        </View>
       </Rise>
 
       <Rise index={2}>
         <BigButton
-          label={waiting > 0 ? 'Study' : 'Study ahead'}
+          label={goal.complete ? 'Study ahead' : goal.done > 0 ? 'Keep going' : 'Study'}
           {...(waiting > 0 ? { hint: describeMix(queue.kindMix) } : {})}
-          onPress={() => router.push(waiting > 0 ? '/review' : '/review?mode=cram')}
+          onPress={() => router.push(goal.complete ? '/review?mode=cram' : '/review')}
         />
+      </Rise>
+
+      {/* The long loop. Tapping it opens the whole ladder on the progress screen. */}
+      <Rise index={3}>
+        <RankBand journey={journey} onPress={() => router.push('/stats')} />
       </Rise>
 
       {/*
@@ -93,7 +124,7 @@ export default function Dashboard() {
         would turn a dashboard into a menu, and put a decision in front of the
         learner before they had done anything.
       */}
-      <Rise index={3}>
+      <Rise index={4}>
         <Row style={styles.modes}>
           <ModeLink
             label="Learn new"
@@ -114,17 +145,18 @@ export default function Dashboard() {
         </Row>
       </Rise>
 
-      <Rise index={4}>
+      <Rise index={5}>
         <Row style={styles.stats}>
           <Stat
             label="day streak"
             value={String(stats.streak.current)}
             color={stats.streak.current > 0 ? theme.colors.ink : theme.colors.inkMuted}
           />
-          <Stat
-            label={`of ${stats.coverage.available} words`}
-            value={String(stats.coverage.entriesKnown)}
-          />
+          {/*
+            "Words known" used to sit here too. The rank band above now states it
+            in the sentence that explains the rank, and the same number twice on
+            one screen is the kind of restatement this design keeps removing.
+          */}
           {/*
             Two different questions, and the label has to say which one is being
             answered. Without an exam date this is progress through the deck,
@@ -140,7 +172,7 @@ export default function Dashboard() {
         </Row>
       </Rise>
 
-      <Rise index={5}>
+      <Rise index={6}>
         <Row style={styles.links}>
           <TextButton label="Progress" onPress={() => router.push('/stats')} />
           <TextButton label="Settings" onPress={() => router.push('/settings')} color={theme.colors.inkMuted} />
@@ -217,7 +249,8 @@ const createStyles = (theme: ResolvedTheme) => ({
   headerText: { flex: 1, gap: 2 },
   chevron: { color: theme.colors.inkFaint, fontSize: 26 },
 
-  hero: { alignItems: 'center' as const, gap: spacing.xs, paddingVertical: spacing.xxl },
+  hero: { alignItems: 'center' as const, gap: spacing.xs, paddingVertical: spacing.xl },
+  segmentsBox: { alignSelf: 'stretch' as const, paddingTop: spacing.lg },
   count: {
     color: theme.colors.ink,
     fontSize: typography.display,

@@ -76,6 +76,41 @@ not have been added.
 Every motion honours the system reduce-motion setting and resolves instantly to its
 end state. Nothing is hidden behind a transition that never plays.
 
+## Progress, and why it is not points
+
+Two loops, and nothing else.
+
+**The day** ends. The target is the work that was actually waiting when the day
+started — everything due, plus the new words the daily limit allows — so clearing
+it means something, and once it is clear the screen says so and proposes nothing
+further. A goal that grows as you approach it is a treadmill wearing a goal's
+clothes.
+
+**The journey** is a rank on a ladder drawn from the culture of the language
+being learned: the twenty-four solar terms for Mandarin, kyū and dan for
+Japanese, the Hangul consonants in dictionary order for Korean, the twelve
+zodiac animals for Vietnamese. It advances on **words known** — words whose every
+card is in review at a week's stability or better.
+
+That denominator is the whole argument. Every mainstream app in this category
+rewards *activity*: experience points for minutes, streaks for opening the app,
+leagues for grinding. The number then rises whether or not anything was learned,
+and people optimise the number, because the number is what was asked of them.
+This app already measures memory, so the rank is taken from memory directly.
+Study badly and it does not move, however long you were here.
+
+Consequences that follow, and are not negotiable:
+
+- **The rank never drops.** Stability does not decay when you stop — recall
+  does — and the app already shows you your recall. A ladder that demotes you
+  for missing a fortnight is a retention mechanic dressed as an achievement.
+- **Every stage ahead is listed with its exact price in words.** A system that
+  hides what it wants from you is a slot machine; this one is a syllabus.
+- **The celebration fires only on a real crossing**, and names the threshold it
+  crossed. A reward that arrives every session is a sound effect.
+- **No second currency.** No points, gems, hearts, or tiers without a unit.
+  Every number on the dashboard is one the learner can verify on another screen.
+
 ## Palette
 
 Shared, in both modes: canvas, surface, surface-raised, line, ink, ink-muted,

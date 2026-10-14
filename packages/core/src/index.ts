@@ -114,6 +114,14 @@ export type {
   StudyQueue,
 } from './session/queue';
 
+// Journey — the cultural rank ladder, earned by retention rather than activity
+export { JOURNEYS, getJourney, getLadder, stageEarned } from './journey';
+export type { Journey, JourneyLadder, JourneyStage } from './journey';
+
+// The day's goal
+export { getDailyGoal } from './session/goal';
+export type { DailyGoal } from './session/goal';
+
 // Triage — the words that are fighting the learner
 export { describeStruggle, findStrugglingCards } from './triage';
 export type { FindStrugglingOptions, StruggleReason, StrugglingCard } from './triage';

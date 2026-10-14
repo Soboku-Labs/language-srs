@@ -2,6 +2,8 @@ import { createCard, generateCards } from './cards/factory';
 import { findExamTrack, getExamTrack, getLevelIdsInScope } from './exams';
 import { summariseDeck, type DeckEntry } from './deck';
 import { findStrugglingCards, type StrugglingCard } from './triage';
+import { getJourney, type Journey } from './journey';
+import { getDailyGoal, type DailyGoal } from './session/goal';
 import { buildStudyQueue, countTodaysWork, type StudyMode, type StudyQueue } from './session/queue';
 import { DEFAULT_SCHEDULER_CONFIG, resolveSchedulerConfig, type SchedulerConfig } from './srs/params';
 import { gradeCard } from './srs/scheduler';
@@ -607,6 +609,25 @@ export class StudyEngine {
       forecast: forecastReviews(cards, now, 14, profile.dayStartHour),
       today: countTodaysWork(this.logs, now, profile.dayStartHour),
     };
+  }
+
+  /**
+   * Where the learner stands on their language's ladder.
+   *
+   * Derived from words known — every card in review at a week's stability or
+   * better — so it moves when memory sticks and not when time is spent.
+   */
+  getJourney(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): Journey {
+    return getJourney(code, this.getStats(code, now).coverage.entriesKnown);
+  }
+
+  /** What today asked for, and how much of it is left. */
+  getDailyGoal(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): DailyGoal {
+    const profile = this.getProfile(code);
+    return getDailyGoal({
+      breakdown: this.getQueue({ code, now }).breakdown,
+      done: countTodaysWork(this.logs, now, profile.dayStartHour),
+    });
   }
 
   getReadiness(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): ExamReadiness {

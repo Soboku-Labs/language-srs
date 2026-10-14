@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   CARD_KINDS,
   STUDY_MODES,
+  stageEarned,
   buildChoiceOptions,
   buildToneOptions,
   checkTypedAnswer,
@@ -110,6 +111,13 @@ export default function ReviewScreen() {
    */
   const history = useRef<{ rating: Rating; missedEntryId?: string }[]>([]);
   const missedIds = useRef(new Set<string>());
+  /**
+   * Words known when this session opened.
+   *
+   * Captured once so the end screen can say whether the sitting actually earned
+   * a stage. Comparing against a live reading would always find them equal.
+   */
+  const knownAtStart = useRef(engine.getStats().coverage.entriesKnown);
 
   /**
    * The session mode, from the link that opened this screen.
@@ -369,11 +377,16 @@ export default function ReviewScreen() {
 
   if (!current || !previews) {
     const accuracy = session.reviewed > 0 ? Math.round((session.recalled / session.reviewed) * 100) : 0;
+    const earned = stageEarned(
+      engine.activeLanguage,
+      knownAtStart.current,
+      engine.getStats().coverage.entriesKnown,
+    );
 
     return (
       <Screen>
         <PopIn style={styles.done} config={springBouncy}>
-          <Title>{session.reviewed > 0 ? 'Done 🎉' : 'Nothing waiting'}</Title>
+          <Title>{session.reviewed > 0 ? 'Done' : 'Nothing waiting'}</Title>
           <Caption>
             {session.reviewed > 0
               ? `${session.reviewed} card${session.reviewed === 1 ? '' : 's'}, ${accuracy}% recalled.`
@@ -381,8 +394,26 @@ export default function ReviewScreen() {
           </Caption>
         </PopIn>
 
-        {missed.length > 0 ? (
+        {/*
+          The one celebration in the app, and it fires only when a stage was
+          genuinely crossed — which takes words sticking, not cards answered. A
+          session that earns nothing says nothing, because a reward that arrives
+          every time is not a reward, it is a sound effect.
+        */}
+        {earned ? (
           <Rise index={1}>
+            <View style={styles.earned}>
+              <Text style={styles.earnedGlyph}>{earned.native}</Text>
+              <Text style={styles.earnedName}>{earned.romanised ?? earned.native}</Text>
+              <Caption>
+                {earned.meaning} · reached {earned.wordsRequired} words known
+              </Caption>
+            </View>
+          </Rise>
+        ) : null}
+
+        {missed.length > 0 ? (
+          <Rise index={2}>
             <View style={styles.missed}>
               <Text style={styles.missedTitle}>To come back to</Text>
               {missed.map((entry) => (
@@ -397,7 +428,7 @@ export default function ReviewScreen() {
           </Rise>
         ) : null}
 
-        <Rise index={2}>
+        <Rise index={3}>
           <BigButton label="Back home" onPress={() => router.replace('/')} />
         </Rise>
 
@@ -406,7 +437,7 @@ export default function ReviewScreen() {
           worth solving, so the way to solve it belongs here rather than three
           taps away in settings.
         */}
-        <Rise index={3}>
+        <Rise index={4}>
           <Row style={styles.doneLinks}>
             <TextButton label="Add more words" onPress={() => router.push('/import')} />
           </Row>
@@ -515,6 +546,9 @@ export default function ReviewScreen() {
 const createStyles = (theme: ResolvedTheme) => ({
   done: { gap: spacing.sm, paddingVertical: spacing.xxl, alignItems: 'center' as const },
   doneLinks: { justifyContent: 'center' as const },
+  earned: { alignItems: 'center' as const, gap: spacing.xs, paddingBottom: spacing.lg },
+  earnedGlyph: { color: theme.colors.accent, fontSize: 44, fontWeight: weight.medium },
+  earnedName: { color: theme.colors.ink, fontSize: typography.heading, fontWeight: weight.medium },
   missed: { gap: spacing.sm },
   missedTitle: {
     color: theme.colors.inkMuted,

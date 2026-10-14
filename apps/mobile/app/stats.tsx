@@ -9,7 +9,9 @@ import {
   kindLabel,
   type KindRetention,
 } from '@language-srs/core';
+import { getLadder } from '@language-srs/core';
 import { useEngine } from '../src/engine/EngineProvider';
+import { Ladder, RankBand } from '../src/components/Journey';
 import {
   Caption,
   DetailRow,
@@ -47,11 +49,12 @@ export default function StatsScreen() {
       stats: engine.getStats(),
       readiness: engine.getReadiness(),
       struggling: engine.getStrugglingCards(),
+      journey: engine.getJourney(),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, revision]);
 
-  const { profile, level, stats, readiness, struggling } = view;
+  const { profile, level, stats, readiness, struggling, journey } = view;
   const weakest = stats.retentionByKind[0];
 
   /**
@@ -93,6 +96,19 @@ export default function StatsScreen() {
       </Rise>
 
       <Rise index={1}>
+        <Section title="Your journey">
+          <RankBand journey={journey} />
+          <Caption>{journey.tradition}.</Caption>
+          {/*
+            The stages ahead are listed with their price in words rather than
+            hidden behind a lock. An achievement system that conceals what it
+            wants from you is a slot machine; this one is a syllabus.
+          */}
+          <Ladder journey={journey} stages={getLadder(profile.languageCode).stages} />
+        </Section>
+      </Rise>
+
+      <Rise index={2}>
         <Row style={styles.stats}>
         <Stat label="known" value={String(stats.coverage.entriesKnown)} />
         <Stat label="learning" value={String(stats.coverage.learningCards)} color={theme.colors.hard} />
@@ -101,7 +117,7 @@ export default function StatsScreen() {
         </Row>
       </Rise>
 
-      <Rise index={2}>
+      <Rise index={3}>
       <Section title="Next two weeks">
         {/* An all-zero chart renders as a row of stubs that look like data. Until
             something is actually scheduled, say so instead of drawing it. */}
@@ -140,7 +156,7 @@ export default function StatsScreen() {
       </Section>
       </Rise>
 
-      <Rise index={3}>
+      <Rise index={4}>
       <Section title="How it is going">
         {stats.retention.reviews === 0 ? (
           <Caption>No graduated reviews yet — these appear once cards start coming back.</Caption>
@@ -163,7 +179,7 @@ export default function StatsScreen() {
         told the learner: that their reading is fine and their listening is not.
       */}
       {stats.retentionByKind.length > 1 ? (
-        <Rise index={4}>
+        <Rise index={5}>
           <Section title="By skill">
             {stats.retentionByKind.map((row) => (
               <View key={row.kind} style={styles.skillRow}>
@@ -203,7 +219,7 @@ export default function StatsScreen() {
         so the number now comes with the way to deal with them.
       */}
       {strugglingWords.length > 0 ? (
-        <Rise index={5}>
+        <Rise index={6}>
           <Section title="Fighting you">
             {strugglingWords.slice(0, 6).map((row) => (
               <Press
@@ -231,7 +247,7 @@ export default function StatsScreen() {
       ) : null}
 
       {level ? (
-        <Rise index={4}>
+        <Rise index={7}>
         <Section title={`What ${level.shortName} tests`}>
           <Row style={styles.wrap}>
             {getExaminedSkills(level).map((skill) => (

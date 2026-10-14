@@ -2,7 +2,7 @@
   "name": "mon",
   "version": "0.1.0",
   "private": true,
-  "description": "Mon \u2014 exam-aligned spaced repetition for Mandarin, Japanese, Korean and Vietnamese. One shared domain core behind a backend; web and phone apps are interfaces.",
+  "description": "Mon — exam-aligned spaced repetition for Mandarin, Japanese, Korean and Vietnamese. One shared domain core behind a backend; web and phone apps are interfaces.",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -25,9 +25,14 @@
     "mobile:start": "npm run start --workspace @mon/mobile",
     "server": "npm run dev --workspace @mon/server",
     "server:test": "npm run test --workspace @mon/server",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "proto:lint": "buf lint",
+    "proto:breaking": "buf breaking --against '.git#branch=main'",
+    "proto:generate": "buf generate"
   },
   "devDependencies": {
+    "@bufbuild/buf": "^1.73.0",
+    "@bufbuild/protoc-gen-es": "^2.16.0",
     "typescript": "~5.9.2"
   }
 }

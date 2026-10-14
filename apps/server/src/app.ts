@@ -1,7 +1,15 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { IncomingMessage, createServer, type ServerResponse } from 'node:http';
+import {
+  createServer as createHttp2Server,
+  type Http2ServerRequest,
+  type Http2ServerResponse,
+} from 'node:http2';
 import { join } from 'node:path';
+import { cors } from '@connectrpc/connect';
+import { connectNodeAdapter } from '@connectrpc/connect-node';
 import { SEED_ENTRIES, StudyEngine, type Account } from '@mon/core';
 import { Accounts, AuthError } from './accounts.ts';
+import { connectRoutes } from './connect/index.ts';
 import { FileStore } from './store.ts';
 import { authRoutes } from './routes/auth.ts';
 import { studyRoutes } from './routes/study.ts';
@@ -14,19 +22,46 @@ import { studyRoutes } from './routes/study.ts';
  * again into Kotlin is three chances for a learner's phone and laptop to
  * disagree about when a word is due, and the disagreement would be silent.
  *
- * Built on `node:http` with no framework. The surface is a dozen routes with
- * JSON in and JSON out; a router dependency would be more code to audit than
- * the forty lines below.
+ * ## Two surfaces, one implementation
+ *
+ * The front door is **Connect**, serving `proto/mon/v1/mon.proto`. It speaks
+ * gRPC, gRPC-Web and HTTP/JSON from this one process, so the phones get binary
+ * gRPC over HTTP/2 and the browser calls it directly with no Envoy sidecar to
+ * deploy and monitor. That is the whole reason Connect was chosen over raw gRPC:
+ * a browser cannot speak gRPC, because HTTP/2 trailers are not exposed to
+ * JavaScript.
+ *
+ * The hand-rolled JSON routes under `/auth` and `/study` are still served, as
+ * Connect's fallback. They are what `HttpAuthProvider` in the core was written
+ * against, and removing them would break the only client that exists today for
+ * the sake of tidiness. Both surfaces call the same `Accounts` and the same
+ * per-account `StudyEngine` — there is no second implementation of anything,
+ * only a second doorway.
+ *
+ * Built on `node:http` with no framework. A router dependency would be more
+ * code to audit than the dispatch below.
  *
  * ## Offline
  *
  * Centralising the scheduler puts it behind a network, and an SRS that stops
  * working on the Underground is a worse product. The design answer is that
- * `POST /study/grades` takes a *batch* of gradings, each carrying the instant it
+ * `SubmitGrades` takes a *batch* of gradings, each carrying the instant it
  * happened — so a client can record reviews offline and replay them later, and
  * the scheduler sees the real timestamps rather than the moment the signal came
  * back. The engine already works this way for home-screen widget taps.
  */
+
+/**
+ * Either protocol's request and response.
+ *
+ * One listener serves HTTP/1.1 and cleartext HTTP/2, so the request objects
+ * arrive as whichever pair the connection produced. They are interchangeable for
+ * everything done here — method, url, headers, a status and a body — and differ
+ * only in the overload *shapes* TypeScript sees, which is why the response is
+ * narrowed once per function rather than threaded through as a union.
+ */
+type NodeRequest = IncomingMessage | Http2ServerRequest;
+type NodeResponse = ServerResponse | Http2ServerResponse;
 
 export interface ServerOptions {
   /** Where accounts, tokens and per-account decks are written. */
@@ -85,21 +120,7 @@ export function createApp(options: ServerOptions) {
   const study = studyRoutes();
   const auth = authRoutes(accounts);
 
-  async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
-    const origin = request.headers.origin;
-    const allowed = options.allowedOrigins ?? ['*'];
-    if (origin && (allowed.includes('*') || allowed.includes(origin))) {
-      response.setHeader('Access-Control-Allow-Origin', origin);
-      response.setHeader('Vary', 'Origin');
-    }
-    response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
-
-    if (request.method === 'OPTIONS') {
-      response.writeHead(204).end();
-      return;
-    }
-
+  async function handleJson(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
     const route = `${request.method} ${url.pathname}`;
 
@@ -132,11 +153,116 @@ export function createApp(options: ServerOptions) {
     }
   }
 
+  /**
+   * Connect in front, the JSON routes behind it.
+   *
+   * The adapter claims only the paths its services actually own
+   * (`/mon.v1.AuthService/SignIn` and the rest) and hands everything else to
+   * `fallback`, so `/health` and the existing routes are untouched. Dispatching
+   * this way rather than by sniffing the path means the list of RPC paths comes
+   * from the generated code, and cannot drift from the proto.
+   */
+  const connect = connectNodeAdapter({
+    routes: connectRoutes({ accounts, engineFor }),
+    fallback: (request, response) => {
+      /*
+       * `listen()` builds an HTTP/1.1 server, so the fallback always receives
+       * the `node:http` pair. The adapter's signature is wider because the same
+       * adapter can be mounted on an `http2` server, where these routes have
+       * never run — so the request is *checked* rather than asserted, and an
+       * HTTP/2 caller is told the JSON surface does not speak it instead of
+       * failing somewhere inside `writeHead` with nothing to debug.
+       *
+       * The response needs one cast either way: the adapter types it as a union
+       * of two `Omit<..., 'write'>`s, whose overloads TypeScript cannot resolve
+       * against each other. `writeHead` and `end` behave the same on both.
+       */
+      const reply = response as unknown as ServerResponse;
+      if (!(request instanceof IncomingMessage)) {
+        reply.writeHead(505, { 'Content-Length': 0 }).end();
+        return;
+      }
+      void handleJson(request, reply);
+    },
+  });
+
+  async function handle(request: NodeRequest, response: NodeResponse): Promise<void> {
+    // See `NodeResponse`: the two protocols' response objects differ only in
+    // overload shape, and every header call below exists on both.
+    const reply = response as unknown as ServerResponse;
+    const origin = request.headers.origin;
+    const allowed = options.allowedOrigins ?? ['*'];
+    if (origin && (allowed.includes('*') || allowed.includes(origin))) {
+      reply.setHeader('Access-Control-Allow-Origin', origin);
+      reply.setHeader('Vary', 'Origin');
+    }
+
+    /*
+     * Connect's own header lists, plus Authorization.
+     *
+     * Hard-coding these was the first attempt and it silently broke the browser
+     * client: a Connect request carries `Connect-Protocol-Version`, and a
+     * preflight that does not allow it fails before the RPC is ever sent. The
+     * library publishes the set it needs, so it is taken from there and will
+     * follow the protocol if it gains a header.
+     */
+    reply.setHeader(
+      'Access-Control-Allow-Headers',
+      [...cors.allowedHeaders, 'Authorization'].join(', '),
+    );
+    reply.setHeader(
+      'Access-Control-Allow-Methods',
+      [...new Set([...cors.allowedMethods, 'PATCH', 'OPTIONS'])].join(', '),
+    );
+    reply.setHeader('Access-Control-Expose-Headers', cors.exposedHeaders.join(', '));
+    // Without this a browser re-preflights every RPC, which doubles the request
+    // count for a client that makes one call per screen.
+    reply.setHeader('Access-Control-Max-Age', '7200');
+
+    if (request.method === 'OPTIONS') {
+      reply.writeHead(204, { 'Content-Length': 0 }).end();
+      return;
+    }
+
+    connect(request, response);
+  }
+
   return {
     handle,
     accounts,
+    /**
+     * The main listener: HTTP/1.1.
+     *
+     * Serves the Connect protocol (binary protobuf or JSON), gRPC-Web, and the
+     * JSON routes. That covers every client this product has or plans: the
+     * browser, and `connect-swift` / `connect-kotlin`, which speak the Connect
+     * protocol with protobuf bodies over ordinary HTTP — so the phones get
+     * binary payloads without needing HTTP/2 at all.
+     */
     listen(port = options.port ?? 8787) {
       const server = createServer((request, response) => void handle(request, response));
+      server.listen(port);
+      return server;
+    },
+
+    /**
+     * A second listener, for real gRPC.
+     *
+     * gRPC needs HTTP/2, because it carries its status in trailers — and node
+     * cannot serve cleartext HTTP/2 and HTTP/1.1 on one port. `allowHTTP1` works
+     * only on a TLS listener, where ALPN does the negotiating; on a plain socket
+     * `http2.createServer` speaks h2c and nothing else, and an HTTP/1.1 client
+     * gets a binary frame where it expected a status line. (Which is precisely
+     * what happened when this was one listener: all 27 HTTP tests failed with
+     * `HPE_INVALID_CONSTANT`.)
+     *
+     * So: two ports, and the same `handle` behind both. Only worth starting if
+     * something genuinely speaks gRPC — a Go service, `grpcurl`, an Envoy mesh.
+     * Cleartext, because TLS belongs to whatever terminates it in front; a server
+     * that loads its own certificates has an opinion about where it is deployed.
+     */
+    listenGrpc(port: number) {
+      const server = createHttp2Server((request, response) => void handle(request, response));
       server.listen(port);
       return server;
     },

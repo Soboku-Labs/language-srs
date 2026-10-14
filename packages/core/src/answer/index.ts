@@ -4,6 +4,7 @@ import type { AnswerAttempt } from './types';
 export * from './types';
 export * from './options';
 export * from './check';
+export * from './question';
 
 /**
  * Turn an answer into a suggested rating.

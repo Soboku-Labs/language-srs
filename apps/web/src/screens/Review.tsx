@@ -2,14 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CARD_KINDS,
   STUDY_MODES,
-  buildChoiceOptions,
-  buildToneOptions,
+  buildQuestion,
   checkTypedAnswer,
   isAutoGraded,
   isTypingFeasible,
   kindLabel,
-  previewIntervals,
-  resolveAnswerMode,
   stageEarned,
   suggestRating,
   RATING_LABELS,
@@ -119,30 +116,33 @@ export function Review() {
     [engine, current],
   );
 
-  const mode = useMemo(() => {
-    if (!current) return 'self' as const;
+  /*
+   * Mode, distractors and previews come from the core as one `Question`.
+   *
+   * This was three separate memos here, and the same three in the Expo app, and
+   * the server would have made a fourth. Three implementations of "which wrong
+   * answers are plausible" would drill three different exams — so the assembly
+   * lives in `buildQuestion` and this screen renders what it is handed.
+   */
+  const question = useMemo(() => {
+    if (!current) return undefined;
     // A widget tap that already revealed the answer cannot then be asked as a
     // question — the learner has seen it.
-    if (forcedReveal && pinnedCard === current.card.id) return 'self' as const;
-    return resolveAnswerMode(current.card, current.entry, pool, preferTyped ? 'typed' : undefined);
-  }, [current, pool, preferTyped, forcedReveal, pinnedCard]);
+    const revealed = forcedReveal && pinnedCard === current.card.id;
+    const preferred: AnswerMode | undefined = revealed ? 'self' : preferTyped ? 'typed' : undefined;
 
-  const options = useMemo(() => {
-    if (!current) return [];
-    if (mode === 'tone') return buildToneOptions({ card: current.card, entry: current.entry, pool });
-    if (mode === 'choice') return buildChoiceOptions({ card: current.card, entry: current.entry, pool });
-    return [];
-  }, [current, mode, pool]);
-
-  const previews = useMemo(() => {
-    if (!current) return undefined;
-    const profile = engine.getProfile(current.card.languageCode);
-    return previewIntervals(current.card, {
+    return buildQuestion({
+      pair: current,
+      pool,
+      profile: engine.getProfile(current.card.languageCode),
       now: engine.now(),
-      config: { desiredRetention: profile.desiredRetention },
-      ...(profile.examDate ? { examDate: profile.examDate } : {}),
+      ...(preferred ? { preferred } : {}),
     });
-  }, [current, engine]);
+  }, [current, pool, preferTyped, forcedReveal, pinnedCard, engine]);
+
+  const mode = question?.mode ?? 'self';
+  const options = question?.options ?? [];
+  const previews = question?.previews;
 
   // Listening cards lead with audio rather than making the learner hunt for it.
   useEffect(() => {

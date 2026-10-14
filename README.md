@@ -67,11 +67,13 @@ silently broke the exercise.
 ```
 proto/mon/v1/mon.proto    The contract: language-neutral, linted, versioned
 
-apps/server/              The backend: one API over the core
-  src/app.ts              routing, auth check, per-account engines
+apps/server/              The backend: the core behind Connect
+  src/app.ts              dispatch, CORS, per-account engines, two listeners
+  src/connect/            the two services; enums and messages mapped once
+  src/gen/                generated from the proto, committed
   src/accounts.ts         scrypt passwords, revocable tokens
   src/store.ts            the storage port on a filesystem, atomic writes
-  src/routes/             auth and study
+  src/routes/             the older JSON surface, served as the fallback
 
 apps/web/                 The website: React + Vite, no React Native runtime
   src/screens/            one file per screen
@@ -139,17 +141,26 @@ the motion, the routing and the widgets.
 ### Native clients, one brain
 
 The phones are going native — SwiftUI and Jetpack Compose — and the scheduler is
-not being ported to get there. `apps/server` runs `packages/core` behind an HTTP
-API, so a native client renders what it is given and owns no scheduling logic at
-all. Nobody writes FSRS in Swift, nobody writes it again in Kotlin, and the two
-cannot drift.
+not being ported to get there. `apps/server` runs `packages/core` behind
+[Connect](https://connectrpc.com), serving `proto/mon/v1/mon.proto`, so a native
+client renders what it is given and owns no scheduling logic at all. Nobody
+writes FSRS in Swift, nobody writes it again in Kotlin, and the two cannot drift.
+
+Connect rather than raw gRPC because **a browser cannot speak gRPC** — HTTP/2
+trailers are not exposed to JavaScript — and running an Envoy sidecar to
+translate for one web app is a second process to deploy and monitor for nothing
+the web app can feel. One server, four protocols: Connect with protobuf bodies
+for the phones, Connect with JSON for the browser and for `curl`, gRPC-Web, and
+real gRPC on a second listener for anything that insists.
 
 The obvious objection to centralising it is offline, and it is a real one: a
 spaced-repetition app that stops working on the Underground is a worse app. So
 grading takes a *batch*, each entry carrying the instant it actually happened. A
 client records reviews locally and replays them on reconnect, and the scheduler
 sees the real timestamps rather than the moment the signal returned. The contract
-is in [docs/API.md](docs/API.md).
+is in [docs/API.md](docs/API.md), and the reasoning — including what building it
+proved wrong — in
+[docs/ARCHITECTURE-DECISIONS.md](docs/ARCHITECTURE-DECISIONS.md).
 
 `apps/mobile` is the current Expo app and still builds iOS and Android. It stays
 until the native clients replace it.
@@ -159,8 +170,8 @@ until the native clients replace it.
 ```bash
 npm install
 
-npm test          # unit tests over the core domain
-npm run typecheck # core + web + mobile
+npm test          # the core domain, and the API over a real socket
+npm run typecheck # core + server + web + mobile
 
 npm run web        # Vite dev server
 npm run web:build  # static build to apps/web/dist
@@ -168,6 +179,10 @@ npm run web:pages  # the same, prefixed and prepared for GitHub Pages
 
 npm run server     # the API on :8787, data in ./data
 npm run server:test
+
+npm run proto:lint      # buf lint, STANDARD
+npm run proto:generate  # regenerate apps/server/src/gen
+npm run proto:breaking  # against main, before anything ships
 
 npm run mobile:start  # Expo, for iOS and Android
 npm run ios

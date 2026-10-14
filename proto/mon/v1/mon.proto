@@ -229,11 +229,18 @@ message Stats {
   double average_seconds_per_card = 6;
   repeated KindRetention retention_by_kind = 7;
   repeated ForecastDay forecast = 8;
+  // How many reviews the retention figures are computed from. A percentage
+  // without its sample size is not a number anyone can act on — "94% over nine
+  // reviews" and "94% over nine hundred" ask for different decisions.
+  int32 retention_reviews = 9;
 }
 
 message ForecastDay {
   string day = 1;  // YYYY-MM-DD
   int32 due = 2;
+  // Running total across the forecast window, so a client plots the area chart
+  // without accumulating the series itself and disagreeing with the next client.
+  int32 cumulative = 3;
 }
 
 message Readiness {
@@ -250,6 +257,11 @@ message Readiness {
   bool pace_is_sufficient = 11;
   string verdict = 12;
   string headline = 13;
+  // The two numbers behind `pace_is_sufficient`. A bare boolean tells a learner
+  // they are behind without telling them by how much, and "set your daily limit
+  // to 14" is the only form of that message anyone can act on.
+  int32 required_new_per_day = 14;
+  int32 planned_new_per_day = 15;
 }
 
 // ---------------------------------------------------------------------- auth
@@ -385,7 +397,11 @@ message DeckEntry {
   int32 due_now = 4;
   // Recall for the *weakest* of its cards, not the mean: a word whose meaning is
   // solid and whose tones are gone is a word you will get wrong.
-  double weakest = 5;
+  //
+  // `optional` for the field presence. Absent means no card has been reviewed yet;
+  // 0.0 means one has and it is gone. Collapsing those into a bare double would
+  // render every unseen word as certainly forgotten.
+  optional double weakest = 5;
   string next_due_at = 6;
   bool in_scope = 7;
 }
@@ -407,6 +423,9 @@ message StrugglingCard {
   string description = 4; // one line a learner can act on
   int32 lapses = 5;
   double failure_rate = 6;
+  // The denominator behind `failure_rate`. Sorted by severity server-side, so
+  // there is no rank to send: the order is the answer.
+  int32 reviews = 7;
 }
 
 message GetStrugglingRequest {

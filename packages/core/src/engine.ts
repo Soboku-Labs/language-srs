@@ -1,3 +1,4 @@
+import { buildQuestion, type AnswerMode, type Question } from './answer';
 import { createCard, generateCards } from './cards/factory';
 import { findExamTrack, getExamTrack, getLevelIdsInScope } from './exams';
 import { summariseDeck, type DeckEntry } from './deck';
@@ -330,6 +331,48 @@ export class StudyEngine {
       ...(options.mode !== undefined ? { mode: options.mode } : {}),
       ...(options.kinds !== undefined ? { kinds: options.kinds } : {}),
     });
+  }
+
+  /**
+   * The queue, with each card already turned into a question.
+   *
+   * Mode, distractors and interval previews resolved here rather than by the
+   * caller. A client that assembles its own questions needs the entry pool, the
+   * profile's retention and its exam date to do it, and will get one of the three
+   * wrong — which shows up as the same card being asked differently on a phone
+   * than on a laptop.
+   */
+  getQuestions(
+    options: {
+      code?: LanguageCode;
+      sessionLimit?: number;
+      now?: Timestamp;
+      mode?: StudyMode;
+      kinds?: CardKind[];
+      preferred?: AnswerMode;
+    } = {},
+  ): { questions: Question[]; queue: StudyQueue } {
+    const code = options.code ?? this.meta.activeLanguage;
+    const now = options.now ?? this.now();
+    const queue = this.getQueue({ ...options, code, now });
+
+    // Built once and shared: the pool is every entry in the language, and
+    // rebuilding it per card would re-walk the whole deck for each question.
+    const pool = this.getEntries(code);
+    const profile = this.getProfile(code);
+
+    return {
+      queue,
+      questions: queue.cards.map((pair) =>
+        buildQuestion({
+          pair,
+          pool,
+          profile,
+          now,
+          ...(options.preferred !== undefined ? { preferred: options.preferred } : {}),
+        }),
+      ),
+    };
   }
 
   /**

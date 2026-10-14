@@ -1,0 +1,22 @@
+# Code generation from the contract.
+#
+# One plugin. `protoc-gen-es` v2 emits the service descriptors alongside the
+# message types, and Connect v2 consumes those descriptors directly — the
+# separate `protoc-gen-connect-es` that v1 needed no longer exists. Less
+# generated code, and one fewer version to keep in step with the runtime.
+#
+# Output is committed. A generated file in the tree is reviewable in a diff,
+# builds without the buf binary present, and makes "the proto changed but
+# nobody regenerated" a visible conflict rather than a mystery at runtime.
+#
+# Run: npm run proto:generate
+version: v2
+clean: true
+plugins:
+  - local: protoc-gen-es
+    out: apps/server/src/gen
+    opt:
+      - target=ts
+      # The server imports its own modules with explicit extensions, because it
+      # typechecks as ESM. Generated code has to match or tsc rejects it.
+      - import_extension=.ts

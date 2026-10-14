@@ -167,6 +167,7 @@ export {
   MEANING_KINDS,
   PRODUCTION_KINDS,
   buildChoiceOptions,
+  buildQuestion,
   buildToneOptions,
   checkTypedAnswer,
   editDistance,
@@ -187,6 +188,8 @@ export type {
   AnswerMode,
   AnswerOption,
   AnswerQuality,
+  BuildQuestionOptions,
+  Question,
 } from './answer';
 
 // Widget contract

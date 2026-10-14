@@ -1,7 +1,9 @@
 import { cardRetrievability } from '../srs/scheduler';
 import type { Card, DateOnly, Timestamp } from '../types/card';
+import type { CardKind } from '../types/exam';
 import type { ReviewLog } from '../types/review';
 import { addDays, studyDayOf, toDateOnly, toEpochMs } from '../utils/date';
+import { parseCardId } from '../utils/id';
 
 /** Consecutive study days ending today (or yesterday, if today is unstarted). */
 export interface StreakInfo {
@@ -202,4 +204,70 @@ export function meanRetrievability(cards: Card[], now: Timestamp): number {
   const active = cards.filter((card) => card.state === 'review' && !card.suspended);
   if (active.length === 0) return 0;
   return active.reduce((sum, card) => sum + cardRetrievability(card, now), 0) / active.length;
+}
+
+/**
+ * Retention per card kind.
+ *
+ * One overall retention figure hides the thing a learner can act on. Somebody
+ * sitting at 88% is usually not 88% at everything — they are comfortable
+ * recognising a word and losing its tones, or reading it and unable to produce
+ * it. Those need different practice, and the single number says only "revise
+ * more".
+ *
+ * Reported weakest first, because the list is read to find what to fix.
+ */
+export interface KindRetention {
+  kind: CardKind;
+  /** Gradings of review-state cards of this kind in the window. */
+  reviews: number;
+  /** Share of those the learner recalled. */
+  trueRetention: number;
+}
+
+export function computeRetentionByKind(
+  logs: ReviewLog[],
+  options: { windowDays?: number; now?: Timestamp; minimumReviews?: number } = {},
+): KindRetention[] {
+  const windowDays = options.windowDays ?? 30;
+  /*
+   * A floor on the sample, or the weakest skill is whichever one was attempted
+   * twice and missed once. Three reviews can say 33% and mean nothing, and a
+   * learner acting on it would drill the wrong thing.
+   */
+  const minimumReviews = options.minimumReviews ?? 5;
+  const cutoff = options.now ? toEpochMs(addDays(options.now, -windowDays)) : 0;
+
+  const byKind = new Map<CardKind, { reviews: number; recalled: number }>();
+
+  for (const log of logs) {
+    // Learning-state gradings are excluded for the same reason true retention
+    // excludes them: a card still in its first ladder has not been remembered
+    // over an interval yet, so counting it flatters the figure.
+    if (log.stateBefore !== 'review') continue;
+    if (toEpochMs(log.reviewedAt) < cutoff) continue;
+
+    let kind: CardKind;
+    try {
+      kind = parseCardId(log.cardId).kind;
+    } catch {
+      // A log whose card id predates the current scheme tells us nothing about
+      // which skill it exercised, and guessing would put it in the wrong bucket.
+      continue;
+    }
+
+    const tally = byKind.get(kind) ?? { reviews: 0, recalled: 0 };
+    tally.reviews += 1;
+    if (log.rating > 1) tally.recalled += 1;
+    byKind.set(kind, tally);
+  }
+
+  return [...byKind.entries()]
+    .filter(([, tally]) => tally.reviews >= minimumReviews)
+    .map(([kind, tally]) => ({
+      kind,
+      reviews: tally.reviews,
+      trueRetention: tally.recalled / tally.reviews,
+    }))
+    .sort((a, b) => a.trueRetention - b.trueRetention || a.kind.localeCompare(b.kind));
 }

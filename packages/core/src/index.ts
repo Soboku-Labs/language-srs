@@ -107,15 +107,28 @@ export {
 } from './session/queue';
 export type { BuildQueueOptions, DailyCounts, QueueBreakdown, StudyQueue } from './session/queue';
 
+// The day's goal — a finish line, as distinct from the queue's list
+export { getDailyGoal } from './session/goal';
+export type { DailyGoal } from './session/goal';
+
+// Journey — the cultural rank ladder, earned by retention rather than activity
+export { JOURNEYS, getJourney, getLadder, stageEarned } from './journey';
+export type { Journey, JourneyLadder, JourneyStage } from './journey';
+
+// Triage — the words that are fighting the learner
+export { describeStruggle, findStrugglingCards } from './triage';
+export type { FindStrugglingOptions, StruggleReason, StrugglingCard } from './triage';
+
 // Stats
 export {
   computeCoverage,
+  computeRetentionByKind,
   computeRetention,
   computeStreak,
   forecastReviews,
   meanRetrievability,
 } from './stats/metrics';
-export type { CoverageStats, ForecastDay, RetentionStats, StreakInfo } from './stats/metrics';
+export type { CoverageStats, ForecastDay, KindRetention, RetentionStats, StreakInfo } from './stats/metrics';
 export { computeExamReadiness, suggestDailyNewLimit } from './stats/readiness';
 export type { ExamReadiness, ReadinessVerdict } from './stats/readiness';
 

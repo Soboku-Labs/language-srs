@@ -44,7 +44,7 @@ export function Dashboard() {
   const waiting = queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning;
 
   return (
-    <Screen>
+    <Screen layer="day">
       {/* Tapping the language is how you switch it — no menu needed. */}
       <Rise index={0}>
         <button type="button" className="header" onClick={() => navigate('/')}>

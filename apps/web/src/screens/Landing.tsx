@@ -115,7 +115,7 @@ export function Landing() {
   };
 
   return (
-    <Screen>
+    <Screen layer="door">
       <Rise index={0}>
         <div className="masthead">
           <div className="masthead__top">

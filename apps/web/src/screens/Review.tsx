@@ -364,7 +364,7 @@ export function Review() {
   const typingFeasible = isTypingFeasible(current.card, current.entry);
 
   return (
-    <Screen>
+    <Screen layer="loop">
       {/*
         The loop's own chrome, and all of it.
 

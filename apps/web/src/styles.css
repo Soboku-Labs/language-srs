@@ -880,3 +880,59 @@ a { color: var(--accent); }
   color: var(--ink-muted);
   max-width: 38em;
 }
+
+/* ------------------------------------------------------- the three layers
+
+   Door, day and loop are not the same kind of page and should not read as
+   one. The rhythm tightens as you go deeper: the door is read once by
+   somebody deciding whether to stay, the day is glanced at every morning,
+   and the loop is answered dozens of times in a row.
+*/
+
+/* Most generous. This one is allowed to breathe — it is a page about the
+   product, not a page you are working in. */
+.screen--door { gap: var(--space-xxl); }
+
+/* The day sits between the two, which is the base rhythm already. */
+
+/*
+  The loop holds the viewport instead of scrolling.
+
+  Everything else here is a document: it starts at the top, runs down, and
+  ends. A review session is not — it is one card at a time, usually on a
+  phone, and a card that starts at the top leaves the answers floating in
+  the middle of the screen with dead space beneath them and nothing within
+  reach of a thumb. So the card takes the space it needs in the middle and
+  the answers sit at the bottom where the hand already is.
+*/
+.screen--loop {
+  /* Exactly the viewport, not merely at least it: the card region below scrolls
+     within this, which it cannot do if the page itself is free to grow. */
+  height: 100dvh;
+  gap: var(--space-lg);
+  padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom));
+}
+/*
+  The card takes the middle and scrolls if it has to.
+
+  Answering expands this a lot — the reading, the meaning, an example sentence
+  and every option marked right or wrong — and on a small phone that pushed the
+  grading buttons off the bottom of the screen. Measured at 390x664: 92px of
+  the answered state was below the fold, so the most repeated action in the app
+  needed a scroll first. Scrolling here instead keeps the grades where the
+  thumb already is.
+*/
+.screen--loop .deal {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-lg);
+  min-height: 0;
+  overflow-y: auto;
+  /* Nothing to scroll means nothing should feel scrollable. */
+  overscroll-behavior: contain;
+}
+/* The grading row and the card's own actions stay put at the bottom. */
+.screen--loop > .grades,
+.screen--loop > .row { flex: 0 0 auto; }

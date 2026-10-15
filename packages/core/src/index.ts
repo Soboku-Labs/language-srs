@@ -32,8 +32,10 @@ export type { LanguageCode, LanguageProfile, ScriptId } from './types/language';
 export {
   LANGUAGE_CODES,
   LANGUAGE_PROFILES,
+  cardKindsForLanguage,
   getLanguageProfile,
   isLanguageCode,
+  usesCharacterWriting,
 } from './types/language';
 export type { GradeResult, Rating, ReviewLog, ReviewSource } from './types/review';
 export {

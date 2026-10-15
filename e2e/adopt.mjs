@@ -57,8 +57,22 @@ await page.locator('[data-language]').first().click();
 // races it, and the pending navigation lands *after* the next goto — which
 // leaves the test on the day screen looking for review options that are not
 // there. This is also what a learner does: they arrive, then they study.
-await page.waitForURL('**/home', { timeout: 15_000 });
+// A language nobody has set up now opens the setup interview first, so
+// arriving means landing on either, and completing the interview if it is
+// the one that came up. Written as "whichever comes" rather than always
+// expecting setup, so this keeps working for a language already set up.
+await page.waitForURL(/\/(home|start)$/, { timeout: 15_000 });
+if (page.url().endsWith('/start')) {
+  await page.getByRole('button', { name: 'Start learning' }).click();
+  await page.waitForURL('**/home', { timeout: 15_000 });
+}
 await page.goto(`${BASE}/review`, { waitUntil: 'load' });
+// Wait for the first card rather than assuming it is there the moment the
+// page loads. The queue is built after mount, and the setup step before this
+// added another navigation ahead of it, so an immediate `count()` found zero
+// and the loop broke on its first pass — reporting "nothing was studied" for
+// a review screen that was merely a few hundred milliseconds away.
+await page.locator('button.option:not([disabled])').first().waitFor({ timeout: 15_000 });
 
 let graded = 0;
 for (let i = 0; i < 4; i += 1) {

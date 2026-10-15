@@ -102,6 +102,28 @@ describe('normalising language settings', () => {
     expect(normaliseLanguageSettings({ dailyNewLimit: 20 }, booked).examDate).toBe('2026-06-01');
   });
 
+  it('records when the learner was asked what they wanted', () => {
+    const next = normaliseLanguageSettings({ setUpAt: '2026-03-01T09:00:00.000Z' }, language);
+    expect(next.setUpAt).toBe('2026-03-01T09:00:00.000Z');
+  });
+
+  it('will not let a later patch clear or move it', () => {
+    // Write-once, unlike the exam date: having been asked is not something
+    // that stops being true. A stale client clearing it would reopen the setup
+    // interview on somebody who has been studying for months.
+    const asked = { ...language, setUpAt: '2026-03-01T09:00:00.000Z' };
+    expect(normaliseLanguageSettings({ dailyNewLimit: 20 }, asked).setUpAt).toBe(
+      '2026-03-01T09:00:00.000Z',
+    );
+    expect(
+      normaliseLanguageSettings({ setUpAt: '2026-09-09T09:00:00.000Z' }, asked).setUpAt,
+    ).toBe('2026-03-01T09:00:00.000Z');
+  });
+
+  it('stays absent until somebody is actually asked', () => {
+    expect(normaliseLanguageSettings({ dailyNewLimit: 20 }, language).setUpAt).toBeUndefined();
+  });
+
   it('clears an exam date when sent null', () => {
     // Absent means "leave it"; null means "cancelled". Without the difference
     // there is no way to un-book an exam.

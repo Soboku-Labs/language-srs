@@ -10,10 +10,12 @@ import {
 } from '@language-srs/core';
 import { Scene } from '../components/Scene';
 import { TeacherAvatar } from '../components/Teacher';
+import { Maker } from '../components/Maker';
 import { useAuth, useEngine } from '../providers';
 import { useRouter } from '../router';
 import { useSettings } from '../settings';
 import { useTheme } from '../theme';
+import { useTravel } from '../travel';
 import { Caption, Rise, Screen, Segmented } from '../ui';
 
 /**
@@ -70,8 +72,7 @@ export function Landing() {
 
   /** The window being looked into, which widens to take more of the row. */
   const [open, setOpen] = useState<LanguageCode | undefined>();
-  /** Set while the scene expands, so the page does not flicker mid-travel. */
-  const [travelling, setTravelling] = useState<LanguageCode | undefined>();
+  const { to: travelling, travel } = useTravel();
 
   const state = useMemo(() => {
     // Started means *reviewed*. The engine creates a Mandarin profile on first
@@ -94,15 +95,28 @@ export function Landing() {
   /*
    * Going in.
    *
-   * The scene expands to fill the screen before the route changes, so arriving
-   * at the day reads as having walked through the window rather than as a page
-   * swap that happens to share a colour.
+   * The window expands while a wash in the language's own colour closes over
+   * it, the route changes underneath, and the wash lifts on the other side.
+   * The timing and the veil live in `travel.tsx`, because the veil has to
+   * outlive this screen — the swap it exists to hide is this screen being
+   * unmounted.
+   *
+   * Where it lands depends on whether anybody has ever said what they want
+   * from this language. A profile exists from the moment a language is
+   * touched, so its existence proves nothing; `setUpAt` is the answer, and
+   * having reviewed cards counts too — somebody mid-deck should not be
+   * stopped and asked to set up the thing they are already doing.
    */
   const enter = (code: LanguageCode) => {
-    setTravelling(code);
-    window.setTimeout(() => {
-      void setActiveLanguage(code).then(() => navigate('/home'));
-    }, 320);
+    const asked =
+      engine.hasProfile(code) &&
+      (Boolean(engine.getProfile(code).setUpAt) ||
+        engine.getAllCards(code).some((card) => card.reps > 0));
+
+    travel(code, async () => {
+      await setActiveLanguage(code);
+      navigate(asked ? '/home' : '/start');
+    });
   };
 
   return (
@@ -240,6 +254,16 @@ export function Landing() {
           Your cards, history and schedule stay on this device unless you sign in, in which case they
           are kept in step across the devices you use and nowhere else.
         </Caption>
+
+        {/*
+          Below the argument, because somebody who has read this far is the
+          one person on this page who might want to know what is coming.
+        */}
+        <button type="button" className="below__link" onClick={() => navigate('/upcoming')}>
+          What&rsquo;s coming next
+        </button>
+
+        <Maker />
       </section>
     </Screen>
   );

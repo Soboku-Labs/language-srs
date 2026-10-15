@@ -10,6 +10,8 @@ import {
 import { SyncStatus } from '../components/SyncStatus';
 import { useAuth, useEngine } from '../providers';
 import { useSettings } from '../settings';
+import { DateField } from '../components/DateField';
+import { Maker } from '../components/Maker';
 import { useRouter } from '../router';
 import { Caption, Choice, DetailRow, Rise, Row, Screen, Section, TextButton } from '../ui';
 
@@ -45,26 +47,21 @@ export function Settings() {
   const level = track?.levels.find((candidate) => candidate.id === profile.targetLevelId);
 
   const [dateDraft, setDateDraft] = useState(profile.examDate ?? '');
-  const [dateError, setDateError] = useState<string | undefined>();
 
   const suggestedNewLimit =
     profile.examDate && DATE_PATTERN.test(profile.examDate)
       ? suggestDailyNewLimit(profile.targetLevelId, engine.now(), profile.examDate)
       : undefined;
 
+  /*
+   * No format check any more.
+   *
+   * `<input type="date">` returns `YYYY-MM-DD` or an empty string and cannot
+   * return anything else, so the pattern test and its error message were
+   * guarding a state the control makes impossible.
+   */
   const commitDate = async (value: string) => {
-    const trimmed = value.trim();
-    if (trimmed.length === 0) {
-      setDateError(undefined);
-      await updateLanguage({ examDate: null });
-      return;
-    }
-    if (!DATE_PATTERN.test(trimmed)) {
-      setDateError('Use YYYY-MM-DD, for example 2026-12-06.');
-      return;
-    }
-    setDateError(undefined);
-    await updateLanguage({ examDate: trimmed });
+    await updateLanguage({ examDate: value ? value : null });
   };
 
   const shortfall = level ? Math.max(0, level.vocabularyTarget - available) : 0;
@@ -153,21 +150,27 @@ export function Settings() {
 
       <Rise index={3}>
         <Section title="Exam date">
+          {/*
+            A calendar, not a text box expecting YYYY-MM-DD. Somebody booking
+            an exam wants to see which day of the week it lands on and count
+            the weeks to it, which a text box cannot do — and the native
+            control cannot return a malformed date, so the format error this
+            section used to show is gone with the thing that caused it.
+          */}
+          <DateField
+            label="Exam date"
+            value={dateDraft}
+            min={toDateOnly(engine.now())}
+            onChange={(next) => {
+              setDateDraft(next);
+              void commitDate(next);
+            }}
+          />
           <Row wrap>
-            <input
-              className="field"
-              style={{ flex: 1, minWidth: 160 }}
-              value={dateDraft}
-              onChange={(event) => setDateDraft(event.target.value)}
-              onBlur={() => void commitDate(dateDraft)}
-              placeholder="YYYY-MM-DD"
-              inputMode="numeric"
-              aria-label="Exam date"
-            />
             {[30, 90, 180].map((days) => (
               <Choice
                 key={days}
-                label={`${days}d`}
+                label={`In ${days} days`}
                 selected={false}
                 onClick={() => {
                   const next = toDateOnly(addDays(engine.now(), days));
@@ -176,8 +179,17 @@ export function Settings() {
                 }}
               />
             ))}
+            {dateDraft ? (
+              <Choice
+                label="Clear"
+                selected={false}
+                onClick={() => {
+                  setDateDraft('');
+                  void commitDate('');
+                }}
+              />
+            ) : null}
           </Row>
-          {dateError ? <Caption>{dateError}</Caption> : null}
           <Caption>
             With a date set, intervals tighten as the exam approaches so nothing lands after the paper.
           </Caption>
@@ -323,12 +335,17 @@ export function Settings() {
 
       <Rise index={7}>
         <Section title="More">
+          <TextButton label="What's coming next" onClick={() => navigate('/upcoming')} />
           <TextButton
             label="Reset all progress"
             color="var(--critical)"
             onClick={() => void mutate((instance) => instance.reset())}
           />
         </Section>
+      </Rise>
+
+      <Rise index={8}>
+        <Maker />
       </Rise>
     </Screen>
   );

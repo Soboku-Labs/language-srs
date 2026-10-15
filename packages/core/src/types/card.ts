@@ -150,6 +150,16 @@ export interface StudyProfile {
    * and `migrateMeta` carries any value that was set here up to the account.
    */
   dayStartHour: number;
+  /**
+   * When the learner said what they wanted from this language.
+   *
+   * Absent means they have not been asked yet. The engine creates a profile
+   * the moment a language is touched — it needs something to schedule against
+   * — so the existence of a profile says nothing about whether anybody chose
+   * anything, and the app was treating the two as the same thing. This is the
+   * difference: a default the app picked, or an answer somebody gave.
+   */
+  setUpAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

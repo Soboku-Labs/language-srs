@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   CSV_COLUMNS,
-  LANGUAGE_CODES,
   exportVocabularyJson,
   getExamTracksForLanguage,
   getLanguageProfile,
@@ -33,12 +32,25 @@ export function Import() {
 
   const [text, setText] = useState('');
   const [format, setFormat] = useState<'csv' | 'json'>('csv');
-  const [language, setLanguage] = useState<LanguageCode>(active);
   const [levelId, setLevelId] = useState(profile.targetLevelId);
   const [done, setDone] = useState<{ added: number; replaced: number } | undefined>();
   const [exported, setExported] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
+  /*
+   * The words are for the language you are studying.
+   *
+   * This screen used to offer all four as a choice, defaulted to the active
+   * one. That is a question nobody came here to answer, and getting it wrong
+   * is silent: the rows import fine, into a language you are not looking at,
+   * and the deck you were trying to fill is still empty. You reach this screen
+   * from inside a language — from its settings, or from its own "not enough
+   * words" prompt — so the language is already decided by the time you arrive.
+   *
+   * A JSON export still carries a language per entry and is imported as it
+   * stands, so a multi-language backup is unaffected.
+   */
+  const language: LanguageCode = active;
   const tracks = getExamTracksForLanguage(language);
 
   /**
@@ -123,26 +135,13 @@ export function Import() {
       </Rise>
 
       {/*
-        A CSV of a word list almost never carries its own language or level, so
-        those are chosen here. JSON exports carry both per entry.
+        A CSV of a word list almost never carries its own level, so that is
+        chosen here. The language is not a choice — see above. JSON exports
+        carry both per entry, so this whole section is skipped for them.
       */}
       {format === 'csv' ? (
         <Rise index={1}>
-          <Section title="These words are">
-            <Row wrap>
-              {LANGUAGE_CODES.map((code) => (
-                <Choice
-                  key={code}
-                  label={getLanguageProfile(code).name}
-                  selected={language === code}
-                  onClick={() => {
-                    setLanguage(code);
-                    const first = getExamTracksForLanguage(code)[0]?.levels[0];
-                    if (first) setLevelId(first.id);
-                  }}
-                />
-              ))}
-            </Row>
+          <Section title={`These words are ${getLanguageProfile(language).name}`}>
             {/*
               Grouped by track and labelled, because Mandarin has two of them and
               flattening the levels produced two chips both reading "HSK 1".

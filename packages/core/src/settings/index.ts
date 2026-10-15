@@ -84,6 +84,15 @@ export interface LanguageSettings {
   desiredRetention: number;
   /** Overrides the level's own weights. Unset is the exam-faithful choice. */
   enabledCardKinds?: CardKind[];
+  /**
+   * When the learner said what they wanted from this language.
+   *
+   * Travels with the account rather than staying on the device, because the
+   * question is "have you been asked", not "has this browser asked you".
+   * Setting up Korean on a laptop and then being interviewed about it again on
+   * a phone is the app forgetting a conversation it already had.
+   */
+  setUpAt?: Timestamp;
   updatedAt: Timestamp;
 }
 
@@ -222,6 +231,19 @@ export function normaliseLanguageSettings(
       ? { enabledCardKinds: input.enabledCardKinds }
       : current.enabledCardKinds
         ? { enabledCardKinds: current.enabledCardKinds }
+        : {}),
+    /*
+     * Write-once. A patch may set it; nothing may clear it.
+     *
+     * Unlike the exam date there is no "cancelled" state to express: having
+     * been asked is not something that stops being true. Letting it be
+     * cleared would mean a stale client could reopen the setup interview on
+     * somebody who has been studying for months.
+     */
+    ...(current.setUpAt
+      ? { setUpAt: current.setUpAt }
+      : typeof input.setUpAt === 'string' && input.setUpAt
+        ? { setUpAt: input.setUpAt }
         : {}),
   };
 }

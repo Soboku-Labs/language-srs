@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useEngine, AuthProvider, EngineProvider } from './providers';
 import { SyncProvider } from './sync';
 import { SettingsProvider, useSettings } from './settings';
+import { TravelProvider } from './travel';
 import { RouterProvider, matchPath, useRouter } from './router';
 import { ThemeProvider } from './theme';
 import { Dashboard } from './screens/Dashboard';
@@ -16,6 +17,8 @@ import { Learn } from './screens/Learn';
 import { Practice } from './screens/Practice';
 import { GrammarPoint } from './screens/GrammarPoint';
 import { SignIn } from './screens/SignIn';
+import { Start } from './screens/Start';
+import { Roadmap } from './screens/Roadmap';
 import { StorageWarning } from './components/StorageWarning';
 import { Caption, Screen, TextButton, Title } from './ui';
 
@@ -63,7 +66,12 @@ function Themed() {
 
   return (
     <ThemeProvider languageCode={language} appearance={appearance}>
-      <Chrome />
+      {/* Inside the theme, because the veil is painted in the destination
+          language's colours; above the routes, because it has to still be
+          there while they swap. */}
+      <TravelProvider>
+        <Chrome />
+      </TravelProvider>
     </ThemeProvider>
   );
 }
@@ -86,6 +94,7 @@ const TITLES: { pattern: string; title: string }[] = [
   { pattern: '/word/:id', title: 'Word' },
   { pattern: '/stats', title: 'Progress' },
   { pattern: '/settings', title: 'Settings' },
+  { pattern: '/upcoming', title: 'Upcoming' },
   { pattern: '/account', title: 'Account' },
   { pattern: '/import', title: 'Add words' },
 ];
@@ -142,11 +151,14 @@ function Routes() {
   if (path === '/' || path === '') return <Landing />;
   if (path === '/home') return <Dashboard />;
   if (path === '/review') return <Review />;
+  // Asked once per language, before the first session rather than after it.
+  if (path === '/start') return <Start />;
 
   if (path === '/learn') return <Learn />;
   if (path === '/words') return <Words />;
   if (path === '/stats') return <Stats />;
   if (path === '/settings') return <Settings />;
+  if (path === '/upcoming') return <Roadmap />;
   if (path === '/import') return <Import />;
 
   // The picker is the door now. Kept so a bookmark from the old structure

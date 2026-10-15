@@ -54,6 +54,26 @@
   --spring: cubic-bezier(0.34, 1.26, 0.64, 1);
   --duration-instant: 90ms;
   --duration-base: 260ms;
+
+  /*
+   * A second curve, for things that move rather than appear.
+   *
+   * `--ease` is an expo-out: almost all of its distance is covered in the
+   * first third. That is right for something arriving — a panel, a label, a
+   * toast — where you want it present immediately and settling after. It is
+   * wrong for a shape being reshaped under the pointer, which is what the
+   * four windows are: it leaps, then crawls, and reads as a jerk rather than
+   * as movement, especially when crossing the row makes it start again before
+   * the last one has settled.
+   *
+   * `--ease-move` is symmetric and gentle at both ends, so the row looks like
+   * it is being eased open and eased shut. Paired with a longer duration,
+   * because at 260ms a symmetric curve has no room to show its middle.
+   */
+  --ease-move: cubic-bezier(0.4, 0.05, 0.2, 1);
+  --duration-move: 520ms;
+  /* Long enough to read as travel rather than as a page swap. */
+  --duration-travel: 620ms;
 }
 
 * { box-sizing: border-box; }
@@ -972,7 +992,15 @@ a { color: var(--accent); }
   overflow: hidden;
   text-align: left;
   isolation: isolate;
-  transition: flex-grow var(--duration-base) var(--ease);
+  /*
+    The row is being reshaped, not revealed, so it uses the symmetric curve.
+
+    This was `--duration-base` on `--ease`, which covered most of its distance
+    in the first 80ms and then inched: snappy, and jerky for exactly that
+    reason. Moving the pointer along the row restarted it before it had
+    settled, so four windows were each part-way through a leap.
+  */
+  transition: flex-grow var(--duration-move) var(--ease-move);
 }
 .windows--travelling .window { pointer-events: none; }
 
@@ -992,13 +1020,38 @@ a { color: var(--accent); }
 .scene__art {
   transform: translateX(-50%);
   transform-origin: 50% 100%;
-  transition: transform var(--duration-base) var(--ease);
+  /* Matched to the window's own resize, or the drawing and its frame move on
+     two different clocks and the pair reads as a stutter. */
+  transition: transform var(--duration-move) var(--ease-move);
   will-change: transform;
 }
 
-/* Going in: it swallows the screen, and the others step back. */
-.window--entering { flex-grow: 14; }
-.window--leaving { flex-grow: 0.01; opacity: 0; }
+/*
+  Going in: it swallows the screen, and the others step back.
+
+  Slower than the hover and on the same curve. The drawing keeps growing while
+  the veil comes over it, so the last thing seen is the place opening rather
+  than the row snapping.
+*/
+.window--entering {
+  flex-grow: 14;
+  transition: flex-grow var(--duration-travel) var(--ease-move);
+}
+.window--entering .scene__art {
+  transform: translateX(-50%) scale(1.5);
+  transition: transform var(--duration-travel) var(--ease-move);
+}
+.window--leaving {
+  flex-grow: 0.01;
+  opacity: 0;
+  transition:
+    flex-grow var(--duration-travel) var(--ease-move),
+    opacity calc(var(--duration-travel) * 0.6) var(--ease-move);
+}
+.windows--travelling .window__plate {
+  opacity: 0;
+  transition: opacity 200ms var(--ease-move);
+}
 
 /* The name plate, floating in front of the weather. */
 /*
@@ -1615,4 +1668,188 @@ a { color: var(--accent); }
 @media (max-width: 719px) {
   .topbar { flex-wrap: wrap; gap: var(--space-sm); }
   .topbar__controls { width: 100%; justify-content: space-between; gap: var(--space-sm); }
+}
+
+/*
+  The veil that spans the door and the day.
+
+  Fixed and above everything, in the destination's own canvas colour, so the
+  moment React swaps four scenes for a dashboard happens behind it. See
+  `travel.tsx` for why this cannot live in either screen.
+
+  `radial-gradient` rather than a flat fill: a plain panel of colour reads as a
+  loading screen, while a soft centre reads as light coming from the place you
+  are walking into. The accent is the language's own pale wash, so Mandarin
+  closes warm and Korean closes green.
+*/
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 50% 55%, var(--veil-accent) 0%, var(--veil-canvas) 62%),
+    var(--veil-canvas);
+  opacity: 0;
+}
+/* Closing over the window as it grows. */
+.veil--closing {
+  animation: veil-close 460ms var(--ease-move) forwards;
+}
+/* Lifting off the day underneath, which is already painted. */
+.veil--opening {
+  animation: veil-open 320ms var(--ease-move) forwards;
+}
+
+@keyframes veil-close {
+  /*
+    Scaled slightly, not just faded.
+
+    A pure cross-fade over an expanding drawing looks like two pictures at
+    different opacities. Letting the wash settle inwards a touch keeps the
+    movement going in one direction all the way through the cut.
+  */
+  from { opacity: 0; transform: scale(1.04); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes veil-open {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(1.03); }
+}
+
+/*
+  Somebody who asked for less movement did not ask for a slower app.
+
+  `travel.tsx` skips the journey entirely under this preference, so the veil is
+  never rendered; this is belt and braces for the case where the media query
+  changes mid-journey.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .veil { display: none; }
+}
+
+/* ---------------------------------------------------------------- setup
+
+   The interview after choosing a language. Laid out as a page of questions,
+   so it reads as a conversation rather than as a settings screen that happens
+   to come first.
+*/
+.start__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding-bottom: var(--space-sm);
+}
+
+/*
+  The four programme shapes.
+
+  Cards rather than chips: each carries a line explaining what it means, and a
+  row of four chips with four sentences under it is unreadable. Single column,
+  because these are read in order and compared against each other.
+*/
+.shapes {
+  display: grid;
+  gap: var(--space-xs);
+}
+.shape {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-instant) var(--ease),
+    background var(--duration-instant) var(--ease);
+}
+.shape:hover { border-color: var(--ink-faint); }
+.shape--on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.shape__name {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+.shape__line {
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+/* ---------------------------------------------------------------- date
+
+   Label above the control rather than beside it: a date input is as wide as
+   its locale's format needs, which varies, and a side-by-side label wraps
+   unpredictably across browsers.
+*/
+.datefield {
+  display: grid;
+  gap: var(--space-xs);
+}
+.datefield__label {
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
+}
+.datefield__input {
+  width: 100%;
+  /* The UA draws the picker indicator in its own colour, which is black on a
+     dark field without this. */
+  color-scheme: inherit;
+}
+
+/* ---------------------------------------------------------------- roadmap */
+.roadmap {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.roadmap__item {
+  display: grid;
+  gap: 2px;
+  padding-left: var(--space-md);
+  /* A rule rather than a bullet: these are entries in a list of intentions,
+     not steps to follow in order. */
+  border-left: 2px solid var(--accent-soft);
+}
+.roadmap__title {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+.roadmap__line {
+  font-size: var(--text-caption);
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+/* ---------------------------------------------------------------- colophon */
+.below__link {
+  align-self: flex-start;
+  padding: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--accent);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.maker {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  margin: var(--space-lg) 0 0;
+  font-size: var(--text-micro);
+  color: var(--ink-faint);
+}
+.maker__name {
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
 }

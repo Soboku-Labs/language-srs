@@ -1,3 +1,4 @@
+import { CARD_KINDS, type CardKind } from './exam';
 /** ISO 639-1 codes for the languages the app supports. */
 export type LanguageCode = 'zh' | 'ja' | 'ko' | 'vi';
 
@@ -115,4 +116,38 @@ export function getLanguageProfile(code: LanguageCode): LanguageProfile {
 
 export function isLanguageCode(value: string): value is LanguageCode {
   return Object.prototype.hasOwnProperty.call(LANGUAGE_PROFILES, value);
+}
+
+/**
+ * Whether this language is written in characters recalled stroke by stroke.
+ *
+ * The distinction handwriting practice turns on. Mandarin, Japanese and Korean
+ * all have a script where producing the character from memory is a separate
+ * skill from knowing the word; Vietnamese is written in a Latin alphabet,
+ * where "writing it" and "producing it" are the same act.
+ */
+export function usesCharacterWriting(code: LanguageCode): boolean {
+  return getLanguageProfile(code).scripts.some(
+    (script) => script.startsWith('hanzi') || script === 'kanji' || script === 'hanja',
+  );
+}
+
+/**
+ * The card kinds that mean anything in this language.
+ *
+ * Offering a Japanese learner tone cards is offering them something that will
+ * never be generated — `tone` needs a tone to drill — and offering a
+ * Vietnamese learner handwriting practice is offering them spelling under
+ * another name. Both were on screen before this existed.
+ *
+ * In `CARD_KINDS` order, so anything built from this lists them the same way
+ * everywhere.
+ */
+export function cardKindsForLanguage(code: LanguageCode): CardKind[] {
+  const { tonal } = getLanguageProfile(code);
+  const handwritten = usesCharacterWriting(code);
+
+  return CARD_KINDS.filter(
+    (kind) => (kind !== 'tone' || tonal) && (kind !== 'writing' || handwritten),
+  );
 }

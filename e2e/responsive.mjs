@@ -36,7 +36,15 @@ for (const [w,h,name] of SIZES) {
   // races it, and the pending navigation lands *after* the next goto — which
   // leaves the test on the day screen looking for review options that are not
   // there. This is also what a learner does: they arrive, then they study.
-  await page.waitForURL('**/home', { timeout: 15_000 });
+  // A language nobody has set up now opens the setup interview first, so
+  // arriving means landing on either, and completing the interview if it is
+  // the one that came up. Written as "whichever comes" rather than always
+  // expecting setup, so this keeps working for a language already set up.
+  await page.waitForURL(/\/(home|start)$/, { timeout: 15_000 });
+  if (page.url().endsWith('/start')) {
+    await page.getByRole('button', { name: 'Start learning' }).click();
+    await page.waitForURL('**/home', { timeout: 15_000 });
+  }
 
   const flags = [];
   for (const route of ROUTES) {

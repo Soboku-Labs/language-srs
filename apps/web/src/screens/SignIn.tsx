@@ -70,6 +70,7 @@ export function SignIn() {
   const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
   const [waking, setWaking] = useState(false);
+  const [preparingDemo, setPreparingDemo] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
   const run = (action: () => Promise<void>) => {
@@ -88,6 +89,7 @@ export function SignIn() {
         );
         setBusy(false);
         setWaking(false);
+        setPreparingDemo(false);
       }
     })();
   };
@@ -225,10 +227,16 @@ export function SignIn() {
             storage slice, saying so throughout.
           */}
           <TextButton
-            label="Look around with a demo first"
+            label={preparingDemo ? 'Setting up the demo\u2026' : 'Look around with a demo first'}
             muted
             disabled={busy}
-            onClick={() => run(() => useDemo())}
+            onClick={() => {
+              // It builds a fortnight of real review history, which takes a
+              // second or two of writes. A button that looks stuck for that
+              // long is worse than one that says what it is doing.
+              setPreparingDemo(true);
+              run(() => useDemo());
+            }}
           />
         </Section>
       </Rise>

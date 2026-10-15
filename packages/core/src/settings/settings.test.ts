@@ -7,6 +7,7 @@ import {
   type LanguageSettings,
   type UserSettings,
 } from './index';
+import { DEFAULT_STUDY_PROFILE } from '../types/card';
 
 const user: UserSettings = { ...DEFAULT_USER_SETTINGS, updatedAt: '2026-01-01T00:00:00.000Z' };
 
@@ -45,6 +46,31 @@ describe('normalising user settings', () => {
 
   it('ignores a number that is not one', () => {
     expect(normaliseUserSettings({ dayStartHour: Number.NaN }, user).dayStartHour).toBe(4);
+  });
+});
+
+/**
+ * The two default sets describe the same thing and must not drift.
+ *
+ * They started out disagreeing — ten new cards a day on the server, fifteen in
+ * the engine — so a language began at a different pace depending on which side
+ * created it first. Nothing catches that by reading the code, so it is asserted.
+ */
+describe('the server and engine defaults', () => {
+  it('agree on where a language starts', () => {
+    expect({
+      dailyNewLimit: DEFAULT_LANGUAGE_SETTINGS.dailyNewLimit,
+      dailyReviewLimit: DEFAULT_LANGUAGE_SETTINGS.dailyReviewLimit,
+      desiredRetention: DEFAULT_LANGUAGE_SETTINGS.desiredRetention,
+    }).toEqual({
+      dailyNewLimit: DEFAULT_STUDY_PROFILE.dailyNewLimit,
+      dailyReviewLimit: DEFAULT_STUDY_PROFILE.dailyReviewLimit,
+      desiredRetention: DEFAULT_STUDY_PROFILE.desiredRetention,
+    });
+  });
+
+  it('agree on when the study day starts', () => {
+    expect(DEFAULT_USER_SETTINGS.dayStartHour).toBe(DEFAULT_STUDY_PROFILE.dayStartHour);
   });
 });
 

@@ -640,7 +640,7 @@ describe('settings, kept apart from the state blob', () => {
 
     // This is the whole point of the split: an exam booked for Mandarin is not
     // an exam booked for Japanese.
-    expect(japanese.body).toMatchObject({ dailyNewLimit: 10 });
+    expect(japanese.body).toMatchObject({ dailyNewLimit: 15 });
     expect((japanese.body as { examDate?: string }).examDate).toBeUndefined();
   });
 

@@ -987,3 +987,72 @@ describe('when the study day rolls over', () => {
     expect(engine.dayStartHour).toBe(4);
   });
 });
+
+/**
+ * Preferences have one carrier, and the blob is not it.
+ *
+ * Appearance, backdrop and the start of the day have their own endpoints. They
+ * also sit in the same `meta` key as the deck's bookkeeping, so a synced blob
+ * carries a copy — and if that copy wins, choosing dark on one device gets
+ * undone by a sync from another that has not heard about it yet.
+ */
+describe('settings and the synced blob', () => {
+  it('keeps this device’s appearance when a blob says otherwise', async () => {
+    const { engine } = await makeEngine();
+    await engine.setAppearance('dark');
+    await engine.setBackdrop('living');
+    await engine.setDayStartHour(2);
+
+    // A blob from a device that still thinks the account is light and calm.
+    const other = await makeEngine();
+    await other.engine.setAppearance('light');
+    await other.engine.setBackdrop('calm');
+    await other.engine.setDayStartHour(9);
+    await engine.importState(await other.engine.exportState());
+
+    expect(engine.appearance).toBe('dark');
+    expect(engine.backdrop).toBe('living');
+    expect(engine.dayStartHour).toBe(2);
+  });
+
+  it('takes the blob’s settings when this device has never chosen', async () => {
+    // The other half of the rule: silence is not a preference. A fresh browser
+    // signing in should adopt the account's look rather than impose defaults.
+    const chosen = await makeEngine();
+    await chosen.engine.setAppearance('dark');
+    await chosen.engine.setBackdrop('living');
+
+    const fresh = await makeEngine();
+    await fresh.engine.importState(await chosen.engine.exportState());
+
+    expect(fresh.engine.appearance).toBe('dark');
+    expect(fresh.engine.backdrop).toBe('living');
+  });
+
+  it('still carries them in the blob, for an older build reading it', async () => {
+    const { engine } = await makeEngine();
+    await engine.setAppearance('dark');
+
+    const exported = await engine.exportState();
+    const meta = JSON.parse(exported[STORAGE_KEYS.meta]!) as { appearance?: string };
+    expect(meta.appearance).toBe('dark');
+  });
+
+  it('survives the preserved settings across a restart', async () => {
+    const { engine, store } = await makeEngine();
+    await engine.setAppearance('dark');
+
+    const other = await makeEngine();
+    await other.engine.setAppearance('light');
+    await engine.importState(await other.engine.exportState());
+
+    // Written to the store, not only held in memory: an import that only fixed
+    // the field in memory would lose it on the next launch.
+    const reopened = await StudyEngine.create({
+      store,
+      seedEntries: SEED_ENTRIES,
+      clock: fixedClock(NOW),
+    });
+    expect(reopened.appearance).toBe('dark');
+  });
+});

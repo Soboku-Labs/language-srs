@@ -1035,6 +1035,29 @@ export class StudyEngine {
    * right move — see `AccountState` on why this is last-writer-wins.
    */
   async importState(values: Record<string, string>): Promise<void> {
+    /*
+     * The account's own preferences are not the blob's to decide.
+     *
+     * Appearance, backdrop and the hour the day starts have their own
+     * endpoints now, and the blob carries a copy of them because they sit in
+     * the same `meta` key as the deck's bookkeeping. Letting that copy win
+     * means two carriers for one value and the later arrival deciding, which
+     * is how choosing dark on one device gets undone by a sync from another
+     * that has not heard yet.
+     *
+     * Found by disabling the settings reconciliation and watching a browser
+     * still turn dark: the blob was quietly doing the job, so the test could
+     * not tell a working reconciliation from a broken one.
+     *
+     * Held across the import and put back. Kept in the blob on the way out,
+     * because an older build reading it still expects them to be there.
+     */
+    const preserved = {
+      appearance: this.meta.appearance,
+      backdrop: this.meta.backdrop,
+      dayStartHour: this.meta.dayStartHour,
+    };
+
     for (const key of SYNCED_STORAGE_KEYS) {
       const value = values[key];
       if (value === undefined) await this.options.store.remove(key);
@@ -1043,9 +1066,19 @@ export class StudyEngine {
 
     // Migrated here as well as on load: this is a blob from another device,
     // which may be running a build that still kept the hour on each profile.
-    this.meta = migrateMeta(
+    const incoming = migrateMeta(
       await readJson<EngineMeta>(this.options.store, STORAGE_KEYS.meta, this.meta),
     );
+    this.meta = {
+      ...incoming,
+      // `undefined` means "never chosen here", which must not overwrite a
+      // value the blob does carry — a device that has only ever used the
+      // defaults should take the account's choice, not impose its silence.
+      appearance: preserved.appearance ?? incoming.appearance,
+      backdrop: preserved.backdrop ?? incoming.backdrop,
+      dayStartHour: preserved.dayStartHour ?? incoming.dayStartHour,
+    };
+    await writeJson(this.options.store, STORAGE_KEYS.meta, this.meta);
     this.cards = await readJson<Card[]>(this.options.store, STORAGE_KEYS.cards, []);
     this.logs = await readJson<import('./types/review').ReviewLog[]>(this.options.store, STORAGE_KEYS.logs, []);
     this.importedEntries = await readJson<LexicalEntry[]>(this.options.store, STORAGE_KEYS.entries, []);

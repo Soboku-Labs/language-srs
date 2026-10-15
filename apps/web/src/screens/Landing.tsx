@@ -12,6 +12,7 @@ import { Scene } from '../components/Scene';
 import { TeacherAvatar } from '../components/Teacher';
 import { useAuth, useEngine } from '../providers';
 import { useRouter } from '../router';
+import { useSettings } from '../settings';
 import { useTheme } from '../theme';
 import { Caption, Rise, Screen, Segmented } from '../ui';
 
@@ -61,7 +62,8 @@ const FAQ = [
 ];
 
 export function Landing() {
-  const { engine, revision, setActiveLanguage, mutate } = useEngine();
+  const { engine, revision, setActiveLanguage } = useEngine();
+  const { appearance, backdrop, setAppearance, setBackdrop } = useSettings();
   const { account, isSignedIn } = useAuth();
   const { navigate } = useRouter();
   const { colorsFor } = useTheme();
@@ -131,10 +133,8 @@ export function Landing() {
                 { value: 'dark', label: 'Dark' },
                 { value: 'system', label: 'Auto' },
               ]}
-              value={engine.appearance}
-              onChange={(value) =>
-                void mutate((instance) => instance.setAppearance(value as Appearance))
-              }
+              value={appearance}
+              onChange={(value) => void setAppearance(value as Appearance)}
             />
             <Segmented
               label="Background"
@@ -142,10 +142,8 @@ export function Landing() {
                 { value: 'calm', label: 'Calm' },
                 { value: 'living', label: 'Living' },
               ]}
-              value={engine.backdrop}
-              onChange={(value) =>
-                void mutate((instance) => instance.setBackdrop(value as Backdrop))
-              }
+              value={backdrop}
+              onChange={(value) => void setBackdrop(value as Backdrop)}
             />
             <button
               type="button"

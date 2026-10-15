@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useEngine, AuthProvider, EngineProvider } from './providers';
 import { SyncProvider } from './sync';
+import { SettingsProvider, useSettings } from './settings';
 import { RouterProvider, matchPath, useRouter } from './router';
 import { ThemeProvider } from './theme';
 import { Dashboard } from './screens/Dashboard';
@@ -23,8 +24,9 @@ import { Caption, Screen, TextButton, Title } from './ui';
  *
  * Auth wraps the engine, because which account you are decides which slice of
  * storage the engine reads. Sync sits inside both — it needs an account and an
- * engine and renders neither. Theme is innermost because it follows the active
- * language, which is engine state.
+ * engine and renders neither. Settings sits inside those because it reconciles
+ * the engine's values against the server's. Theme is innermost because it
+ * follows the active language and the appearance, which are both settings.
  */
 export function App() {
   return (
@@ -32,7 +34,9 @@ export function App() {
       <AuthProvider>
         <EngineProvider>
           <SyncProvider>
-            <Themed />
+            <SettingsProvider>
+              <Themed />
+            </SettingsProvider>
           </SyncProvider>
         </EngineProvider>
       </AuthProvider>
@@ -42,9 +46,8 @@ export function App() {
 
 function Themed() {
   const { engine, revision } = useEngine();
+  const { appearance, backdrop } = useSettings();
   const language = useMemo(() => engine.activeLanguage, [engine, revision]);
-  const backdrop = useMemo(() => engine.backdrop, [engine, revision]);
-  const appearance = useMemo(() => engine.appearance, [engine, revision]);
 
   /*
    * On the document, not on a component.

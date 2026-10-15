@@ -104,7 +104,11 @@ export const DEFAULT_LANGUAGE_SETTINGS: Omit<
   LanguageSettings,
   'languageCode' | 'examTrackId' | 'targetLevelId' | 'updatedAt'
 > = {
-  dailyNewLimit: 10,
+  // Deliberately the same numbers as `DEFAULT_STUDY_PROFILE`. These started out
+  // disagreeing — ten here, fifteen there — which meant a new language began at
+  // a different pace depending on whether the server or the app got there
+  // first. Two defaults for one setting is the drift this split exists to stop.
+  dailyNewLimit: 15,
   dailyReviewLimit: 120,
   desiredRetention: 0.9,
 };

@@ -9,6 +9,7 @@ import {
 } from '@language-srs/core';
 import { SyncStatus } from '../components/SyncStatus';
 import { useAuth, useEngine } from '../providers';
+import { useSettings } from '../settings';
 import { useRouter } from '../router';
 import { Caption, Choice, DetailRow, Rise, Row, Screen, Section, TextButton } from '../ui';
 
@@ -23,6 +24,15 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function Settings() {
   const { engine, revision, mutate } = useEngine();
+  const {
+    backdrop,
+    dayStartHour,
+    setBackdrop,
+    setDayStartHour,
+    setExamTrack,
+    updateLanguage,
+    error,
+  } = useSettings();
   const { account, synced, canSignIn, signOut } = useAuth();
   const { navigate } = useRouter();
 
@@ -46,7 +56,7 @@ export function Settings() {
     const trimmed = value.trim();
     if (trimmed.length === 0) {
       setDateError(undefined);
-      await mutate((instance) => instance.updateProfile(code, { examDate: undefined }));
+      await updateLanguage({ examDate: null });
       return;
     }
     if (!DATE_PATTERN.test(trimmed)) {
@@ -54,7 +64,7 @@ export function Settings() {
       return;
     }
     setDateError(undefined);
-    await mutate((instance) => instance.updateProfile(code, { examDate: trimmed }));
+    await updateLanguage({ examDate: trimmed });
   };
 
   const shortfall = level ? Math.max(0, level.vocabularyTarget - available) : 0;
@@ -62,7 +72,16 @@ export function Settings() {
   return (
     <Screen>
       <Rise index={0}>
-        <Caption>Settings apply to {language.name}. Each language keeps its own.</Caption>
+        <Caption>
+          Exam, level and daily amounts apply to {language.name}. Your day and the background
+          apply everywhere.
+        </Caption>
+        {/*
+          Said, not hidden, and not undone. A failed push leaves the setting
+          applied here — rolling back a choice somebody just made because the
+          network blinked is worse than it being a moment behind the server.
+        */}
+        {error ? <Caption>Saved on this device. Not reaching the server: {error}</Caption> : null}
       </Rise>
 
       {tracks.length > 1 ? (
@@ -74,7 +93,7 @@ export function Settings() {
                   key={candidate.id}
                   label={candidate.name}
                   selected={candidate.id === profile.examTrackId}
-                  onClick={() => void mutate((instance) => instance.setExamTrack(code, candidate.id))}
+                  onClick={() => void setExamTrack(candidate.id)}
                 />
               ))}
             </Row>
@@ -91,11 +110,7 @@ export function Settings() {
                 key={candidate.id}
                 label={candidate.shortName}
                 selected={candidate.id === profile.targetLevelId}
-                onClick={() =>
-                  void mutate((instance) =>
-                    instance.updateProfile(code, { targetLevelId: candidate.id }),
-                  )
-                }
+                onClick={() => void updateLanguage({ targetLevelId: candidate.id })}
               />
             ))}
           </Row>
@@ -182,7 +197,7 @@ export function Settings() {
             step={5}
             min={0}
             max={200}
-            onChange={(value) => void mutate((i) => i.updateProfile(code, { dailyNewLimit: value }))}
+            onChange={(value) => void updateLanguage({ dailyNewLimit: value })}
           />
           <Stepper
             label="Reviews"
@@ -190,7 +205,7 @@ export function Settings() {
             step={20}
             min={20}
             max={999}
-            onChange={(value) => void mutate((i) => i.updateProfile(code, { dailyReviewLimit: value }))}
+            onChange={(value) => void updateLanguage({ dailyReviewLimit: value })}
           />
           <Stepper
             label="Target retention"
@@ -199,9 +214,7 @@ export function Settings() {
             min={70}
             max={97}
             suffix="%"
-            onChange={(value) =>
-              void mutate((i) => i.updateProfile(code, { desiredRetention: value / 100 }))
-            }
+            onChange={(value) => void updateLanguage({ desiredRetention: value / 100 })}
           />
           <Caption>
             Higher retention means shorter intervals and more reviews. 90% is where most learners get
@@ -218,6 +231,29 @@ export function Settings() {
       </Rise>
 
       <Rise index={6}>
+        <Section title="Your day">
+          {/*
+            A user setting, not a language one — and until now one with no
+            control at all: it was stored on each language's profile, defaulted
+            to four, and could not be changed from anywhere in the app.
+          */}
+          <Stepper
+            label="Day starts at"
+            value={dayStartHour}
+            step={1}
+            min={0}
+            max={23}
+            suffix=":00"
+            onChange={(value) => void setDayStartHour(value)}
+          />
+          <Caption>
+            Reviews before this hour count towards the previous day, so finishing at 2am does not
+            start a second day's work. Applies to every language.
+          </Caption>
+        </Section>
+      </Rise>
+
+      <Rise index={6}>
         <Section title="Background">
           {/*
             Applies everywhere, not to this language. The four places keep
@@ -227,17 +263,17 @@ export function Settings() {
           <Row wrap>
             <Choice
               label="Calm"
-              selected={engine.backdrop === 'calm'}
-              onClick={() => void mutate((instance) => instance.setBackdrop('calm'))}
+              selected={backdrop === 'calm'}
+              onClick={() => void setBackdrop('calm')}
             />
             <Choice
               label="Living"
-              selected={engine.backdrop === 'living'}
-              onClick={() => void mutate((instance) => instance.setBackdrop('living'))}
+              selected={backdrop === 'living'}
+              onClick={() => void setBackdrop('living')}
             />
           </Row>
           <Caption>
-            {engine.backdrop === 'living'
+            {backdrop === 'living'
               ? 'The sky moves, the light crosses it and the drawing drifts. Nothing is added — the same scene, awake.'
               : 'The scene is a still drawing. It answers the pointer and otherwise holds its breath.'}
           </Caption>

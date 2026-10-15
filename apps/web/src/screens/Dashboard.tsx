@@ -47,7 +47,7 @@ export function Dashboard() {
     <Screen>
       {/* Tapping the language is how you switch it — no menu needed. */}
       <Rise index={0}>
-        <button type="button" className="header" onClick={() => navigate('/languages')}>
+        <button type="button" className="header" onClick={() => navigate('/')}>
           <span className="header__text">
             <Title>{language.name}</Title>
             <Caption>

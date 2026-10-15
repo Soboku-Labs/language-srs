@@ -344,6 +344,21 @@ a { color: var(--accent); }
 /* ---------------------------------------------------------------- review */
 
 .progress { display: flex; flex-direction: column; gap: var(--space-sm); align-items: center; }
+.progress__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  width: 100%;
+}
+/* Quiet on purpose: the way out should be findable, not inviting. */
+.progress__leave {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+  padding: 0 var(--space-xs);
+}
+.progress__leave:hover { color: var(--ink); }
 .progress .track { align-self: stretch; }
 
 .question { display: flex; flex-direction: column; gap: var(--space-lg); }
@@ -753,3 +768,115 @@ a { color: var(--accent); }
   text-underline-offset: 2px;
 }
 .alert + .chrome { padding-top: var(--space-md); }
+
+/* ---------------------------------------------------------------- the door
+
+   The front page is the one place in the app that is allowed to be loud. It
+   is read once, by somebody deciding whether to stay, where the day and the
+   loop are opened every morning by somebody who has already decided. So the
+   type is larger here and the whitespace is more generous, and both tighten
+   as you go deeper.
+*/
+.masthead { display: flex; flex-direction: column; gap: var(--space-md); }
+.masthead__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.wordmark {
+  font-size: var(--text-heading);
+  font-weight: var(--weight-strong);
+  letter-spacing: -0.02em;
+}
+.masthead__headline {
+  margin: 0;
+  font-size: 34px;
+  line-height: 38px;
+  font-weight: var(--weight-strong);
+  letter-spacing: -0.02em;
+}
+.masthead__standfirst {
+  margin: 0;
+  font-size: var(--text-body);
+  line-height: 23px;
+  color: var(--ink-muted);
+  max-width: 34em;
+}
+
+/* The one row here about the learner rather than the product. */
+.resume {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-lg);
+  border-radius: var(--radius-card);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.resume__label {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.resume__language { font-size: var(--text-heading); font-weight: var(--weight-strong); }
+.resume__count { font-size: var(--text-caption); color: var(--ink-muted); }
+
+.method { display: flex; flex-direction: column; gap: var(--space-lg); }
+.method__row { display: flex; gap: var(--space-md); align-items: flex-start; }
+.method__number {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--accent);
+  padding-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.method__title { margin: 0 0 2px; font-size: var(--text-body); font-weight: var(--weight-strong); }
+.method__body { margin: 0; font-size: var(--text-caption); line-height: 20px; color: var(--ink-muted); }
+
+.place__badge {
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  color: var(--place-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+/*
+  The FAQ uses <details>, so it is collapsed by default and open to anybody who
+  wants it. Somebody who already knows why they are here should not have to
+  scroll past four paragraphs of argument to reach the languages.
+*/
+.faq { display: flex; flex-direction: column; gap: var(--space-xs); }
+.faq__item {
+  border-bottom: 1px solid var(--line);
+  padding: var(--space-sm) 0;
+}
+.faq__question {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.faq__question::-webkit-details-marker { display: none; }
+.faq__question::after {
+  content: '+';
+  color: var(--ink-muted);
+  font-weight: var(--weight-regular);
+}
+.faq__item[open] .faq__question::after { content: '–'; }
+.faq__answer {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-caption);
+  line-height: 20px;
+  color: var(--ink-muted);
+  max-width: 38em;
+}

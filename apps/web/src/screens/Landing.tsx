@@ -8,7 +8,7 @@ import {
   type LanguageCode,
 } from '@language-srs/core';
 import { LanguageArt } from '../components/LanguageArt';
-import { TeacherAvatar, TeacherCard } from '../components/Teacher';
+import { TeacherAvatar } from '../components/Teacher';
 import { useAuth, useEngine } from '../providers';
 import { useRouter } from '../router';
 import { Caption, Rise, Screen, TextButton } from '../ui';
@@ -118,8 +118,13 @@ export function Landing() {
   return (
     <Screen layer="door">
       <Rise index={0}>
-        <header className="masthead">
-          <span className="wordmark">mon</span>
+        <header className="topbar">
+          <div className="topbar__brand">
+            <span className="wordmark">mon</span>
+            <span className="topbar__line">
+              Exam-shaped review for Mandarin, Japanese, Korean and Vietnamese.
+            </span>
+          </div>
           <TextButton
             label={isSignedIn ? (account?.displayName ?? 'Account') : 'Sign in'}
             muted
@@ -129,61 +134,13 @@ export function Landing() {
       </Rise>
 
       {/*
-        The headline promises four teachers, so the hero shows them.
-
-        It used to promise them and then show a quarter-page of empty canvas —
-        the text held the left third and nothing held the rest, which on a wide
-        screen reads as a page that has not finished loading. The four of them
-        fill that side, and they are the choice itself rather than decoration:
-        tapping one opens their language.
-      */}
-      <Rise index={1}>
-        <section className="hero">
-          <div className="hero__text">
-            <h1 className="hero__headline">
-              Four languages.
-              <br />
-              Four teachers.
-            </h1>
-            <p className="hero__standfirst">
-              Spaced repetition for Mandarin, Japanese, Korean and Vietnamese, shaped like the exam
-              you are sitting. Choose a language and meet the person who takes you through it.
-            </p>
-          </div>
-
-          <div className="constellation">
-            {LANGUAGE_CODES.map((code) => {
-              const teacher = getTeacher(code);
-              const theme = getLanguageTheme(code);
-              return (
-                <button
-                  key={code}
-                  type="button"
-                  className="constellation__person"
-                  style={{
-                    ['--place-accent' as string]: theme.colors.accent,
-                    ['--place-wash' as string]: theme.colors.accentSoft,
-                  }}
-                  onClick={() => void open(code)}
-                >
-                  <TeacherAvatar teacher={teacher} size="large" />
-                  <span className="constellation__name">{teacher.romanised}</span>
-                  <span className="constellation__language">{getLanguageProfile(code).endonym}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      </Rise>
-
-      {/*
-        Only for somebody who has actually studied. Offering to "continue" a
-        language nobody has opened would greet a first-time visitor with
-        somebody else's progress — and it is the one row here that is about
-        them rather than about the product, so it sits above the explaining.
+        Somebody who has studied is not here to choose, so this comes first and
+        stays small — a strip rather than a card, because it has to be obvious
+        without becoming the subject of a page whose subject is the four
+        languages.
       */}
       {state.resume ? (
-        <Rise index={2}>
+        <Rise index={1}>
           <button type="button" className="resume" onClick={() => void open(state.resume!)}>
             <span className="resume__label">Continue</span>
             <span className="resume__language">{getLanguageProfile(state.resume).name}</span>
@@ -194,51 +151,58 @@ export function Landing() {
         </Rise>
       ) : null}
 
-      <Rise index={3}>
-        <h2 className="section__title section__title--major">Choose a language</h2>
-      </Rise>
+      {/*
+        The first screen is the choice itself.
 
-      <div className="places">
+        This page has twice been a landing page — a headline announcing four
+        languages and four teachers, above a grid that then showed them. Saying
+        it and then showing it is one of them too many, and it left the thing
+        somebody came to do below the fold behind an argument for doing it.
+
+        So there is no headline. Four panels fill the first screen, each in its
+        own language's ink with its own place drawn at the foot of it, and the
+        one line of positioning sits up in the bar. The argument still exists,
+        under the choice, for anybody who wants it.
+      */}
+      <div className="gate">
         {LANGUAGE_CODES.map((code, index) => {
           const profile = getLanguageProfile(code);
           const theme = getLanguageTheme(code);
           const culture = getCulture(code);
+          const teacher = getTeacher(code);
+          const started = state.started.has(code);
 
           return (
-            <Rise key={code} index={4 + index}>
-              {/*
-                Drawn in its own language's ink rather than the active theme's,
-                so four of these read as four places instead of one place in
-                four shades.
-              */}
+            <Rise key={code} index={2 + index} className="gate__cell">
               <button
                 type="button"
-                className={`place${state.started.has(code) ? ' place--started' : ''}`}
-                // The card borrows the language's accent for its own chrome,
-                // scoped here rather than on `:root` so four of them can be on
-                // screen at once without fighting.
+                className={`gate__panel${started ? ' gate__panel--started' : ''}`}
+                // Scoped here rather than on `:root` so four of them can be on
+                // screen at once without fighting over the accent.
                 style={{
                   ['--place-accent' as string]: theme.colors.accent,
                   ['--place-wash' as string]: theme.colors.accentSoft,
                 }}
                 onClick={() => void open(code)}
               >
-                <LanguageArt code={code} className="place__art" animate={false} />
+                <LanguageArt code={code} className="gate__art" animate={false} />
 
-                <span className="place__head">
-                  <span className="place__name">
-                    {profile.name}
-                    <span className="place__endonym"> · {profile.endonym}</span>
+                <span className="gate__body">
+                  <span className="gate__top">
+                    <span className="gate__endonym">{profile.endonym}</span>
+                    {started ? <span className="gate__badge">Started</span> : null}
                   </span>
-                  {state.started.has(code) ? <span className="place__badge">Started</span> : null}
-                </span>
 
-                <span className="place__where">
-                  {culture.cityLocal} · {culture.countryLocal}
-                </span>
-                <span className="place__line">{culture.line}</span>
+                  <span className="gate__name">{profile.name}</span>
+                  <span className="gate__where">
+                    {culture.cityLocal} · {culture.countryLocal}
+                  </span>
 
-                <TeacherCard code={code} />
+                  <span className="gate__teacher">
+                    <TeacherAvatar teacher={teacher} size="small" />
+                    <span className="gate__teacher-name">{teacher.romanised}</span>
+                  </span>
+                </span>
               </button>
             </Rise>
           );

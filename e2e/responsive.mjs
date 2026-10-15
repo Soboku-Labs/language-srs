@@ -30,7 +30,7 @@ for (const [w,h,name] of SIZES) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => bad.push(`${name}: pageerror ${e.message.slice(0,80)}`));
   await page.goto(BASE, { waitUntil: 'load' });
-  await page.locator('.place').first().click();
+  await page.locator('.gate__panel').first().click();
   await page.waitForTimeout(400);
 
   const flags = [];

@@ -671,78 +671,7 @@ a { color: var(--accent); }
 
 /* ------------------------------------------------------- the language cards */
 
-.places { display: flex; flex-direction: column; gap: var(--space-lg); }
 
-/*
- * One language, as a place.
- *
- * Every colour here comes from `--place-accent`, set per card from that
- * language's own theme — so four cards read as four places rather than as one
- * palette applied four times.
- */
-.place {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  width: 100%;
-  text-align: left;
-  padding: 0 0 var(--space-lg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  overflow: hidden;
-  transition: border-color 160ms ease, transform 160ms ease;
-}
-.place:hover { border-color: var(--place-accent); }
-.place:active { transform: scale(0.995); }
-.place--chosen { border-color: var(--place-accent); }
-
-/* The drawing is the card's lid: full bleed, on its own wash. */
-.place__art { background: var(--place-wash); padding-top: var(--space-md); }
-
-.place__head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg) 0;
-}
-.place__name { flex: 1; font-size: var(--text-title); font-weight: var(--weight-medium); }
-.place__endonym { color: var(--ink-faint); font-weight: var(--weight-regular); }
-.place__check { color: var(--place-accent); font-weight: var(--weight-strong); }
-
-.place__where {
-  padding: 0 var(--space-lg);
-  font-size: var(--text-caption);
-  color: var(--place-accent);
-  font-weight: var(--weight-medium);
-}
-.place__line {
-  padding: 0 var(--space-lg);
-  font-size: var(--text-caption);
-  color: var(--ink-muted);
-  line-height: 1.5;
-}
-
-.place .teacher { padding: var(--space-sm) var(--space-lg) 0; }
-
-.place__palette {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-lg) 0;
-  font-size: var(--text-micro);
-  color: var(--ink-faint);
-  line-height: 1.5;
-}
-.place__swatch {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  margin-top: 2px;
-  border-radius: 3px;
-  background: var(--place-accent);
-}
-.place__palette b { color: var(--ink-muted); font-weight: var(--weight-medium); }
 
 /*
   The unsaved-work warning.
@@ -782,130 +711,155 @@ a { color: var(--accent); }
 
 /* ---------------------------------------------------------------- the door
 
-   The front page carries the weight of the whole app, so it is composed
-   rather than stacked. The order is hook, choose, why, questions — the
-   argument comes after the choice, because somebody who already wants to
-   start should not have to scroll past three paragraphs defending the
-   product to reach the languages.
+   The first screen is the choice, not an argument for making it.
+
+   Two earlier versions of this page were landing pages: a headline announcing
+   four languages and four teachers, above a grid that then showed them. The
+   positioning now lives on one line in the bar, and the four of them take the
+   screen.
 */
 
-/* A rule across the top, so the wordmark and the account link read as one
-   bar rather than two things marooned at opposite edges of a wide screen. */
-.masthead {
+.topbar {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-md);
+  gap: var(--space-lg);
   padding-bottom: var(--space-md);
   border-bottom: 1px solid var(--line);
 }
+.topbar__brand { display: flex; align-items: baseline; gap: var(--space-md); min-width: 0; }
 .wordmark {
   font-size: var(--text-heading);
   font-weight: var(--weight-strong);
   letter-spacing: 0.04em;
 }
-
-/*
-  The hero.
-
-  One column on a phone, two once there is room — and the second column is
-  the four teachers the headline has just promised. Before this the text held
-  the left third of a 1000px page and nothing held the rest, which reads as a
-  page that has not finished loading.
-*/
-.hero { display: flex; flex-direction: column; gap: var(--space-xl); }
-.hero__text { display: flex; flex-direction: column; gap: var(--space-md); }
-.hero__headline {
-  margin: 0;
-  font-size: 34px;
-  line-height: 1.12;
-  font-weight: var(--weight-strong);
-  letter-spacing: -0.025em;
-  text-wrap: balance;
-}
-.hero__standfirst {
-  margin: 0;
-  font-size: var(--text-body);
-  line-height: 24px;
-  color: var(--ink-muted);
-  max-width: 32em;
-}
-
-/*
-  Four people, not four flags.
-
-  Each sits in their own language's ink, and tapping one opens that language —
-  the hero is the choice rather than a picture of it.
-*/
-.constellation {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-sm);
-}
-.constellation__person {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-md) var(--space-xs);
-  border-radius: var(--radius-card);
-  transition: background var(--duration-instant) var(--ease);
-}
-.constellation__person:hover { background: var(--place-wash); }
-.constellation__name {
+/* The whole pitch, in one line, next to the name. */
+.topbar__line {
   font-size: var(--text-caption);
-  font-weight: var(--weight-medium);
-  text-align: center;
-  line-height: 16px;
-  /* Two lines' worth, always. "Seo Ha-eun" and "Nguyen Thi Mai" wrap in a
-     narrow column where the other two do not, and without this the language
-     under each name sits at a different height across the row. */
-  min-height: 32px;
-  text-wrap: balance;
-}
-.constellation__language {
-  font-size: var(--text-micro);
   color: var(--ink-muted);
-  text-align: center;
+  /* Dropped before it can wrap into a paragraph and become a headline again. */
+  display: none;
 }
 
-/* The one row here about the learner rather than the product. */
-.resume {
+/*
+  Four doors.
+
+  One column on a phone, two by two once there is room, and sized so all four
+  are on the first screen either way — a chooser where the choice is visible
+  is a different thing from a list you scroll through looking for yours.
+*/
+.gate {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-md);
+}
+.gate__cell { display: flex; }
+
+.gate__panel {
+  position: relative;
+  display: flex;
+  /* Words at the top, the place drawn along the floor beneath them. The
+     artwork anchors to the bottom of its own box, so putting the text
+     anywhere but the top means reading it through a pagoda. */
+  align-items: flex-start;
+  width: 100%;
+  /*
+    Tall enough for both bands.
+
+    The words need the top of the panel and the drawing needs the floor, and
+    at 150px they were fighting over the middle — every teacher's name was
+    crossed by a roofline. This is the height at which the text block clears
+    the artwork on the narrowest phone.
+  */
+  min-height: 200px;
+  padding: var(--space-lg);
+  overflow: hidden;
+  text-align: left;
+  border-radius: var(--radius-card);
+  background: var(--place-wash);
+  transition:
+    transform var(--duration-instant) var(--ease),
+    box-shadow var(--duration-base) var(--ease);
+}
+.gate__panel:hover { transform: translateY(-2px); }
+.gate__panel:active { transform: translateY(0); }
+
+/*
+  The place, drawn along the floor of its panel.
+
+  The artwork anchors to the bottom of its own box already, so it needs no
+  cropping — it just needs to be behind the words and quiet enough that they
+  stay readable over it.
+*/
+.gate__art {
+  position: absolute;
+  inset: auto 0 0 0;
+  width: 100%;
+  /* Kept to the lower half, and quiet. It is the floor of the panel, not its
+     subject — the name has to win. */
+  height: 40%;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.gate__body {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
   width: 100%;
+}
+.gate__top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-sm); }
+.gate__endonym {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--place-accent);
+}
+.gate__badge {
+  font-size: var(--text-micro);
+  font-weight: var(--weight-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--place-accent);
+}
+.gate__name {
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.gate__where { font-size: var(--text-caption); color: var(--ink-muted); }
+.gate__teacher { display: flex; align-items: center; gap: var(--space-sm); padding-top: var(--space-sm); }
+.gate__teacher-name { font-size: var(--text-caption); color: var(--ink-muted); }
+
+/* The one row here about the learner rather than the product. */
+.resume {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  width: 100%;
   text-align: left;
-  padding: var(--space-lg);
-  border-radius: var(--radius-card);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-control);
   background: var(--accent-soft);
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .resume__label {
-  font-size: var(--text-caption);
-  font-weight: var(--weight-medium);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-strong);
   color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
-.resume__language { font-size: var(--text-heading); font-weight: var(--weight-strong); }
-.resume__count { font-size: var(--text-caption); color: var(--ink-muted); }
-
-/* The heading over the main event carries more weight than a section label. */
-.section__title--major {
-  font-size: var(--text-title);
-  font-weight: var(--weight-strong);
-  text-transform: none;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-}
+.resume__language { font-size: var(--text-body); font-weight: var(--weight-strong); }
+.resume__count { font-size: var(--text-caption); color: var(--ink-muted); margin-left: auto; }
 
 /*
-  The argument, after the choice and set on its own ground.
+  The argument, under the choice and on its own ground.
 
   A band rather than more text on the same canvas, so the page has somewhere
-  to breathe between the languages and the questions instead of running four
-  identical blocks together.
+  to breathe between the languages and the questions.
 */
 .method {
   display: flex;
@@ -926,25 +880,12 @@ a { color: var(--accent); }
 .method__title { margin: 0 0 2px; font-size: var(--text-body); font-weight: var(--weight-strong); }
 .method__body { margin: 0; font-size: var(--text-caption); line-height: 20px; color: var(--ink-muted); }
 
-.place__badge {
-  font-size: 11px;
-  font-weight: var(--weight-medium);
-  color: var(--place-accent);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-}
-
 /*
   The FAQ uses <details>, so it is collapsed by default and open to anybody who
-  wants it. Somebody who already knows why they are here should not have to
-  scroll past four paragraphs of argument to reach the languages.
+  wants it. Nobody should have to scroll past four paragraphs of argument.
 */
 .faq { display: flex; flex-direction: column; gap: var(--space-xs); }
-.faq__item {
-  border-bottom: 1px solid var(--line);
-  padding: var(--space-sm) 0;
-}
+.faq__item { border-bottom: 1px solid var(--line); padding: var(--space-sm) 0; }
 .faq__question {
   font-size: var(--text-body);
   font-weight: var(--weight-medium);
@@ -955,11 +896,7 @@ a { color: var(--accent); }
   gap: var(--space-md);
 }
 .faq__question::-webkit-details-marker { display: none; }
-.faq__question::after {
-  content: '+';
-  color: var(--ink-muted);
-  font-weight: var(--weight-regular);
-}
+.faq__question::after { content: '+'; color: var(--ink-muted); font-weight: var(--weight-regular); }
 .faq__item[open] .faq__question::after { content: '\2013'; }
 .faq__answer {
   margin: var(--space-sm) 0 0;
@@ -1045,58 +982,36 @@ a { color: var(--accent); }
 */
 @media (min-width: 720px) {
   :root { --page: 600px; }
-  .hero__headline { font-size: 42px; }
+
+  /* The pitch has room to sit beside the name now. */
+  .topbar__line { display: block; }
+
+  /* Two by two, and tall enough to be panels rather than rows. */
+  .gate { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-lg); }
+  .gate__panel { min-height: 210px; }
+  .gate__name { font-size: 26px; }
 }
 
 @media (min-width: 1024px) {
   :root { --page: 760px; }
 
-  /* The door opens up and its cards go two across. */
   .screen--door { max-width: 1000px; }
 
   /*
-    The hero becomes two columns, and the teachers take the half that used to
-    be empty. The text column is capped in ems rather than given a fraction of
-    the grid, so the line length stays readable as the page gets wider instead
-    of the measure growing with the screen.
-  */
-  .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-    gap: var(--space-xxl);
-    align-items: center;
-  }
-  .hero__headline { font-size: 52px; }
-  .hero__standfirst { font-size: var(--text-heading); line-height: 27px; }
+    All four on the first screen.
 
-  /* Two by two rather than a row of four, so they read as a group sitting
-     opposite the headline rather than a toolbar under it. */
-  .constellation {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-md);
-    /* Held to its own width and pushed to the end of the column, so the four
-       read as one block answering the headline rather than four items drifting
-       across the right half of the page. */
-    justify-self: end;
-    max-width: 420px;
-  }
-  .constellation__person { padding: var(--space-lg) var(--space-md); }
-  .constellation__name { font-size: var(--text-body); }
-  .constellation__language { font-size: var(--text-caption); }
-  /* Given real presence opposite a 52px headline. */
-  .constellation .avatar--large {
-    width: 86px;
-    height: 86px;
-    font-size: calc(44px * var(--glyph-scale, 1));
-  }
-  .screen--door .places {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    The panels take what is left of the viewport under the bar, so the choice
+    is seen whole rather than scrolled through — with a floor, so a short
+    laptop window does not squeeze them into strips.
+  */
+  .gate {
+    min-height: min(560px, calc(100dvh - 220px));
     gap: var(--space-xl);
   }
-  /* The grid item is the Rise wrapper, so the card has to be told to fill it. */
-  .screen--door .places > .rise { display: flex; }
-  .screen--door .places > .rise > .place { width: 100%; }
+  .gate__panel { min-height: 240px; padding: var(--space-xl); }
+  .gate__name { font-size: 30px; }
+  .gate__where, .gate__teacher-name { font-size: var(--text-body); }
+  .gate__art { height: 56%; }
 
   .screen--door .method {
     display: grid;
@@ -1104,8 +1019,6 @@ a { color: var(--accent); }
     gap: var(--space-xl);
     align-items: start;
   }
-  /* The section's own heading is a child of the grid, so without this it takes
-     the first cell and shunts the three points out of alignment. */
   .screen--door .method > .section__title,
   .screen--door .faq > .section__title { grid-column: 1 / -1; }
   .screen--door .faq {
@@ -1123,6 +1036,7 @@ a { color: var(--accent); }
 @media (min-width: 1440px) {
   :root { --page: 820px; }
   .screen--door { max-width: 1120px; }
+  .gate { min-height: min(620px, calc(100dvh - 240px)); }
 }
 
 /* ------------------------------------------------------------- the grammar

@@ -1905,3 +1905,63 @@ a { color: var(--accent); }
   bottom: var(--space-lg);
   color: var(--brand);
 }
+
+/* ---------------------------------------------------------------- handwriting
+
+   A square to write a character in with a finger. Only ever rendered on a
+   touchscreen — see components/Handwriting.tsx for why a mouse is excluded
+   rather than supported badly.
+*/
+.hand {
+  position: relative;
+  display: grid;
+  gap: var(--space-xs);
+  justify-items: center;
+  width: 100%;
+}
+.hand__pad {
+  width: min(70vw, 280px);
+  /* Square, because a character is. */
+  aspect-ratio: 1;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  /*
+    The reason the whole thing works.
+
+    Without this the first downward stroke scrolls the page rather than
+    drawing, and the card slides out from under the finger mid-character.
+  */
+  touch-action: none;
+  cursor: crosshair;
+}
+/*
+  The answer, behind the learner's attempt, once revealed.
+
+  Underneath rather than beside: the point is to see your stroke against the
+  real one. Faint, so it reads as a comparison rather than as the subject.
+*/
+.hand__reveal {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(70vw, 280px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-size: min(48vw, 190px);
+  line-height: 1;
+  color: var(--accent);
+  opacity: 0.16;
+  pointer-events: none;
+}
+.hand__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.hand__count {
+  font-size: var(--text-micro);
+  color: var(--ink-faint);
+}

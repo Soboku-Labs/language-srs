@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   LANGUAGE_CODES,
   getCulture,
@@ -7,64 +7,34 @@ import {
   getTeacher,
   type LanguageCode,
 } from '@language-srs/core';
-import { LanguageArt } from '../components/LanguageArt';
+import { Scene } from '../components/Scene';
 import { TeacherAvatar } from '../components/Teacher';
 import { useAuth, useEngine } from '../providers';
 import { useRouter } from '../router';
 import { Caption, Rise, Screen, TextButton } from '../ui';
 
 /**
- * The door.
+ * Four windows.
  *
- * The app used to open on a password field. Before a visitor had been told what
- * this is, who teaches it or why it exists, it asked them to make an account —
- * which is the wrong order, and meant the only page that explained the product
- * was one nobody signed in ever saw again.
+ * This page has been rebuilt three times and each version was the same object
+ * underneath: a document about an app, with the app's four languages drawn on
+ * it as cards. A headline, a grid, an argument, a FAQ. Rearranging those is
+ * how it kept coming out feeling like a brochure — because it was one.
  *
- * So this is the front page, and every launch starts here. It says three things
- * in order: what this is, which language you are here for, and why this exists
- * when a dozen other apps already do. The exam machinery, the readiness maths
- * and the settings all live past the door.
+ * It is not a document now. Four places are open at once, each with its own
+ * sky and its own weather, and choosing one travels into it rather than
+ * selecting it from a list. The pointer moves the layers of whichever you are
+ * over, so the thing under the cursor is somewhere rather than something.
  *
- * ## Nothing is chosen for you
+ * ## What is left of the brochure
  *
- * The engine creates a Mandarin profile on first run so there is something to
- * schedule against, and it would be easy to let that read as a choice already
- * made. It is not one. A language is shown as yours only once it has review
- * history — so a visitor meets four open doors rather than somebody else's
- * half-finished deck, and somebody signed in comes back to the one they were
- * actually studying.
+ * The argument still exists, under the windows, for anybody who scrolls to
+ * find it — some people do want to know why another language app exists before
+ * they start. But it is below the horizon, and the first screen is four
+ * doorways and nothing else.
  */
 
-/** How it is taught, in the three claims that are actually different. */
-const METHOD = [
-  {
-    number: '01',
-    title: 'Shaped like your exam',
-    body:
-      'Pick HSK 4 in June and the scheduler works backwards from the date. It tells you the pace the deck needs, and says so plainly when that pace is no longer reachable.',
-  },
-  {
-    number: '02',
-    title: 'Four skills, not one',
-    body:
-      'Meaning, listening, production and tones are scheduled separately, because recognising a word and being able to say it are different memories that fade at different rates.',
-  },
-  {
-    number: '03',
-    title: 'A teacher, not a dashboard',
-    body:
-      'Each language is taught by somebody with a method and a temperament. They say what they think of the session you just had.',
-  },
-];
-
-/**
- * Why this exists.
- *
- * Answered rather than avoided: anybody who has looked at language apps before
- * is entitled to ask what another one is for, and a front page that dodges it
- * reads as though there is no answer.
- */
+/** Why this exists, for whoever scrolls past the doors to ask. */
 const FAQ = [
   {
     question: 'Why another language app?',
@@ -77,14 +47,14 @@ const FAQ = [
       'It is honest about what it knows. HSK publishes official word lists, so those targets are exact and the app says so; JLPT, TOPIK and the Vietnamese framework do not publish theirs, and every figure derived from them is labelled an estimate rather than dressed up as precision.',
   },
   {
+    question: 'How is it taught?',
+    answer:
+      'Meaning, listening, production and tones are scheduled separately, because recognising a word and being able to say it are different memories that fade at different rates. Grammar is read first and practised afterwards, in four shapes — matching, filling a gap, typing it, and explaining the rule back.',
+  },
+  {
     question: 'Do I need an account?',
     answer:
       'No. Everything works on this device, offline, with nothing sent anywhere. An account exists for one reason: to carry your deck, every card’s schedule and your whole review history to your phone and back.',
-  },
-  {
-    question: 'What happens to my progress?',
-    answer:
-      'It stays yours. Signed out it never leaves the browser. Signed in it is kept in step across your devices and nowhere else, and you can export every word and review you own as JSON at any time.',
   },
 ];
 
@@ -93,8 +63,15 @@ export function Landing() {
   const { account, isSignedIn } = useAuth();
   const { navigate } = useRouter();
 
+  /** The window being looked into, which widens to take more of the row. */
+  const [open, setOpen] = useState<LanguageCode | undefined>();
+  /** Set while the scene expands, so the page does not flicker mid-travel. */
+  const [travelling, setTravelling] = useState<LanguageCode | undefined>();
+
   const state = useMemo(() => {
-    // Started means *reviewed*, not merely having a profile — see above.
+    // Started means *reviewed*. The engine creates a Mandarin profile on first
+    // run so there is something to schedule against, and letting that read as a
+    // choice already made would greet a visitor with somebody else's progress.
     const started = LANGUAGE_CODES.filter(
       (code) => engine.hasProfile(code) && engine.getAllCards(code).some((card) => card.reps > 0),
     );
@@ -106,17 +83,25 @@ export function Landing() {
       resume,
       waiting: resume ? waitingFor(engine, resume) : 0,
     };
-    // revision is the engine's change counter; the engine object itself is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, revision]);
 
-  const open = async (code: LanguageCode) => {
-    await setActiveLanguage(code);
-    navigate('/home');
+  /*
+   * Going in.
+   *
+   * The scene expands to fill the screen before the route changes, so arriving
+   * at the day reads as having walked through the window rather than as a page
+   * swap that happens to share a colour.
+   */
+  const enter = (code: LanguageCode) => {
+    setTravelling(code);
+    window.setTimeout(() => {
+      void setActiveLanguage(code).then(() => navigate('/home'));
+    }, 320);
   };
 
   return (
-    <Screen layer="door">
+    <Screen layer="door" flush>
       <Rise index={0}>
         <header className="topbar">
           <div className="topbar__brand">
@@ -134,114 +119,90 @@ export function Landing() {
       </Rise>
 
       {/*
-        Somebody who has studied is not here to choose, so this comes first and
-        stays small — a strip rather than a card, because it has to be obvious
-        without becoming the subject of a page whose subject is the four
-        languages.
+        Somebody who has studied is not here to choose. A strip above the
+        windows, small enough not to become the subject of the page.
       */}
       {state.resume ? (
-        <Rise index={1}>
-          <button type="button" className="resume" onClick={() => void open(state.resume!)}>
-            <span className="resume__label">Continue</span>
-            <span className="resume__language">{getLanguageProfile(state.resume).name}</span>
-            <span className="resume__count">
-              {state.waiting > 0 ? `${state.waiting} waiting` : 'Nothing due — study ahead'}
-            </span>
-          </button>
-        </Rise>
+        <button type="button" className="resume" onClick={() => enter(state.resume!)}>
+          <span className="resume__label">Continue</span>
+          <span className="resume__language">{getLanguageProfile(state.resume).name}</span>
+          <span className="resume__count">
+            {state.waiting > 0 ? `${state.waiting} waiting` : 'Nothing due — study ahead'}
+          </span>
+        </button>
       ) : null}
 
-      {/*
-        The first screen is the choice itself.
-
-        This page has twice been a landing page — a headline announcing four
-        languages and four teachers, above a grid that then showed them. Saying
-        it and then showing it is one of them too many, and it left the thing
-        somebody came to do below the fold behind an argument for doing it.
-
-        So there is no headline. Four panels fill the first screen, each in its
-        own language's ink with its own place drawn at the foot of it, and the
-        one line of positioning sits up in the bar. The argument still exists,
-        under the choice, for anybody who wants it.
-      */}
-      <div className="gate">
-        {LANGUAGE_CODES.map((code, index) => {
+      <div className={`windows${travelling ? ' windows--travelling' : ''}`}>
+        {LANGUAGE_CODES.map((code) => {
           const profile = getLanguageProfile(code);
-          const theme = getLanguageTheme(code);
           const culture = getCulture(code);
           const teacher = getTeacher(code);
           const started = state.started.has(code);
 
           return (
-            <Rise key={code} index={2 + index} className="gate__cell">
-              <button
-                type="button"
-                className={`gate__panel${started ? ' gate__panel--started' : ''}`}
-                // Scoped here rather than on `:root` so four of them can be on
-                // screen at once without fighting over the accent.
-                style={{
-                  ['--place-accent' as string]: theme.colors.accent,
-                  ['--place-wash' as string]: theme.colors.accentSoft,
-                }}
-                onClick={() => void open(code)}
-              >
-                <LanguageArt code={code} className="gate__art" animate={false} />
+            <button
+              key={code}
+              type="button"
+              className={`window${open === code ? ' window--open' : ''}${
+                travelling === code ? ' window--entering' : ''
+              }${travelling && travelling !== code ? ' window--leaving' : ''}`}
+              onPointerEnter={() => setOpen(code)}
+              onPointerLeave={() => setOpen(undefined)}
+              onFocus={() => setOpen(code)}
+              onBlur={() => setOpen(undefined)}
+              onClick={() => enter(code)}
+              aria-label={`${profile.name} — ${culture.city}`}
+              /* A stable hook for the browser tests. Three redesigns have
+                 renamed this element's class, and each rename silently broke
+                 suites that selected on it; the language a door opens is not
+                 going to change. */
+              data-language={code}
+              // On the window rather than the scene inside it: the name plate
+              // is the scene's sibling, so an accent set on the scene never
+              // reaches it and every endonym came out Mandarin red.
+              style={{
+                ['--scene-accent' as string]: getLanguageTheme(code).colors.accent,
+                ['--scene-wash' as string]: getLanguageTheme(code).colors.accentSoft,
+              }}
+            >
+              <Scene code={code} />
 
-                <span className="gate__body">
-                  <span className="gate__top">
-                    <span className="gate__endonym">{profile.endonym}</span>
-                    {started ? <span className="gate__badge">Started</span> : null}
-                  </span>
+              <span className="window__plate">
+                <span className="window__endonym">{profile.endonym}</span>
+                <span className="window__name">{profile.name}</span>
 
-                  <span className="gate__name">{profile.name}</span>
-                  <span className="gate__where">
-                    {culture.cityLocal} · {culture.countryLocal}
-                  </span>
-
-                  <span className="gate__teacher">
+                {/* Only once there is room for it — see the stylesheet. */}
+                <span className="window__more">
+                  <span className="window__line">{culture.line}</span>
+                  <span className="window__teacher">
                     <TeacherAvatar teacher={teacher} size="small" />
-                    <span className="gate__teacher-name">{teacher.romanised}</span>
+                    <span className="window__teacher-name">{teacher.romanised}</span>
                   </span>
                 </span>
-              </button>
-            </Rise>
+
+                {started ? <span className="window__badge">Started</span> : null}
+              </span>
+            </button>
           );
         })}
       </div>
 
-      <Rise index={8}>
-        <section className="method">
-          <h2 className="section__title">How it is taught</h2>
-          {METHOD.map((item) => (
-            <div key={item.title} className="method__row">
-              <span className="method__number">{item.number}</span>
-              <div>
-                <h3 className="method__title">{item.title}</h3>
-                <p className="method__body">{item.body}</p>
-              </div>
-            </div>
-          ))}
-        </section>
-      </Rise>
-
-      <Rise index={9}>
-        <section className="faq">
-          <h2 className="section__title">Why this exists</h2>
+      <section className="below">
+        <h2 className="section__title">Why this exists</h2>
+        <div className="faq">
           {FAQ.map((item) => (
             <details key={item.question} className="faq__item">
               <summary className="faq__question">{item.question}</summary>
               <p className="faq__answer">{item.answer}</p>
             </details>
           ))}
-        </section>
-      </Rise>
+        </div>
 
-      <Rise index={10}>
         <Caption>
           Your cards, history and schedule stay on this device unless you sign in, in which case they
           are kept in step across the devices you use and nowhere else.
         </Caption>
-      </Rise>
+      </section>
     </Screen>
   );
 }

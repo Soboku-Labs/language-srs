@@ -31,10 +31,20 @@ export function LanguageArt({
   className,
   /** Skip the entrance — for art that is already on screen, or repeated in a list. */
   animate = true,
+  /**
+   * How the drawing meets its box.
+   *
+   * `meet` fits the whole thing inside, which is right for a thumbnail. `slice`
+   * fills the box and lets the edges run off it, which is what a scene wants:
+   * a horizon should reach both sides of the window rather than sitting in the
+   * middle of one with margins.
+   */
+  fit = 'meet',
 }: {
   code: LanguageCode;
   className?: string;
   animate?: boolean;
+  fit?: 'meet' | 'slice';
 }) {
   const theme = getLanguageTheme(code);
   const culture = getCulture(code);
@@ -51,7 +61,7 @@ export function LanguageArt({
       fill="none"
       role="img"
       aria-label={`${culture.city}, drawn`}
-      preserveAspectRatio="xMidYMax meet"
+      preserveAspectRatio={`xMidYMax ${fit}`}
     >
       {motif({ accent, wash })}
     </svg>

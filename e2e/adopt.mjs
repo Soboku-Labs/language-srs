@@ -51,7 +51,7 @@ const accountReviews = async () => {
 // ------------------------------------------------- study without an account
 
 await page.goto(BASE, { waitUntil: 'load' });
-await page.locator('.gate__panel').first().click();
+await page.locator('[data-language]').first().click();
 await page.waitForTimeout(500);
 await page.goto(`${BASE}/review`, { waitUntil: 'load' });
 

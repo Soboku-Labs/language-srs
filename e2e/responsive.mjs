@@ -30,7 +30,7 @@ for (const [w,h,name] of SIZES) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => bad.push(`${name}: pageerror ${e.message.slice(0,80)}`));
   await page.goto(BASE, { waitUntil: 'load' });
-  await page.locator('.gate__panel').first().click();
+  await page.locator('[data-language]').first().click();
   await page.waitForTimeout(400);
 
   const flags = [];
@@ -40,14 +40,32 @@ for (const [w,h,name] of SIZES) {
     const r = await page.evaluate(() => {
       const docW = document.documentElement.scrollWidth;
       const vw = window.innerWidth;
-      // Anything actually sticking out past the viewport?
+
+      /*
+       * Clipped is not escaped.
+       *
+       * Some artwork is deliberately larger than its frame and cropped by it —
+       * that is how a scene reads as a view rather than a picture. What matters
+       * is content a learner would have to scroll sideways to reach, so an
+       * element any ancestor hides the overflow of does not count.
+       */
+      const clipped = (el) => {
+        for (let p = el.parentElement; p; p = p.parentElement) {
+          const o = getComputedStyle(p);
+          if (o.overflowX === 'hidden' || o.overflowX === 'clip') return true;
+        }
+        return false;
+      };
+
       let worst = null;
       for (const el of document.querySelectorAll('.screen *')) {
         const b = el.getBoundingClientRect();
         if (b.width === 0) continue;
         if (b.right > vw + 1 || b.left < -1) {
+          if (clipped(el)) continue;
           const over = Math.round(Math.max(b.right - vw, -b.left));
-          if (!worst || over > worst.over) worst = { over, cls: el.className?.toString().slice(0,34) || el.tagName };
+          const name = typeof el.className === 'string' ? el.className : el.tagName;
+          if (!worst || over > worst.over) worst = { over, cls: name.slice(0, 34) };
         }
       }
       return { hScroll: docW - vw, worst };

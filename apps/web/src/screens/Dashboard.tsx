@@ -81,16 +81,30 @@ export function Dashboard() {
       <Scene code={profile.languageCode} variant="backdrop" className="screen__backdrop" />
       {/* Tapping the language is how you switch it — no menu needed. */}
       <Rise index={0}>
-        <button type="button" className="header" onClick={() => navigate('/')}>
+        {/*
+          The way back, said rather than implied.
+
+          This was the language's name with a chevron pointing right, which
+          reads as going deeper — so the way back to the four places was a
+          control nobody could find. It is a labelled back link now, and the
+          chevron points the way it goes.
+        */}
+        <button
+          type="button"
+          className="header"
+          onClick={() => navigate('/')}
+          aria-label="Back to all languages"
+        >
+          <span className="header__chevron" aria-hidden="true">
+            ‹
+          </span>
           <span className="header__text">
+            <span className="header__back">All languages</span>
             <Title>{language.name}</Title>
             <Caption>
               {level?.shortName} · {describePlace(profile.languageCode)}
               {profile.examDate ? ` · ${describeCountdown(readiness.daysToExam)}` : ''}
             </Caption>
-          </span>
-          <span className="header__chevron" aria-hidden="true">
-            ›
           </span>
         </button>
       </Rise>

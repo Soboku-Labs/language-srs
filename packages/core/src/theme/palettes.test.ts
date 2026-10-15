@@ -233,3 +233,69 @@ describe('derived colours', () => {
     expect(() => getLanguageTheme('es')).toThrow(/No theme for language/);
   });
 });
+
+describe('the same room after dark', () => {
+  it('gives every language a night palette', () => {
+    for (const theme of Object.values(LANGUAGE_THEMES)) {
+      expect(theme.dark, theme.languageCode).toBeDefined();
+      expect(theme.dark.background).not.toBe(theme.colors.background);
+      expect(theme.dark.text).not.toBe(theme.colors.text);
+    }
+  });
+
+  it('keeps each language a different colour after dark', () => {
+    // The whole identity is four inks. A night palette that collapses them
+    // into one accent would be a different product with the lights off.
+    const accents = Object.values(LANGUAGE_THEMES).map((theme) => theme.dark.accent);
+    expect(new Set(accents).size).toBe(accents.length);
+  });
+
+  it('lifts the accent off the dark ground rather than reusing the paper one', () => {
+    for (const theme of Object.values(LANGUAGE_THEMES)) {
+      expect(theme.dark.accent, theme.languageCode).not.toBe(theme.colors.accent);
+      // Brighter, not merely different: an ink for paper is too dark to read
+      // on slate, which is the entire reason these exist.
+      expect(luminance(theme.dark.accent), theme.languageCode).toBeGreaterThan(
+        luminance(theme.colors.accent),
+      );
+    }
+  });
+
+  it('keeps the grade scale identical in both, because it is muscle memory', () => {
+    for (const theme of Object.values(LANGUAGE_THEMES)) {
+      expect(theme.dark.again).toBe(theme.colors.again);
+      expect(theme.dark.good).toBe(theme.colors.good);
+      expect(theme.dark.easy).toBe(theme.colors.easy);
+    }
+  });
+});
+
+describe('the night palettes are as readable as the day ones', () => {
+  it('keeps body text above 4.5:1 on both dark surfaces', () => {
+    for (const theme of Object.values(LANGUAGE_THEMES)) {
+      expect(contrast(theme.dark.text, theme.dark.background), theme.languageCode).toBeGreaterThan(4.5);
+      expect(contrast(theme.dark.text, theme.dark.surface), theme.languageCode).toBeGreaterThan(4.5);
+    }
+  });
+
+  it('keeps muted text legible rather than merely present', () => {
+    for (const theme of Object.values(LANGUAGE_THEMES)) {
+      expect(contrast(theme.dark.textMuted, theme.dark.background), theme.languageCode).toBeGreaterThan(3);
+    }
+  });
+
+  it('keeps each accent readable on its own night ground', () => {
+    // This is the check the hand-picked values exist for: an ink chosen for
+    // paper fails it, which is why there is a second one per language.
+    for (const theme of Object.values(LANGUAGE_THEMES)) {
+      expect(contrast(theme.dark.accent, theme.dark.background), theme.languageCode).toBeGreaterThan(4.5);
+    }
+  });
+
+  it('would have failed with the paper inks, which is the point', () => {
+    const failures = Object.values(LANGUAGE_THEMES).filter(
+      (theme) => contrast(theme.colors.accent, theme.dark.background) < 4.5,
+    );
+    expect(failures.length).toBeGreaterThan(0);
+  });
+});

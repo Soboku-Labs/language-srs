@@ -3,15 +3,17 @@ import {
   LANGUAGE_CODES,
   getCulture,
   getLanguageProfile,
-  getLanguageTheme,
   getTeacher,
+  type Appearance,
+  type Backdrop,
   type LanguageCode,
 } from '@language-srs/core';
 import { Scene } from '../components/Scene';
 import { TeacherAvatar } from '../components/Teacher';
 import { useAuth, useEngine } from '../providers';
 import { useRouter } from '../router';
-import { Caption, Rise, Screen, TextButton } from '../ui';
+import { useTheme } from '../theme';
+import { Caption, Rise, Screen, Segmented } from '../ui';
 
 /**
  * Four windows.
@@ -59,9 +61,10 @@ const FAQ = [
 ];
 
 export function Landing() {
-  const { engine, revision, setActiveLanguage } = useEngine();
+  const { engine, revision, setActiveLanguage, mutate } = useEngine();
   const { account, isSignedIn } = useAuth();
   const { navigate } = useRouter();
+  const { colorsFor } = useTheme();
 
   /** The window being looked into, which widens to take more of the row. */
   const [open, setOpen] = useState<LanguageCode | undefined>();
@@ -110,11 +113,48 @@ export function Landing() {
               Exam-shaped review for Mandarin, Japanese, Korean and Vietnamese.
             </span>
           </div>
-          <TextButton
-            label={isSignedIn ? (account?.displayName ?? 'Account') : 'Sign in'}
-            muted
-            onClick={() => navigate(isSignedIn ? '/settings' : '/sign-in')}
-          />
+
+          {/*
+            The two settings worth reaching without going into settings.
+
+            Both are about how the app looks while you are looking at it, so
+            asking somebody to choose a language, open the day, and find a
+            settings screen before they can turn the motion down is the wrong
+            way round. They are in the bar, on the page the backgrounds are
+            actually on.
+          */}
+          <nav className="topbar__controls">
+            <Segmented
+              label="Appearance"
+              options={[
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+                { value: 'system', label: 'Auto' },
+              ]}
+              value={engine.appearance}
+              onChange={(value) =>
+                void mutate((instance) => instance.setAppearance(value as Appearance))
+              }
+            />
+            <Segmented
+              label="Background"
+              options={[
+                { value: 'calm', label: 'Calm' },
+                { value: 'living', label: 'Living' },
+              ]}
+              value={engine.backdrop}
+              onChange={(value) =>
+                void mutate((instance) => instance.setBackdrop(value as Backdrop))
+              }
+            />
+            <button
+              type="button"
+              className="topbar__account"
+              onClick={() => navigate(isSignedIn ? '/settings' : '/sign-in')}
+            >
+              {isSignedIn ? (account?.displayName ?? 'Account') : 'Sign in'}
+            </button>
+          </nav>
         </header>
       </Rise>
 
@@ -161,8 +201,8 @@ export function Landing() {
               // is the scene's sibling, so an accent set on the scene never
               // reaches it and every endonym came out Mandarin red.
               style={{
-                ['--scene-accent' as string]: getLanguageTheme(code).colors.accent,
-                ['--scene-wash' as string]: getLanguageTheme(code).colors.accentSoft,
+                ['--scene-accent' as string]: colorsFor(code).accent,
+                ['--scene-wash' as string]: colorsFor(code).accentSoft,
               }}
             >
               <Scene code={code} />

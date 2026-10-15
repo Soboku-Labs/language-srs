@@ -344,7 +344,16 @@ a { color: var(--accent); }
 
 .header { display: flex; align-items: center; gap: var(--space-md); width: 100%; text-align: left; }
 .header__text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.header__chevron { color: var(--ink-faint); font-size: 26px; }
+.header__chevron { color: var(--ink-faint); font-size: 26px; line-height: 1; }
+.header__back {
+  font-size: var(--text-micro);
+  font-weight: var(--weight-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+.header:hover .header__back,
+.header:hover .header__chevron { color: var(--accent); }
 
 .modes { display: flex; gap: var(--space-sm); }
 .mode {
@@ -726,9 +735,6 @@ a { color: var(--accent); }
   position: absolute;
   inset: 0;
   overflow: hidden;
-  /* Zero until the hook starts, so a scene with no script is simply still. */
-  --px: 0px;
-  --py: 0px;
 }
 
 .scene__sky {
@@ -750,10 +756,9 @@ a { color: var(--accent); }
   inset: -10%;
   background: radial-gradient(
     42% 38% at 72% 24%,
-    color-mix(in srgb, white 70%, var(--scene-wash)) 0%,
+    color-mix(in srgb, var(--canvas) 70%, var(--scene-wash)) 0%,
     transparent 70%
   );
-  transform: translate3d(calc(var(--px) * -0.15), calc(var(--py) * -0.15), 0);
   will-change: transform;
 }
 
@@ -802,8 +807,7 @@ a { color: var(--accent); }
 
   A custom property is a string to the animation engine unless it has been
   given a type, and an untyped one jumps between keyframes instead of moving
-  between them. The layers' drift rides on this alongside the pointer offset,
-  which is why it cannot simply be another transform.
+  between them.
 */
 @property --sway {
   syntax: '<length>';
@@ -819,11 +823,15 @@ a { color: var(--accent); }
     a foreground, and the old multiplier carried the nearest of those 42px on
     a 14px pointer travel — which is not depth, it is a drawing coming apart.
   */
-  transform: translate3d(
-    calc(var(--px) * (var(--layer) + 1) * 0.26 + var(--sway)),
-    calc(var(--py) * (var(--layer) + 1) * 0.16),
-    0
-  );
+  /*
+    Depth comes from the layers' own clocks, not from the pointer.
+
+    Each plane drifts by its distance, so the far ridge barely moves while the
+    foreground travels. It used to follow the cursor as well, which made the
+    scene feel handled rather than alive — and meant the background did
+    nothing at all for anybody using a keyboard or a phone.
+  */
+  transform: translate3d(calc(var(--sway) * (var(--layer) + 1) * 0.5), 0, 0);
   will-change: transform;
 }
 
@@ -842,8 +850,8 @@ a { color: var(--accent); }
   background: linear-gradient(
     to bottom,
     transparent,
-    color-mix(in srgb, var(--scene-wash) 55%, white) 60%,
-    color-mix(in srgb, var(--scene-wash) 80%, white) 100%
+    color-mix(in srgb, var(--scene-wash) 55%, var(--canvas)) 60%,
+    color-mix(in srgb, var(--scene-wash) 80%, var(--canvas)) 100%
   );
   pointer-events: none;
 }
@@ -862,8 +870,8 @@ a { color: var(--accent); }
   background: linear-gradient(
     to bottom,
     transparent,
-    color-mix(in srgb, var(--scene-wash) 55%, white) 70%,
-    color-mix(in srgb, var(--scene-wash) 78%, white) 100%
+    color-mix(in srgb, var(--scene-wash) 55%, var(--canvas)) 70%,
+    color-mix(in srgb, var(--scene-wash) 78%, var(--canvas)) 100%
   );
   pointer-events: none;
 }
@@ -879,7 +887,6 @@ a { color: var(--accent); }
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--scene-accent) 70%, transparent);
-  transform: translate3d(calc(var(--px) * 0.4), calc(var(--py) * 0.4), 0);
 }
 
 /*
@@ -896,7 +903,7 @@ a { color: var(--accent); }
   height: 42%;
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--scene-wash) 78%, white) 10%,
+    color-mix(in srgb, var(--scene-wash) 78%, var(--canvas)) 10%,
     transparent 100%
   );
   pointer-events: none;
@@ -950,7 +957,15 @@ a { color: var(--accent); }
   min-height: calc(100dvh - 140px);
 }
 
+/*
+  Each window keeps its own layout and paint to itself.
+
+  Four of them resize together on every hover; without this, one changing
+  width makes the browser reconsider the other three and everything inside
+  them.
+*/
 .window {
+  contain: layout paint;
   position: relative;
   flex: 1 1 0;
   min-height: 168px;
@@ -963,12 +978,22 @@ a { color: var(--accent); }
 
 /* The one being looked into takes more of the row. */
 .window--open { flex-grow: 1.6; }
-.window--open .scene__art { width: 112%; }
+.window--open .scene__art { transform: translateX(-50%) scale(1.125); }
 .window__more { padding-top: var(--space-xs); }
+/*
+  The zoom is a transform, not a width.
+
+  Animating the drawing's width re-lays-out and re-rasterises a 120-path SVG
+  on every frame of the hover; measured, that dropped three frames out of
+  ninety-two crossing the row, with a worst frame of 50ms. Scaling from the
+  bottom centre looks identical — the horizon stays put — and the compositor
+  can do it without touching layout.
+*/
 .scene__art {
-  transition:
-    width var(--duration-base) var(--ease),
-    bottom var(--duration-base) var(--ease);
+  transform: translateX(-50%);
+  transform-origin: 50% 100%;
+  transition: transform var(--duration-base) var(--ease);
+  will-change: transform;
 }
 
 /* Going in: it swallows the screen, and the others step back. */
@@ -991,7 +1016,6 @@ a { color: var(--accent); }
   flex-direction: column;
   gap: 2px;
   z-index: 1;
-  transform: translate3d(calc(var(--px) * 0.8), 0, 0);
 }
 .window__endonym {
   font-size: var(--text-caption);
@@ -1217,7 +1241,8 @@ a { color: var(--accent); }
     the part that was empty.
   */
   .window .scene__art { width: 290%; bottom: 13%; }
-  .window--open .scene__art { width: 172%; bottom: 11%; }
+  /* 172/290 — the same framing the width used to produce. */
+  .window--open .scene__art { transform: translateX(-50%) scale(0.593); }
   .window__badge { top: auto; bottom: var(--space-xl); left: auto; right: var(--space-lg); }
 
   .window__plate { inset: auto var(--space-lg) var(--space-xl) var(--space-xl); }
@@ -1459,9 +1484,17 @@ a { color: var(--accent); }
   background: radial-gradient(circle, color-mix(in srgb, var(--secondary, var(--scene-accent)) 28%, transparent), transparent 70%);
 }
 
-:root[data-backdrop='living'] .scene__weather { opacity: 1; }
-:root[data-backdrop='living'] .scene__mass--one { animation: drift-one 34s ease-in-out infinite alternate; }
-:root[data-backdrop='living'] .scene__mass--two { animation: drift-two 46s ease-in-out infinite alternate; }
+/*
+  Only on the home page.
+
+  The day and the loop are screens somebody is working on; weather moving
+  behind a column of numbers is the sort of thing that is charming once and
+  distracting every morning after. The door is where the places are the
+  subject, so that is where they are awake.
+*/
+:root[data-backdrop='living'] .screen--door .scene__weather { opacity: 1; }
+:root[data-backdrop='living'] .screen--door .scene__mass--one { animation: drift-one 34s ease-in-out infinite alternate; }
+:root[data-backdrop='living'] .screen--door .scene__mass--two { animation: drift-two 46s ease-in-out infinite alternate; }
 
 @keyframes drift-one {
   from { transform: translate3d(-6%, -4%, 0) scale(1); }
@@ -1473,7 +1506,7 @@ a { color: var(--accent); }
 }
 
 /* The sun crossing its own sky, slowly enough to notice only if you watch. */
-:root[data-backdrop='living'] .scene__light {
+:root[data-backdrop='living'] .screen--door .scene__light {
   animation: sun 58s ease-in-out infinite alternate;
 }
 @keyframes sun {
@@ -1488,7 +1521,7 @@ a { color: var(--accent); }
   barely moves while the foreground travels — the same rule as the parallax,
   which is why they can share a transform.
 */
-:root[data-backdrop='living'] .art__layer {
+:root[data-backdrop='living'] .screen--door .art__layer {
   animation: sway calc(26s + var(--layer) * 5s) ease-in-out infinite alternate;
   animation-delay: calc(var(--layer) * -3s);
 }
@@ -1498,7 +1531,7 @@ a { color: var(--accent); }
 }
 
 /* And the air itself, moving over the horizon. */
-:root[data-backdrop='living'] .scene__haze {
+:root[data-backdrop='living'] .screen--door .scene__haze {
   animation: breathe 24s ease-in-out infinite alternate;
 }
 @keyframes breathe {
@@ -1527,3 +1560,59 @@ a { color: var(--accent); }
   z-index: 0;
 }
 .screen--day > *:not(.screen__backdrop) { position: relative; z-index: 1; }
+
+/* ------------------------------------------------------ the bar's controls
+
+   Small, quiet, and on the page they affect. A setting about how the app
+   looks should not be three screens away from the thing it changes.
+*/
+.topbar__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+}
+.segmented__option {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+  white-space: nowrap;
+  transition:
+    background var(--duration-instant) var(--ease),
+    color var(--duration-instant) var(--ease);
+}
+.segmented__option:hover { color: var(--ink); }
+.segmented__option[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.topbar__account {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+  transition: background var(--duration-instant) var(--ease);
+}
+.topbar__account:hover { background: var(--surface-raised); }
+
+/* On a phone the bar stacks: the pitch goes, the controls stay. */
+@media (max-width: 719px) {
+  .topbar { flex-wrap: wrap; gap: var(--space-sm); }
+  .topbar__controls { width: 100%; justify-content: space-between; gap: var(--space-sm); }
+}

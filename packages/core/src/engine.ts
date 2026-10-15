@@ -35,7 +35,7 @@ import {
 import { LANGUAGE_CODES, getLanguageProfile, type LanguageCode } from './types/language';
 import type { GradeResult, Rating, ReviewSource } from './types/review';
 import { addDays, endOfStudyDay, systemClock, type Clock } from './utils/date';
-import type { Appearance, Backdrop } from './settings';
+import { SETTINGS_LIMITS, type Appearance, type Backdrop } from './settings';
 import { buildWidgetSnapshot, buildWidgetTimeline, pickSpotlight, type WidgetSnapshot, type WidgetTimeline } from './widget/payload';
 import { applyPendingGrades, type PendingWidgetGrade } from './widget/pending';
 
@@ -129,6 +129,30 @@ const ENTRY_WINDOW = 200;
 
 
 
+/**
+ * Carry a stored meta forward to what this version expects.
+ *
+ * Only `dayStartHour` so far, which moved from each language's profile to the
+ * account. Somebody who set it to 2am for Mandarin before this change should
+ * find it still 2am afterwards, in every language — the alternative is their
+ * study day silently moving back to four and a day's streak breaking for no
+ * reason they can see.
+ *
+ * Takes the first non-default value it finds rather than the active language's,
+ * because the active language may well be one they never changed. Profiles keep
+ * their copy: it is dead weight rather than a second source of truth, and
+ * removing it would break an older build reading the same synced blob.
+ */
+function migrateMeta(meta: EngineMeta): EngineMeta {
+  if (meta.dayStartHour !== undefined) return meta;
+
+  const moved = Object.values(meta.profiles)
+    .map((profile) => profile?.dayStartHour)
+    .find((hour) => typeof hour === 'number' && hour !== DEFAULT_STUDY_PROFILE.dayStartHour);
+
+  return moved === undefined ? meta : { ...meta, dayStartHour: moved };
+}
+
 interface EngineMeta {
   version: number;
   activeLanguage: LanguageCode;
@@ -138,6 +162,17 @@ interface EngineMeta {
   backdrop?: Backdrop;
   /** Light, dark, or whatever the device is set to. Absent means the device. */
   appearance?: Appearance;
+  /**
+   * Hour the study day rolls over, for every language. Absent means four.
+   *
+   * It used to live on each language's profile, where it meant one person
+   * could have two study days: changing it for Mandarin left Japanese rolling
+   * over at a different hour, so a late-night sitting counted towards
+   * different dates depending on which language it was in. It is a fact about
+   * the person's sleep, so it is stored once. `readMeta` carries the old
+   * per-language value up.
+   */
+  dayStartHour?: number;
 }
 
 export interface StudyEngineOptions {
@@ -227,12 +262,14 @@ export class StudyEngine {
     const { store } = options;
     const clock = options.clock ?? systemClock;
 
-    const meta = await readJson<EngineMeta>(store, STORAGE_KEYS.meta, {
-      version: STORAGE_VERSION,
-      activeLanguage: 'zh',
-      profiles: {},
-      schedulerConfig: {},
-    });
+    const meta = migrateMeta(
+      await readJson<EngineMeta>(store, STORAGE_KEYS.meta, {
+        version: STORAGE_VERSION,
+        activeLanguage: 'zh',
+        profiles: {},
+        schedulerConfig: {},
+      }),
+    );
 
     const engine = new StudyEngine(options, {
       meta,
@@ -399,6 +436,29 @@ export class StudyEngine {
     await this.notifyChanged();
   }
 
+  /**
+   * The hour the study day rolls over, for every language.
+   *
+   * One value per person, not per language. Four in the morning by default, so
+   * a late-night sitting counts towards the day it started in rather than
+   * splitting one session across two dates.
+   */
+  get dayStartHour(): number {
+    return this.meta.dayStartHour ?? DEFAULT_STUDY_PROFILE.dayStartHour;
+  }
+
+  async setDayStartHour(hour: number): Promise<void> {
+    const clamped = Math.round(
+      Math.min(SETTINGS_LIMITS.dayStartHour.max, Math.max(SETTINGS_LIMITS.dayStartHour.min, hour)),
+    );
+    if (this.meta.dayStartHour === clamped) return;
+    this.meta.dayStartHour = clamped;
+    await this.persistMeta();
+    // Every streak, forecast and daily count is measured against this, so they
+    // all have to be read again.
+    await this.notifyChanged();
+  }
+
   async setActiveLanguage(code: LanguageCode): Promise<void> {
     await this.ensureProfile(code);
     this.meta.activeLanguage = code;
@@ -558,7 +618,7 @@ export class StudyEngine {
       profile,
       cards: this.getAllCards(code),
       entries: this.entriesById,
-      done: countTodaysWork(this.logs, now, profile.dayStartHour),
+      done: countTodaysWork(this.logs, now, this.dayStartHour),
       ...(options.sessionLimit !== undefined ? { sessionLimit: options.sessionLimit } : {}),
     });
   }
@@ -613,14 +673,14 @@ export class StudyEngine {
     const level = trackLevels.find((candidate) => candidate.id === profile.targetLevelId);
 
     return {
-      streak: computeStreak(this.logs, now, profile.dayStartHour),
+      streak: computeStreak(this.logs, now, this.dayStartHour),
       retention: computeRetention(this.logs, 30, now),
       // Per skill as well as overall: 88% hides "comfortable recognising a word
       // and losing its tones", which is the part a learner can act on.
       retentionByKind: computeRetentionByKind(this.logs, { windowDays: 30, now }),
       coverage: computeCoverage(cards, level?.vocabularyTarget ?? 0),
-      forecast: forecastReviews(cards, now, 14, profile.dayStartHour),
-      today: countTodaysWork(this.logs, now, profile.dayStartHour),
+      forecast: forecastReviews(cards, now, 14, this.dayStartHour),
+      today: countTodaysWork(this.logs, now, this.dayStartHour),
     };
   }
 
@@ -641,7 +701,7 @@ export class StudyEngine {
     const profile = this.getProfile(code);
     return getDailyGoal({
       breakdown: this.getQueue({ code, now }).breakdown,
-      done: countTodaysWork(this.logs, now, profile.dayStartHour),
+      done: countTodaysWork(this.logs, now, this.dayStartHour),
     });
   }
 
@@ -729,7 +789,7 @@ export class StudyEngine {
 
     const card = this.cards[index]!;
     const profile = this.getProfile(card.languageCode);
-    const buriedUntil = until ?? endOfStudyDay(this.now(), profile.dayStartHour);
+    const buriedUntil = until ?? endOfStudyDay(this.now(), this.dayStartHour);
 
     this.cards[index] = { ...card, buriedUntil };
     await this.persistCards();
@@ -831,7 +891,7 @@ export class StudyEngine {
       now,
       ...(options.days !== undefined ? { days: options.days } : {}),
       ...(options.recentLimit !== undefined ? { recentLimit: options.recentLimit } : {}),
-      dayStartHour: profile?.dayStartHour ?? 4,
+      dayStartHour: this.dayStartHour,
     });
   }
 
@@ -981,7 +1041,11 @@ export class StudyEngine {
       else await this.options.store.set(key, value);
     }
 
-    this.meta = await readJson<EngineMeta>(this.options.store, STORAGE_KEYS.meta, this.meta);
+    // Migrated here as well as on load: this is a blob from another device,
+    // which may be running a build that still kept the hour on each profile.
+    this.meta = migrateMeta(
+      await readJson<EngineMeta>(this.options.store, STORAGE_KEYS.meta, this.meta),
+    );
     this.cards = await readJson<Card[]>(this.options.store, STORAGE_KEYS.cards, []);
     this.logs = await readJson<import('./types/review').ReviewLog[]>(this.options.store, STORAGE_KEYS.logs, []);
     this.importedEntries = await readJson<LexicalEntry[]>(this.options.store, STORAGE_KEYS.entries, []);
@@ -1013,7 +1077,7 @@ export class StudyEngine {
       now,
       profile,
       queue,
-      streak: computeStreak(this.logs, now, profile.dayStartHour),
+      streak: computeStreak(this.logs, now, this.dayStartHour),
       readiness: this.getReadiness(code, now),
       ...(queue.cards.length === 0
         ? { spotlight: pickSpotlight(this.getAllCards(code), this.entriesById, now) }
@@ -1029,7 +1093,7 @@ export class StudyEngine {
       now,
       profile,
       queue: this.getQueue({ code, now }),
-      streak: computeStreak(this.logs, now, profile.dayStartHour),
+      streak: computeStreak(this.logs, now, this.dayStartHour),
       readiness: this.getReadiness(code, now),
       // Recompute the queue at each future instant so a timeline entry three
       // hours out shows the counts that will actually be true then.

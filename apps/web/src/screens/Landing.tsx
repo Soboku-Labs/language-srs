@@ -4,10 +4,11 @@ import {
   getCulture,
   getLanguageProfile,
   getLanguageTheme,
+  getTeacher,
   type LanguageCode,
 } from '@language-srs/core';
 import { LanguageArt } from '../components/LanguageArt';
-import { TeacherCard } from '../components/Teacher';
+import { TeacherAvatar, TeacherCard } from '../components/Teacher';
 import { useAuth, useEngine } from '../providers';
 import { useRouter } from '../router';
 import { Caption, Rise, Screen, TextButton } from '../ui';
@@ -117,25 +118,62 @@ export function Landing() {
   return (
     <Screen layer="door">
       <Rise index={0}>
-        <div className="masthead">
-          <div className="masthead__top">
-            <span className="wordmark">mon</span>
-            <TextButton
-              label={isSignedIn ? (account?.displayName ?? 'Account') : 'Sign in'}
-              muted
-              onClick={() => navigate(isSignedIn ? '/settings' : '/sign-in')}
-            />
+        <header className="masthead">
+          <span className="wordmark">mon</span>
+          <TextButton
+            label={isSignedIn ? (account?.displayName ?? 'Account') : 'Sign in'}
+            muted
+            onClick={() => navigate(isSignedIn ? '/settings' : '/sign-in')}
+          />
+        </header>
+      </Rise>
+
+      {/*
+        The headline promises four teachers, so the hero shows them.
+
+        It used to promise them and then show a quarter-page of empty canvas —
+        the text held the left third and nothing held the rest, which on a wide
+        screen reads as a page that has not finished loading. The four of them
+        fill that side, and they are the choice itself rather than decoration:
+        tapping one opens their language.
+      */}
+      <Rise index={1}>
+        <section className="hero">
+          <div className="hero__text">
+            <h1 className="hero__headline">
+              Four languages.
+              <br />
+              Four teachers.
+            </h1>
+            <p className="hero__standfirst">
+              Spaced repetition for Mandarin, Japanese, Korean and Vietnamese, shaped like the exam
+              you are sitting. Choose a language and meet the person who takes you through it.
+            </p>
           </div>
-          <h1 className="masthead__headline">
-            Four languages.
-            <br />
-            Four teachers.
-          </h1>
-          <p className="masthead__standfirst">
-            Spaced repetition for Mandarin, Japanese, Korean and Vietnamese, shaped like the exam you
-            are sitting. Choose a language and meet the person who takes you through it.
-          </p>
-        </div>
+
+          <div className="constellation">
+            {LANGUAGE_CODES.map((code) => {
+              const teacher = getTeacher(code);
+              const theme = getLanguageTheme(code);
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  className="constellation__person"
+                  style={{
+                    ['--place-accent' as string]: theme.colors.accent,
+                    ['--place-wash' as string]: theme.colors.accentSoft,
+                  }}
+                  onClick={() => void open(code)}
+                >
+                  <TeacherAvatar teacher={teacher} size="large" />
+                  <span className="constellation__name">{teacher.romanised}</span>
+                  <span className="constellation__language">{getLanguageProfile(code).endonym}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
       </Rise>
 
       {/*
@@ -145,7 +183,7 @@ export function Landing() {
         them rather than about the product, so it sits above the explaining.
       */}
       {state.resume ? (
-        <Rise index={1}>
+        <Rise index={2}>
           <button type="button" className="resume" onClick={() => void open(state.resume!)}>
             <span className="resume__label">Continue</span>
             <span className="resume__language">{getLanguageProfile(state.resume).name}</span>
@@ -156,23 +194,8 @@ export function Landing() {
         </Rise>
       ) : null}
 
-      <Rise index={2}>
-        <section className="method">
-          <h2 className="section__title">How it is taught</h2>
-          {METHOD.map((item) => (
-            <div key={item.title} className="method__row">
-              <span className="method__number">{item.number}</span>
-              <div>
-                <h3 className="method__title">{item.title}</h3>
-                <p className="method__body">{item.body}</p>
-              </div>
-            </div>
-          ))}
-        </section>
-      </Rise>
-
       <Rise index={3}>
-        <h2 className="section__title">Choose a language</h2>
+        <h2 className="section__title section__title--major">Choose a language</h2>
       </Rise>
 
       <div className="places">
@@ -223,6 +246,21 @@ export function Landing() {
       </div>
 
       <Rise index={8}>
+        <section className="method">
+          <h2 className="section__title">How it is taught</h2>
+          {METHOD.map((item) => (
+            <div key={item.title} className="method__row">
+              <span className="method__number">{item.number}</span>
+              <div>
+                <h3 className="method__title">{item.title}</h3>
+                <p className="method__body">{item.body}</p>
+              </div>
+            </div>
+          ))}
+        </section>
+      </Rise>
+
+      <Rise index={9}>
         <section className="faq">
           <h2 className="section__title">Why this exists</h2>
           {FAQ.map((item) => (
@@ -234,7 +272,7 @@ export function Landing() {
         </section>
       </Rise>
 
-      <Rise index={9}>
+      <Rise index={10}>
         <Caption>
           Your cards, history and schedule stay on this device unless you sign in, in which case they
           are kept in step across the devices you use and nowhere else.

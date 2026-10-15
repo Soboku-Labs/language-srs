@@ -782,37 +782,91 @@ a { color: var(--accent); }
 
 /* ---------------------------------------------------------------- the door
 
-   The front page is the one place in the app that is allowed to be loud. It
-   is read once, by somebody deciding whether to stay, where the day and the
-   loop are opened every morning by somebody who has already decided. So the
-   type is larger here and the whitespace is more generous, and both tighten
-   as you go deeper.
+   The front page carries the weight of the whole app, so it is composed
+   rather than stacked. The order is hook, choose, why, questions — the
+   argument comes after the choice, because somebody who already wants to
+   start should not have to scroll past three paragraphs defending the
+   product to reach the languages.
 */
-.masthead { display: flex; flex-direction: column; gap: var(--space-md); }
-.masthead__top {
+
+/* A rule across the top, so the wordmark and the account link read as one
+   bar rather than two things marooned at opposite edges of a wide screen. */
+.masthead {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--line);
 }
 .wordmark {
   font-size: var(--text-heading);
   font-weight: var(--weight-strong);
-  letter-spacing: -0.02em;
+  letter-spacing: 0.04em;
 }
-.masthead__headline {
+
+/*
+  The hero.
+
+  One column on a phone, two once there is room — and the second column is
+  the four teachers the headline has just promised. Before this the text held
+  the left third of a 1000px page and nothing held the rest, which reads as a
+  page that has not finished loading.
+*/
+.hero { display: flex; flex-direction: column; gap: var(--space-xl); }
+.hero__text { display: flex; flex-direction: column; gap: var(--space-md); }
+.hero__headline {
   margin: 0;
   font-size: 34px;
-  line-height: 38px;
+  line-height: 1.12;
   font-weight: var(--weight-strong);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
 }
-.masthead__standfirst {
+.hero__standfirst {
   margin: 0;
   font-size: var(--text-body);
-  line-height: 23px;
+  line-height: 24px;
   color: var(--ink-muted);
-  max-width: 34em;
+  max-width: 32em;
+}
+
+/*
+  Four people, not four flags.
+
+  Each sits in their own language's ink, and tapping one opens that language —
+  the hero is the choice rather than a picture of it.
+*/
+.constellation {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+.constellation__person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-xs);
+  border-radius: var(--radius-card);
+  transition: background var(--duration-instant) var(--ease);
+}
+.constellation__person:hover { background: var(--place-wash); }
+.constellation__name {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  text-align: center;
+  line-height: 16px;
+  /* Two lines' worth, always. "Seo Ha-eun" and "Nguyen Thi Mai" wrap in a
+     narrow column where the other two do not, and without this the language
+     under each name sits at a different height across the row. */
+  min-height: 32px;
+  text-wrap: balance;
+}
+.constellation__language {
+  font-size: var(--text-micro);
+  color: var(--ink-muted);
+  text-align: center;
 }
 
 /* The one row here about the learner rather than the product. */
@@ -837,7 +891,30 @@ a { color: var(--accent); }
 .resume__language { font-size: var(--text-heading); font-weight: var(--weight-strong); }
 .resume__count { font-size: var(--text-caption); color: var(--ink-muted); }
 
-.method { display: flex; flex-direction: column; gap: var(--space-lg); }
+/* The heading over the main event carries more weight than a section label. */
+.section__title--major {
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+/*
+  The argument, after the choice and set on its own ground.
+
+  A band rather than more text on the same canvas, so the page has somewhere
+  to breathe between the languages and the questions instead of running four
+  identical blocks together.
+*/
+.method {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
 .method__row { display: flex; gap: var(--space-md); align-items: flex-start; }
 .method__number {
   font-size: var(--text-caption);
@@ -883,7 +960,7 @@ a { color: var(--accent); }
   color: var(--ink-muted);
   font-weight: var(--weight-regular);
 }
-.faq__item[open] .faq__question::after { content: '–'; }
+.faq__item[open] .faq__question::after { content: '\2013'; }
 .faq__answer {
   margin: var(--space-sm) 0 0;
   font-size: var(--text-caption);
@@ -968,7 +1045,7 @@ a { color: var(--accent); }
 */
 @media (min-width: 720px) {
   :root { --page: 600px; }
-  .masthead__headline { font-size: 40px; line-height: 44px; }
+  .hero__headline { font-size: 42px; }
 }
 
 @media (min-width: 1024px) {
@@ -976,6 +1053,42 @@ a { color: var(--accent); }
 
   /* The door opens up and its cards go two across. */
   .screen--door { max-width: 1000px; }
+
+  /*
+    The hero becomes two columns, and the teachers take the half that used to
+    be empty. The text column is capped in ems rather than given a fraction of
+    the grid, so the line length stays readable as the page gets wider instead
+    of the measure growing with the screen.
+  */
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: var(--space-xxl);
+    align-items: center;
+  }
+  .hero__headline { font-size: 52px; }
+  .hero__standfirst { font-size: var(--text-heading); line-height: 27px; }
+
+  /* Two by two rather than a row of four, so they read as a group sitting
+     opposite the headline rather than a toolbar under it. */
+  .constellation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md);
+    /* Held to its own width and pushed to the end of the column, so the four
+       read as one block answering the headline rather than four items drifting
+       across the right half of the page. */
+    justify-self: end;
+    max-width: 420px;
+  }
+  .constellation__person { padding: var(--space-lg) var(--space-md); }
+  .constellation__name { font-size: var(--text-body); }
+  .constellation__language { font-size: var(--text-caption); }
+  /* Given real presence opposite a 52px headline. */
+  .constellation .avatar--large {
+    width: 86px;
+    height: 86px;
+    font-size: calc(44px * var(--glyph-scale, 1));
+  }
   .screen--door .places {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1001,8 +1114,6 @@ a { color: var(--accent); }
     gap: 0 var(--space-xxl);
     align-items: start;
   }
-
-  .masthead__headline { font-size: 46px; line-height: 50px; }
 
   /* Held back on purpose — see above. */
   .screen--day { max-width: 560px; }

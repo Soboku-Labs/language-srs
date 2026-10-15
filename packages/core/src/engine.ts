@@ -509,6 +509,7 @@ export class StudyEngine {
   async syncCards(): Promise<void> {
     const existing = new Map(this.cards.map((card) => [card.id, card]));
     const next = new Map(existing);
+    let changed = false;
 
     for (const code of LANGUAGE_CODES) {
       const profile = this.meta.profiles[code];
@@ -522,11 +523,43 @@ export class StudyEngine {
       });
 
       for (const card of generated) {
-        if (!next.has(card.id)) next.set(card.id, card);
+        const current = next.get(card.id);
+        if (!current) {
+          next.set(card.id, card);
+          changed = true;
+          continue;
+        }
+
+        /*
+         * Re-tag a card whose level moved under it.
+         *
+         * Card ids are `entryId:kind`, which is what makes this idempotent —
+         * an entry with review history keeps it. But it also meant a
+         * regenerated card was discarded as a duplicate *including its level
+         * tag*, and the queue filters on exactly that tag. Switch from HSK 3
+         * to HSK 2 and every card still said `hsk3-1` while the queue was
+         * asking for `hsk2-1`, so the app went silently, completely empty:
+         * 27 words in scope, 119 cards in storage, nothing served.
+         *
+         * Only the tag changes. Every scheduling field — stability,
+         * difficulty, due date, reps — is the learner's history and is none of
+         * this function's business.
+         */
+        if (current.levelId !== card.levelId) {
+          next.set(card.id, { ...current, levelId: card.levelId });
+          changed = true;
+        }
       }
     }
 
-    if (next.size !== existing.size) {
+    /*
+     * Keyed on whether anything changed, not on the count.
+     *
+     * The guard used to compare `next.size` against `existing.size`, which is
+     * blind to a card being updated in place — the re-tag above would have
+     * been computed, held in memory, and lost on the next launch.
+     */
+    if (changed) {
       this.cards = [...next.values()];
       await this.persistCards();
     }
@@ -666,9 +699,29 @@ export class StudyEngine {
 
   // ---------------------------------------------------------------- stats
 
+  /**
+   * The cards this language's current level is actually about.
+   *
+   * The session queue has always filtered on the levels in scope; coverage and
+   * readiness were computed over every card the language had ever generated,
+   * and the two disagreeing is a bug with a very bad symptom. Switch track and
+   * some card kinds stop being generated — HSK 2 and HSK 3 weight them
+   * differently — so those cards keep the old level's tag and can never be
+   * served again. `entriesKnown` counts an entry only when *all* of its cards
+   * are known, so a single unservable leftover held the whole entry back:
+   * coverage read 0% forever, to somebody who had studied every word in the
+   * level. The cards are kept, because deleting review history to reflect a
+   * settings change would be indefensible — they are simply not this level's
+   * question.
+   */
+  private cardsInScope(code: LanguageCode): Card[] {
+    const scope = new Set(getLevelIdsInScope(this.getProfile(code).targetLevelId));
+    return this.getAllCards(code).filter((card) => scope.has(card.levelId));
+  }
+
   getStats(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()) {
     const profile = this.getProfile(code);
-    const cards = this.getAllCards(code);
+    const cards = this.cardsInScope(code);
     const trackLevels = getExamTrack(profile.examTrackId).levels;
     const level = trackLevels.find((candidate) => candidate.id === profile.targetLevelId);
 
@@ -685,7 +738,8 @@ export class StudyEngine {
   }
 
   getReadiness(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): ExamReadiness {
-    return computeExamReadiness(this.getAllCards(code), this.getProfile(code), now);
+    // Scoped for the same reason as the stats: readiness is about this level.
+    return computeExamReadiness(this.cardsInScope(code), this.getProfile(code), now);
   }
 
   /**

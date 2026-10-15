@@ -120,7 +120,9 @@ export function Landing() {
      * in place means the next thing on screen is the thing that unblocks it.
      */
     if (!canUse('multipleLanguages', tier) && state.started.size > 0 && !state.started.has(code)) {
-      navigate('/sign-in');
+      // The badge on the window said "Free account", so this one means make
+      // one. The toggle is there for somebody who already has one.
+      navigate('/sign-in?new=1');
       return;
     }
 

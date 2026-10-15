@@ -30,7 +30,8 @@
     "e2e:sync": "node e2e/sync.mjs",
     "e2e:adopt": "node e2e/adopt.mjs",
     "e2e:responsive": "node e2e/responsive.mjs",
-    "e2e:settings": "node e2e/settings.mjs"
+    "e2e:settings": "node e2e/settings.mjs",
+    "e2e:signin": "node e2e/signin.mjs"
   },
   "devDependencies": {
     "playwright": "1.56.1",

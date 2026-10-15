@@ -315,7 +315,7 @@ export function Settings() {
               {canSignIn ? (
                 <TextButton
                   label="Create an account to sync"
-                  onClick={() => navigate('/sign-in')}
+                  onClick={() => navigate('/sign-in?new=1&from=%2Fsettings')}
                 />
               ) : null}
             </>

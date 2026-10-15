@@ -54,10 +54,16 @@ async function device(label) {
 }
 
 async function signIn(page, { register }) {
-  // Explicitly, because the app no longer sends anybody here. The front page
-  // is the door now and signing in is an offer reached from it.
-  await page.goto(`${BASE}/sign-in`, { waitUntil: 'networkidle' });
-  if (!register) await page.getByText('I already have an account').click();
+  /*
+   * The route says which of the two this is.
+   *
+   * This used to open `/sign-in` and then click "I already have an account",
+   * because the screen opened on Create an account however you arrived —
+   * which was the bug: the "Sign in" button in the bar led to a sign-up form.
+   * Now `?new=1` means make one and a bare `/sign-in` means sign in, so the
+   * toggle is no longer part of the path either test takes.
+   */
+  await page.goto(`${BASE}/sign-in${register ? '?new=1' : ''}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(200);
 
   if (register) await page.locator('input[autocomplete="name"]').fill('Vish');

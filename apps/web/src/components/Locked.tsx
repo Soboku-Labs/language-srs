@@ -41,7 +41,7 @@ export function Locked({
   children: ReactNode;
 }) {
   const { can } = useAccess();
-  const { navigate } = useRouter();
+  const { navigate, path } = useRouter();
 
   if (can(feature)) return <>{children}</>;
 
@@ -54,7 +54,13 @@ export function Locked({
       <Caption>
         Needs a free account — an email and a password, nothing else, no card.
       </Caption>
-      <TextButton label="Create an account" onClick={() => navigate('/sign-in')} />
+      {/* `new=1` because this one really does mean make an account, and
+          `from` so somebody who came here to import a word list is returned
+          to the import screen rather than to the front door. */}
+      <TextButton
+        label="Create an account"
+        onClick={() => navigate(`/sign-in?new=1&from=${encodeURIComponent(path)}`)}
+      />
     </div>
   );
 }

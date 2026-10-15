@@ -45,8 +45,10 @@ async function device(label) {
 }
 
 async function signIn(page, { register }) {
-  await page.goto(`${BASE}/sign-in`, { waitUntil: 'networkidle' });
-  if (!register) await page.getByText('I already have an account').click();
+  // The route says which of the two this is: `?new=1` makes one, a bare
+  // /sign-in signs in. The screen used to open on Create an account however
+  // you arrived, which is what made the bar's "Sign in" button a lie.
+  await page.goto(`${BASE}/sign-in${register ? '?new=1' : ''}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(200);
 
   if (register) await page.locator('input[autocomplete="name"]').fill('Vish');

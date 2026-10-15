@@ -11,6 +11,7 @@ import {
 import { Scene } from '../components/Scene';
 import { TeacherAvatar } from '../components/Teacher';
 import { Maker } from '../components/Maker';
+import { Wordmark } from '../components/Logo';
 import { useAuth, useEngine } from '../providers';
 import { useRouter } from '../router';
 import { useSettings } from '../settings';
@@ -124,7 +125,7 @@ export function Landing() {
       <Rise index={0}>
         <header className="topbar">
           <div className="topbar__brand">
-            <span className="wordmark">mon</span>
+            <Wordmark />
             <span className="topbar__line">
               Exam-shaped review for Mandarin, Japanese, Korean and Vietnamese.
             </span>

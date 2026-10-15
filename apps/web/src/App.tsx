@@ -87,16 +87,25 @@ function Themed() {
  * progress bar and a way out — and a title bar above it would be a second
  * header competing with the card for the only thing that should be looked at.
  */
-const TITLES: { pattern: string; title: string }[] = [
-  { pattern: '/learn', title: 'Grammar' },
-  { pattern: '/learn/:id', title: 'Grammar' },
-  { pattern: '/words', title: 'Words' },
-  { pattern: '/word/:id', title: 'Word' },
-  { pattern: '/stats', title: 'Progress' },
-  { pattern: '/settings', title: 'Settings' },
-  { pattern: '/upcoming', title: 'Upcoming' },
-  { pattern: '/account', title: 'Account' },
-  { pattern: '/import', title: 'Add words' },
+/** Matches the `<title>` and description in index.html, for the door. */
+const DOOR_TITLE = 'Mon \u2014 exam-aligned review for HSK, JLPT, TOPIK';
+const DOOR_DESCRIPTION =
+  'Spaced repetition built around your exam date. Mandarin, Japanese, Korean and Vietnamese, scheduled so nothing lands after the paper. Free, works offline.';
+
+const TITLES: { pattern: string; title: string; description?: string }[] = [
+  { pattern: '/learn', title: 'Grammar', description: 'Grammar points read first, then practised four ways.' },
+  { pattern: '/learn/:id', title: 'Grammar', description: 'A grammar point, with its pattern, examples and the pitfall.' },
+  { pattern: '/words', title: 'Words', description: 'Every word in your deck, and how well each one is holding.' },
+  { pattern: '/word/:id', title: 'Word', description: 'One word: its reading, its meanings and your own notes.' },
+  { pattern: '/stats', title: 'Progress', description: 'Retention per skill, your streak and how ready you are for the paper.' },
+  { pattern: '/settings', title: 'Settings', description: 'Exam, level, daily amounts and how the app looks.' },
+  {
+    pattern: '/upcoming',
+    title: 'Upcoming',
+    description: 'What is being built next for Mon, in the order it is being built.',
+  },
+  { pattern: '/account', title: 'Account', description: 'Carry your deck and its schedule between devices.' },
+  { pattern: '/import', title: 'Add words', description: 'Bring your own word list in, or back yours up.' },
 ];
 
 function Chrome() {
@@ -113,8 +122,25 @@ function Chrome() {
    * it, so it is reached from the door rather than standing in front of it.
    */
 
+  /*
+   * Title and description, kept in step with the route.
+   *
+   * The description matters because this is one HTML document serving every
+   * path: without updating it, a link shared from /upcoming carries the front
+   * page's description, and every page a crawler reaches claims to be the
+   * same page. The title on the door is the full one rather than the bare
+   * brand — "Mon" alone tells somebody scanning a list of tabs or results
+   * nothing.
+   */
   useEffect(() => {
-    document.title = titled ? `${titled.title} · Mon` : 'Mon';
+    document.title = titled ? `${titled.title} · Mon` : DOOR_TITLE;
+
+    const description = titled?.description ?? DOOR_DESCRIPTION;
+    document.querySelector('meta[name="description"]')?.setAttribute('content', description);
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', description);
+    document
+      .querySelector('meta[property="og:title"]')
+      ?.setAttribute('content', titled ? `${titled.title} · Mon` : DOOR_TITLE);
   }, [titled]);
 
   return (

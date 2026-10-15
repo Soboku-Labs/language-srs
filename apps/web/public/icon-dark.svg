@@ -1,7 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Mon">
   <title>Mon</title>
-  <rect width="512" height="512" rx="0" fill="#111113"/>
-  <text x="50%" y="50%" fill="#FBFAF8" font-size="287.5392"
-        font-family="'Noto Sans SC','Noto Sans JP','PingFang SC','Hiragino Sans','Microsoft YaHei',sans-serif"
-        font-weight="500" text-anchor="middle" dominant-baseline="central">門</text>
+  <rect width="512" height="512" rx="0" fill="#141311"/>
+  <!--
+    The same arch as apps/web/src/components/Logo.tsx, at 16x the scale.
+    Drawn as paths rather than set as the glyph 門: the previous icon was
+    `<text>` relying on Noto Sans SC or PingFang being installed, so it
+    rendered differently on every machine and as an empty box on one with
+    neither font. An icon is the one image that has to look the same
+    everywhere.
+  -->
+  <g stroke="#E8864F" fill="none" stroke-linecap="round">
+    <path d="M80 448V240a176 176 0 0 1 352 0v208" stroke-width="41.6"/>
+    <path d="M200 448v-96a56 56 0 0 1 112 0v96" stroke-width="35.2"/>
+  </g>
 </svg>

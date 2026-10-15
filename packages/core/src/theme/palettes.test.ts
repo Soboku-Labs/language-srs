@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CARD_KINDS } from '../types/exam';
 import { LANGUAGE_CODES, getLanguageProfile } from '../types/language';
-import { LANGUAGE_THEMES, getCardKindColors, getLanguageTheme, getToneColor, getToneColors } from './palettes';
+import { BRAND, LANGUAGE_THEMES, getCardKindColors, getLanguageTheme, getToneColor, getToneColors } from './palettes';
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 
@@ -297,5 +297,29 @@ describe('the night palettes are as readable as the day ones', () => {
       (theme) => contrast(theme.colors.accent, theme.dark.background) < 4.5,
     );
     expect(failures.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The product's colour, which no language changes.
+ *
+ * The wordmark is text, so it needs text contrast on both grounds — not the
+ * 3:1 a graphic can get away with. These two values are chosen against their
+ * own ground rather than one being lightened from the other, and this is what
+ * stops somebody "simplifying" them to one.
+ */
+describe('the brand orange', () => {
+  it('is readable as text on paper and on slate', () => {
+    expect(contrast(BRAND.orange, '#FBFAF8')).toBeGreaterThan(4.5);
+    expect(contrast(BRAND.orangeDark, '#141311')).toBeGreaterThan(4.5);
+  });
+
+  it('is not mistakable for any language ink', () => {
+    // The nearest is Cinnabar, and the two sit next to each other in the bar
+    // whenever Mandarin is the active language.
+    for (const theme of Object.values(LANGUAGE_THEMES)) {
+      expect(theme.colors.accent).not.toBe(BRAND.orange);
+      expect(theme.dark.accent).not.toBe(BRAND.orangeDark);
+    }
   });
 });

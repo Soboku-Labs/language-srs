@@ -969,7 +969,6 @@ a { color: var(--accent); }
   border-bottom: 1px solid var(--line);
 }
 .topbar__brand { display: flex; align-items: baseline; gap: var(--space-md); min-width: 0; }
-.wordmark { font-size: var(--text-heading); font-weight: var(--weight-strong); letter-spacing: 0.04em; }
 .topbar__line { font-size: var(--text-caption); color: var(--ink-muted); display: none; }
 
 .windows {
@@ -1855,4 +1854,23 @@ a { color: var(--accent); }
   font-weight: var(--weight-strong);
   letter-spacing: 0.02em;
   color: var(--ink-muted);
+}
+
+/* ---------------------------------------------------------------- the mark */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42em;
+}
+.logo {
+  flex: none;
+  /* Optically centred against the wordmark's x-height rather than its box:
+     the gate's lintel sits above the lowercase letters otherwise. */
+  margin-top: -1px;
+}
+.wordmark {
+  font-size: var(--text-heading);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.04em;
+  color: var(--brand);
 }

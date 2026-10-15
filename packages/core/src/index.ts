@@ -354,6 +354,7 @@ export { cardId, parseCardId, reviewLogId, studySessionId } from './utils/id';
 
 // Engine
 export type { Appearance, Backdrop } from './settings';
+export { BRAND } from './theme/palettes';
 export {
   DEFAULT_LANGUAGE_SETTINGS,
   DEFAULT_USER_SETTINGS,

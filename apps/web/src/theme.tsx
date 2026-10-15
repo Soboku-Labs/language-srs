@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
+  BRAND,
   type Appearance,
   getLanguageTheme,
   getToneColor,
@@ -134,6 +135,16 @@ export function ThemeProvider({
     getToneColors(theme).forEach((colour, index) =>
       root.style.setProperty(`--tone-${index + 1}`, colour),
     );
+
+    /*
+     * The product's own colour, which does not follow the language.
+     *
+     * Set here with everything else so one effect owns the custom properties,
+     * but read from `BRAND` rather than from the theme: the wordmark stays
+     * orange when the app is being Korean.
+     */
+    root.style.setProperty('--brand', dark ? BRAND.orangeDark : BRAND.orange);
+    root.style.setProperty('--brand-soft', dark ? BRAND.orangeSoftDark : BRAND.orangeSoft);
 
     root.style.setProperty('--radius-card', `${theme.radius.card}px`);
     root.style.setProperty('--radius-control', `${theme.radius.control}px`);

@@ -36,5 +36,47 @@ console.log('  .nojekyll written');
 copyFileSync(index, join(distDir, '404.html'));
 console.log('  404.html  from index.html, so deep links boot the app');
 
+/*
+ * robots.txt and sitemap.xml, written here rather than checked into `public/`.
+ *
+ * Both have to name the real origin, and the origin is only known at build
+ * time — a checked-in sitemap would be wrong for every deployment but one, and
+ * a sitemap listing URLs that 404 is worse for a site than no sitemap at all.
+ *
+ * Only the routes worth indexing. The app has screens for reviewing, for one
+ * word and for settings; none of those means anything to somebody arriving
+ * from a search, and several need an account, so listing them would invite
+ * crawlers to spend the site's budget on soft-404s.
+ */
+const siteUrl = (process.env.WEB_SITE_URL ?? 'https://soboku-labs.github.io/language-srs/').replace(/\/*$/, '/');
+const ROUTES = [
+  { path: '', changefreq: 'weekly', priority: '1.0' },
+  { path: 'upcoming', changefreq: 'weekly', priority: '0.5' },
+];
+const today = new Date().toISOString().slice(0, 10);
+
+writeFileSync(
+  join(distDir, 'robots.txt'),
+  `User-agent: *\nAllow: /\n\nSitemap: ${siteUrl}sitemap.xml\n`,
+);
+console.log('  robots.txt written');
+
+writeFileSync(
+  join(distDir, 'sitemap.xml'),
+  `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    ROUTES.map(
+      (route) =>
+        `  <url>\n` +
+        `    <loc>${siteUrl}${route.path}</loc>\n` +
+        `    <lastmod>${today}</lastmod>\n` +
+        `    <changefreq>${route.changefreq}</changefreq>\n` +
+        `    <priority>${route.priority}</priority>\n` +
+        `  </url>\n`,
+    ).join('') +
+    `</urlset>\n`,
+);
+console.log(`  sitemap.xml ${ROUTES.length} routes at ${siteUrl}`);
+
 const assets = join(distDir, 'assets');
 console.log(`  assets    ${existsSync(assets) ? `${readdirSync(assets).length} files` : 'MISSING'}`);

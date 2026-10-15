@@ -110,43 +110,92 @@ function Layer({ index, animate, children }: { index: number; animate: boolean; 
 }
 
 /**
- * Beijing — a pagoda on a terrace, city roofs behind, a seal in the sky.
+ * Beijing — a pagoda on its terrace, hutong roofs at its feet, a seal in the sky.
  *
- * The seal is the one square in the drawing, and it is the only filled shape:
- * a red stamp on paper is where the Mandarin accent comes from in the first
- * place, so the picture and the palette explain each other.
+ * Drawn at five depths rather than three, because the scenes crop in close now
+ * and a drawing with three planes reads as three cut-outs when you move across
+ * it. Far ridge, city blocks, courtyard roofs, the pagoda, then a wall in front
+ * of everything — which is roughly the order you actually meet them walking
+ * towards one.
+ *
+ * The detail that matters is the eave. A pagoda is recognisable from the lift
+ * at the ends of its roofs and almost nothing else, so each of the four gets
+ * its tips flicked up rather than merely being a wider line than the one below.
+ *
+ * The seal is still the only filled shape in any of these drawings: a red stamp
+ * on paper is where the Mandarin accent comes from, so the picture and the
+ * palette go on explaining each other.
  */
 function pagoda({ accent, wash, animate }: MotifProps) {
   return (
     <>
       <Layer index={0} animate={animate}>
+        <Path d="M0 78 q44 -14 88 -7 t74 3 q46 5 86 -9 t72 -5" stroke={accent} strokeWidth={1} opacity={0.22} fill="none" />
         <Path d="M0 96 H320" stroke={accent} strokeWidth={1} opacity={0.35} />
-        <Path
-          d="M18 96 V78 h16 v18 M44 96 V70 h20 v26 M74 96 V82 h14 v14"
-          stroke={accent}
-          strokeWidth={1.2}
-          opacity={0.4}
-        />
-        <Path
-          d="M238 96 V74 h18 v22 M266 96 V84 h16 v12 M292 96 V66 h14 v30"
-          stroke={accent}
-          strokeWidth={1.2}
-          opacity={0.4}
-        />
       </Layer>
 
       <Layer index={1} animate={animate}>
-        {/* Three tiers, each roof wider than the storey under it. */}
-        <Path d="M120 96 V74 h80 v22" stroke={accent} strokeWidth={1.6} />
-        <Path d="M104 74 q56 -14 112 0" stroke={accent} strokeWidth={2} strokeLinecap="round" />
-        <Path d="M130 74 V56 h60 v18" stroke={accent} strokeWidth={1.6} />
-        <Path d="M116 56 q44 -12 88 0" stroke={accent} strokeWidth={2} strokeLinecap="round" />
-        <Path d="M142 56 V40 h36 v16" stroke={accent} strokeWidth={1.6} />
-        <Path d="M128 40 q32 -10 64 0" stroke={accent} strokeWidth={2} strokeLinecap="round" />
-        <Path d="M160 40 V28" stroke={accent} strokeWidth={1.6} strokeLinecap="round" />
+        {/* The city, kept to a rhythm of verticals so it reads as blocks. */}
+        <Path d="M10 96 V70 h13 v26 M28 96 V62 h11 v34 M44 96 V76 h10 v20" stroke={accent} strokeWidth={1.1} opacity={0.32} />
+        <Path d="M266 96 V68 h13 v28 M284 96 V58 h11 v38 M300 96 V74 h14 v22" stroke={accent} strokeWidth={1.1} opacity={0.32} />
+        <Path d="M13 76 h7 M13 83 h7 M31 68 h5 M31 76 h5 M269 74 h7 M269 82 h7 M287 64 h5 M287 72 h5" stroke={accent} strokeWidth={0.8} opacity={0.28} />
       </Layer>
 
       <Layer index={2} animate={animate}>
+        {/* Courtyard roofs: low, grey, tiled in short ticks. */}
+        <Path d="M0 96 V86 h56 v10" stroke={accent} strokeWidth={1.2} opacity={0.45} />
+        <Path d="M-4 86 h64" stroke={accent} strokeWidth={1.6} opacity={0.5} />
+        <Path d="M6 86 v-4 M16 86 v-4 M26 86 v-4 M36 86 v-4 M46 86 v-4" stroke={accent} strokeWidth={0.8} opacity={0.35} />
+        <Path d="M252 96 V88 h68 v8" stroke={accent} strokeWidth={1.2} opacity={0.4} />
+        <Path d="M248 88 h76" stroke={accent} strokeWidth={1.6} opacity={0.45} />
+        {/* A moon gate in the near wall, which is the one shape that says hutong. */}
+        {/* A moon gate is a circle in a wall, so it is drawn as one. */}
+        <Circle cx={278} cy={84} r={11} stroke={accent} strokeWidth={1.2} opacity={0.5} fill={wash} fillOpacity={0.3} />
+        <Path d="M267 96 V84 M289 96 V84" stroke={accent} strokeWidth={1.2} opacity={0.4} />
+      </Layer>
+
+      <Layer index={3} animate={animate}>
+        {/* The terrace it stands on. */}
+        <Path d="M104 96 h112 M110 92 h100" stroke={accent} strokeWidth={1.4} opacity={0.75} />
+
+        {/* Four storeys, each eave wider than the one above and flicked at the tips. */}
+        <Path d="M124 92 V76 h72 v16" stroke={accent} strokeWidth={1.6} />
+        <Path d="M106 76 q54 -13 108 0" stroke={accent} strokeWidth={2.2} strokeLinecap="round" />
+        <Path d="M106 76 q-7 -1 -10 -6 M214 76 q7 -1 10 -6" stroke={accent} strokeWidth={2} strokeLinecap="round" />
+        <Path d="M112 79 h96" stroke={accent} strokeWidth={0.9} opacity={0.45} />
+
+        <Path d="M132 76 V60 h56 v16" stroke={accent} strokeWidth={1.6} />
+        <Path d="M116 60 q44 -11 88 0" stroke={accent} strokeWidth={2.1} strokeLinecap="round" />
+        <Path d="M116 60 q-6 -1 -9 -5 M204 60 q6 -1 9 -5" stroke={accent} strokeWidth={1.9} strokeLinecap="round" />
+        <Path d="M122 63 h76" stroke={accent} strokeWidth={0.9} opacity={0.45} />
+
+        <Path d="M140 60 V46 h40 v14" stroke={accent} strokeWidth={1.6} />
+        <Path d="M126 46 q34 -9 68 0" stroke={accent} strokeWidth={2} strokeLinecap="round" />
+        <Path d="M126 46 q-5 -1 -8 -4 M194 46 q5 -1 8 -4" stroke={accent} strokeWidth={1.8} strokeLinecap="round" />
+
+        <Path d="M148 46 V34 h24 v12" stroke={accent} strokeWidth={1.5} />
+        <Path d="M136 34 q24 -7 48 0" stroke={accent} strokeWidth={1.9} strokeLinecap="round" />
+        <Path d="M136 34 q-4 -1 -7 -4 M184 34 q4 -1 7 -4" stroke={accent} strokeWidth={1.7} strokeLinecap="round" />
+
+        {/* Doorway and windows, which give the tiers their scale. */}
+        <Path d="M152 92 V82 q8 -6 16 0 v10" stroke={accent} strokeWidth={1.3} fill="none" />
+        <Path d="M132 86 h12 M176 86 h12 M150 70 h20 M154 54 h12" stroke={accent} strokeWidth={1.1} opacity={0.75} />
+
+        {/* Finial: rings and a point, the thing the whole roofline aims at. */}
+        <Path d="M160 34 V22" stroke={accent} strokeWidth={1.6} strokeLinecap="round" />
+        <Path d="M156 29 h8 M157 26 h6" stroke={accent} strokeWidth={1.1} />
+        <Circle cx={160} cy={20} r={2} fill={accent} opacity={0.85} />
+      </Layer>
+
+      <Layer index={4} animate={animate}>
+        {/* A wall in front of everything, with a scholar tree over it. */}
+        <Path d="M0 110 h78 M-2 104 h84" stroke={accent} strokeWidth={1.3} opacity={0.5} />
+        {/* A branch leaning in from the edge, rather than a mark in mid-air. */}
+        <Path d="M320 86 q-20 1 -34 11" stroke={accent} strokeWidth={1.5} opacity={0.4} strokeLinecap="round" fill="none" />
+        <Path d="M302 92 q-2 -8 2 -13 M310 88 q-1 -8 3 -12 M292 97 q-3 -7 0 -12" stroke={accent} strokeWidth={1} opacity={0.32} strokeLinecap="round" fill="none" />
+      </Layer>
+
+      <Layer index={5} animate={animate}>
         <Rect x={252} y={24} width={22} height={22} rx={2} fill={accent} opacity={0.9} />
         <Path d="M257 31 h12 M257 36 h12 M263 28 v14" stroke={wash} strokeWidth={1.4} strokeLinecap="round" />
       </Layer>
@@ -155,112 +204,216 @@ function pagoda({ accent, wash, animate }: MotifProps) {
 }
 
 /**
- * Kyoto — a torii, a mountain behind it, the sun above.
+ * Kyoto — a torii, the gates repeating behind it, a mountain, a lantern.
  *
- * The gate is drawn heavier than the mountain on purpose: the thing in front of
- * you is the thing you are walking through.
+ * The gate is drawn with its actual parts rather than as two posts and a bar:
+ * the kasagi curving along the top, the shimaki under it, the nuki through the
+ * pillars with its wedges, and the gakuzuka standing between them. That is what
+ * separates a torii from a goalpost, and at this crop it is visible.
+ *
+ * A second gate stands behind at three-quarter size. One torii is a gate; two
+ * is Fushimi, and the repetition is the thing people picture.
  */
 function torii({ accent, wash, animate }: MotifProps) {
   return (
     <>
       <Layer index={0} animate={animate}>
+        {/* Filled, faintly. Drawn as open lines they read as zigzags rather
+            than as something with a far side. */}
+        <Path d="M150 96 l58 -52 26 22 18 -16 68 46 Z" stroke={accent} strokeWidth={1.2} opacity={0.26} fill={accent} fillOpacity={0.05} />
+        <Path d="M0 96 l54 -40 28 24 22 -16 46 32 Z" stroke={accent} strokeWidth={1.2} opacity={0.18} fill={accent} fillOpacity={0.04} />
         <Path d="M0 96 H320" stroke={accent} strokeWidth={1} opacity={0.35} />
-        <Path d="M196 96 l52 -46 22 20 14 -12 36 38 Z" stroke={accent} strokeWidth={1.3} opacity={0.45} fill="none" />
-        <Path d="M232 62 l16 -12 10 9" stroke={accent} strokeWidth={1.3} opacity={0.7} />
-        <Path d="M22 96 l40 -34 30 26" stroke={accent} strokeWidth={1.2} opacity={0.3} />
       </Layer>
 
       <Layer index={1} animate={animate}>
-        <Path d="M96 96 V44 M176 96 V44" stroke={accent} strokeWidth={3} strokeLinecap="round" />
-        <Path d="M84 44 h104" stroke={accent} strokeWidth={2} />
-        <Path d="M76 34 q60 -10 120 0" stroke={accent} strokeWidth={3.4} strokeLinecap="round" />
-        <Path d="M104 58 h64" stroke={accent} strokeWidth={2.2} strokeLinecap="round" />
+        {/* Snow on the far ridge, and a treeline under it. */}
+        <Path d="M198 54 l10 -10 10 9" stroke={accent} strokeWidth={1.3} opacity={0.5} />
+        {/* Cedars, not tick marks: tall and narrow is what a Kyoto hillside does. */}
+        <Path d="M246 96 V80 M240 92 l6 -10 6 10 M242 86 l4 -7 4 7" stroke={accent} strokeWidth={1} opacity={0.3} fill="none" />
+        <Path d="M266 96 V76 M259 90 l7 -12 7 12 M261 83 l5 -8 5 8" stroke={accent} strokeWidth={1} opacity={0.26} fill="none" />
+        <Path d="M286 96 V82 M281 92 l5 -9 5 9" stroke={accent} strokeWidth={1} opacity={0.22} fill="none" />
       </Layer>
 
       <Layer index={2} animate={animate}>
-        <Circle cx={58} cy={34} r={13} fill={accent} opacity={0.85} />
-        <Circle cx={58} cy={34} r={19} stroke={accent} strokeWidth={1} opacity={0.3} fill={wash} fillOpacity={0.15} />
+        {/* The gate behind, three-quarter size. */}
+        <Path d="M214 96 V66 M242 96 V66" stroke={accent} strokeWidth={1.7} opacity={0.4} strokeLinecap="round" />
+        <Path d="M209 75 h38" stroke={accent} strokeWidth={1.3} opacity={0.4} />
+        <Path d="M204 66 q24 -6 48 0" stroke={accent} strokeWidth={2} opacity={0.4} strokeLinecap="round" />
+        <Path d="M226 66 V75" stroke={accent} strokeWidth={1.1} opacity={0.35} />
+      </Layer>
+
+      <Layer index={3} animate={animate}>
+        {/* Footing stones. */}
+        <Path d="M90 96 h16 M170 96 h16" stroke={accent} strokeWidth={3} opacity={0.6} strokeLinecap="round" />
+
+        {/* Pillars, nuki with its wedges, gakuzuka, shimaki, and the kasagi. */}
+        <Path d="M98 96 V44 M178 96 V44" stroke={accent} strokeWidth={3.2} strokeLinecap="round" />
+        <Path d="M88 62 h100" stroke={accent} strokeWidth={2.4} />
+        <Path d="M94 59 h8 v6 h-8 Z M174 59 h8 v6 h-8 Z" stroke={accent} strokeWidth={1} fill="none" opacity={0.7} />
+        <Path d="M134 50 h8 v12 h-8 Z" stroke={accent} strokeWidth={1.3} fill="none" opacity={0.8} />
+        <Path d="M82 50 h112" stroke={accent} strokeWidth={2.2} />
+        <Path d="M74 42 q64 -11 128 0" stroke={accent} strokeWidth={3.6} strokeLinecap="round" />
+        <Path d="M74 42 q-6 0 -9 -4 M202 42 q6 0 9 -4" stroke={accent} strokeWidth={2.6} strokeLinecap="round" />
+      </Layer>
+
+      <Layer index={4} animate={animate}>
+        {/* A stone lantern, and the path going under the gate. */}
+        <Path d="M26 96 h22" stroke={accent} strokeWidth={2.4} opacity={0.65} strokeLinecap="round" />
+        <Path d="M37 96 V82" stroke={accent} strokeWidth={2} opacity={0.65} />
+        <Path d="M29 82 h16" stroke={accent} strokeWidth={1.6} opacity={0.65} />
+        <Path d="M31 82 V72 h12 v10" stroke={accent} strokeWidth={1.4} opacity={0.65} fill="none" />
+        <Path d="M34 77 h6" stroke={accent} strokeWidth={1.2} opacity={0.5} />
+        <Path d="M27 72 q10 -8 20 0" stroke={accent} strokeWidth={2} opacity={0.65} strokeLinecap="round" />
+        <Path d="M37 72 V66" stroke={accent} strokeWidth={1.4} opacity={0.6} strokeLinecap="round" />
+        <Path d="M104 104 h68 M96 112 h88" stroke={accent} strokeWidth={1.3} opacity={0.4} strokeLinecap="round" />
+      </Layer>
+
+      <Layer index={5} animate={animate}>
+        {/* Clear of the kasagi: at x58 the disc sat on the curve's left tip. */}
+        <Circle cx={40} cy={24} r={12} fill={accent} opacity={0.85} />
+        <Circle cx={40} cy={24} r={18} stroke={accent} strokeWidth={1} opacity={0.3} fill={wash} fillOpacity={0.15} />
       </Layer>
     </>
   );
 }
 
 /**
- * Seoul — hanok eaves in front, towers behind, a moon jar's curve as the moon.
+ * Seoul — hanok eaves in front, glass towers behind, a moon jar for a moon.
  *
  * The old roofline crosses in front of the new one because that is what the city
  * actually looks like from Bukchon, and because a language is learned in the
  * present tense.
+ *
+ * Two pieces of detail do the work here. The eaves get their tile courses — the
+ * short ticks that make a giwa roof read as a roof rather than a curve — and the
+ * front wall gets its lattice, which is the pattern anybody who has stood in a
+ * hanok courtyard remembers before they remember the shape of the building.
  */
 function hanok({ accent, wash, animate }: MotifProps) {
   return (
     <>
       <Layer index={0} animate={animate}>
         <Path d="M0 96 H320" stroke={accent} strokeWidth={1} opacity={0.35} />
-        <Path
-          d="M204 96 V40 h16 v56 M228 96 V54 h14 v42 M250 96 V30 h18 v66 M276 96 V60 h16 v36"
-          stroke={accent}
-          strokeWidth={1.2}
-          opacity={0.35}
-        />
+        <Path d="M196 96 V34 h18 v62 M220 96 V48 h14 v48 M242 96 V26 h20 v70 M268 96 V56 h16 v40 M290 96 V42 h18 v54" stroke={accent} strokeWidth={1.1} opacity={0.3} />
       </Layer>
 
       <Layer index={1} animate={animate}>
-        {/* Two eaves, the near one lower, both with the upward flick at the tip. */}
-        <Path d="M28 70 q52 -26 104 0" stroke={accent} strokeWidth={2.4} strokeLinecap="round" />
-        <Path d="M28 70 q-8 -2 -12 -8 M132 70 q8 -2 12 -8" stroke={accent} strokeWidth={2.4} strokeLinecap="round" />
-        <Path d="M40 70 V96 M120 70 V96" stroke={accent} strokeWidth={1.6} />
-        <Path d="M52 96 V78 h56 v18" stroke={accent} strokeWidth={1.3} opacity={0.8} />
-
-        <Path d="M96 88 q46 -22 92 0" stroke={accent} strokeWidth={2.2} strokeLinecap="round" opacity={0.9} />
-        <Path d="M96 88 q-7 -2 -11 -7 M188 88 q7 -2 11 -7" stroke={accent} strokeWidth={2.2} strokeLinecap="round" opacity={0.9} />
+        {/* Window courses, which is all a glass tower is from this far away. */}
+        <Path d="M199 44 h12 M199 54 h12 M199 64 h12 M199 74 h12 M245 36 h14 M245 46 h14 M245 56 h14 M245 66 h14 M245 76 h14 M293 52 h12 M293 62 h12 M293 72 h12" stroke={accent} strokeWidth={0.8} opacity={0.25} />
       </Layer>
 
       <Layer index={2} animate={animate}>
-        <Circle cx={264} cy={28} r={14} fill={wash} stroke={accent} strokeWidth={1.6} />
-        <Path d="M254 28 q10 -8 20 0" stroke={accent} strokeWidth={1} opacity={0.5} />
+        {/* The back eave, with its tile courses. */}
+        {/* Higher and further right than the near eave, which is what puts it
+            behind. Lower down it crossed in front of the roof it stands
+            behind, and the two read as one tangled line. */}
+        {/* Clear of the near eave in x as well as in height. Overlapping them
+            put two curves through each other and read as one tangle. */}
+        <Path d="M146 74 q42 -20 84 0" stroke={accent} strokeWidth={2} strokeLinecap="round" opacity={0.7} />
+        <Path d="M146 74 q-6 -2 -10 -6 M230 74 q6 -2 10 -6" stroke={accent} strokeWidth={2} strokeLinecap="round" opacity={0.7} />
+        <Path d="M154 70 v-4 M166 66 v-4 M178 64 v-4 M190 64 v-4 M202 66 v-4 M214 70 v-4" stroke={accent} strokeWidth={0.85} opacity={0.32} />
+        <Path d="M156 74 V96 M220 74 V96" stroke={accent} strokeWidth={1.3} opacity={0.45} />
+      </Layer>
+
+      <Layer index={3} animate={animate}>
+        {/* The near eave, lower and heavier, with rafter ends under it. */}
+        <Path d="M28 70 q52 -26 104 0" stroke={accent} strokeWidth={2.6} strokeLinecap="round" />
+        <Path d="M28 70 q-8 -2 -12 -8 M132 70 q8 -2 12 -8" stroke={accent} strokeWidth={2.6} strokeLinecap="round" />
+        <Path d="M34 66 v-4 M46 61 v-4 M60 58 v-4 M74 57 v-4 M88 58 v-4 M102 61 v-4 M116 66 v-4" stroke={accent} strokeWidth={1} opacity={0.5} />
+        <Path d="M32 73 q48 -23 96 0" stroke={accent} strokeWidth={1.1} opacity={0.45} />
+        <Path d="M38 72 l-4 6 M126 72 l4 6" stroke={accent} strokeWidth={1.2} opacity={0.5} />
+
+        {/* Posts, and the lattice between them. */}
+        <Path d="M40 72 V96 M120 72 V96" stroke={accent} strokeWidth={1.8} />
+        <Path d="M52 96 V78 h56 v18" stroke={accent} strokeWidth={1.3} opacity={0.85} fill="none" />
+        <Path d="M66 78 V96 M80 78 V96 M94 78 V96 M52 84 h56 M52 90 h56" stroke={accent} strokeWidth={0.9} opacity={0.5} />
+      </Layer>
+
+      <Layer index={4} animate={animate}>
+        {/* The moon jar, on the ground where it belongs. */}
+        {/* In the foreground, where it is not standing in a tower's window. */}
+        {/*
+          No jar on the ground.
+
+          It was tried against the towers and against the open ground and read
+          as a bubble in both: a pale circle among rooflines competes with the
+          moon above, and the drawing already has one circle. The moon is the
+          moon jar — that is where the shape comes from.
+        */}
+        <Path d="M0 108 h52 M8 114 h60" stroke={accent} strokeWidth={1.2} opacity={0.35} strokeLinecap="round" />
+      </Layer>
+
+      <Layer index={5} animate={animate}>
+        <Circle cx={272} cy={24} r={14} fill={wash} stroke={accent} strokeWidth={1.6} />
+        <Path d="M262 24 q10 -8 20 0" stroke={accent} strokeWidth={1} opacity={0.5} />
       </Layer>
     </>
   );
 }
 
 /**
- * Hạ Long — a junk under limestone karsts, and a lotus on the water.
+ * Hạ Long — a junk under limestone karsts, a sampan behind it, lotus on the water.
  *
- * The sails are the drawing's subject and get its only heavy strokes; the karsts
- * behind them are the same shape repeated at three sizes, which is roughly what
- * the bay does.
+ * The sails are the subject and keep the only heavy strokes. What they gained is
+ * their battens: a junk rig is a sail divided by horizontal spars, and without
+ * them the shape is just a triangle — with them it is unmistakably this boat.
+ *
+ * The karsts repeat the same shape at four sizes and three depths, which is
+ * roughly what the bay does to anybody looking at it.
  */
 function junk({ accent, wash, animate }: MotifProps) {
   return (
     <>
       <Layer index={0} animate={animate}>
         <Path d="M0 96 H320" stroke={accent} strokeWidth={1} opacity={0.35} />
-        <Path d="M204 96 q14 -46 30 -46 t28 46 Z" stroke={accent} strokeWidth={1.3} opacity={0.4} fill="none" />
-        <Path d="M248 96 q10 -32 22 -32 t20 32 Z" stroke={accent} strokeWidth={1.3} opacity={0.3} fill="none" />
-        <Path d="M18 96 q8 -24 18 -24 t16 24 Z" stroke={accent} strokeWidth={1.3} opacity={0.25} fill="none" />
+        <Path d="M196 96 q14 -50 32 -50 t30 50 Z" stroke={accent} strokeWidth={1.2} opacity={0.22} fill="none" />
+        <Path d="M252 96 q10 -34 23 -34 t21 34 Z" stroke={accent} strokeWidth={1.2} opacity={0.18} fill="none" />
+        <Path d="M284 96 q8 -24 18 -24 t16 24 Z" stroke={accent} strokeWidth={1.2} opacity={0.15} fill="none" />
       </Layer>
 
       <Layer index={1} animate={animate}>
-        {/* Two battened sails, the classic red-brown junk rig. */}
-        <Path d="M120 88 V26" stroke={accent} strokeWidth={2} strokeLinecap="round" />
-        <Path d="M120 30 q34 16 30 46 h-30 Z" fill={accent} fillOpacity={0.16} stroke={accent} strokeWidth={2} />
-        <Path d="M124 42 h24 M124 54 h27 M124 66 h28" stroke={accent} strokeWidth={1} opacity={0.6} />
-
-        <Path d="M92 88 V44" stroke={accent} strokeWidth={1.8} strokeLinecap="round" />
-        <Path d="M92 48 q-22 12 -19 28 h19 Z" fill={accent} fillOpacity={0.12} stroke={accent} strokeWidth={1.8} />
-
-        <Path d="M64 88 h84 l-10 10 H74 Z" fill={accent} fillOpacity={0.2} stroke={accent} strokeWidth={2} strokeLinejoin="round" />
+        <Path d="M8 96 q10 -30 22 -30 t20 30 Z" stroke={accent} strokeWidth={1.3} opacity={0.3} fill="none" />
+        <Path d="M44 96 q7 -20 15 -20 t14 20 Z" stroke={accent} strokeWidth={1.3} opacity={0.24} fill="none" />
+        {/* The scrub that grows on them, in three ticks. */}
+        <Path d="M24 70 l-3 -5 M30 67 l2 -6 M212 54 l-3 -6 M220 50 l2 -6" stroke={accent} strokeWidth={1} opacity={0.3} strokeLinecap="round" />
       </Layer>
 
       <Layer index={2} animate={animate}>
-        {/* Water: two strokes, not a texture. */}
+        {/* A sampan further out, which gives the junk its size. */}
+        <Path d="M232 90 h30 l-5 5 h-20 Z" stroke={accent} strokeWidth={1.2} opacity={0.4} fill="none" />
+        <Path d="M246 90 V74 M246 78 q10 4 9 12 h-9 Z" stroke={accent} strokeWidth={1.2} opacity={0.4} fill="none" />
+      </Layer>
+
+      <Layer index={3} animate={animate}>
+        {/* Mainsail: battened, which is the whole character of a junk rig. */}
+        <Path d="M120 88 V24" stroke={accent} strokeWidth={2.2} strokeLinecap="round" />
+        <Path d="M120 28 q36 17 32 48 h-32 Z" fill={accent} fillOpacity={0.16} stroke={accent} strokeWidth={2} />
+        <Path d="M122 38 h18 M122 46 h23 M122 54 h27 M122 62 h29 M122 70 h30" stroke={accent} strokeWidth={0.9} opacity={0.55} />
+        <Path d="M120 24 q10 2 14 7" stroke={accent} strokeWidth={1.2} opacity={0.5} strokeLinecap="round" />
+
+        {/* Foresail. */}
+        <Path d="M92 88 V42" stroke={accent} strokeWidth={1.9} strokeLinecap="round" />
+        <Path d="M92 46 q-24 13 -21 30 h21 Z" fill={accent} fillOpacity={0.12} stroke={accent} strokeWidth={1.8} />
+        <Path d="M90 56 h-14 M90 64 h-16 M90 72 h-17" stroke={accent} strokeWidth={0.85} opacity={0.45} />
+
+        {/* Hull, with planking and a rudder. */}
+        <Path d="M64 88 h84 l-10 10 H74 Z" fill={accent} fillOpacity={0.2} stroke={accent} strokeWidth={2} strokeLinejoin="round" />
+        <Path d="M68 92 h76" stroke={accent} strokeWidth={0.9} opacity={0.5} />
+        <Path d="M148 88 l8 -6 M152 85 V96" stroke={accent} strokeWidth={1.4} opacity={0.7} strokeLinecap="round" />
+      </Layer>
+
+      <Layer index={4} animate={animate}>
         <Path d="M24 104 q16 -6 32 0 t32 0" stroke={accent} strokeWidth={1.2} opacity={0.45} strokeLinecap="round" />
         <Path d="M180 108 q16 -6 32 0 t32 0" stroke={accent} strokeWidth={1.2} opacity={0.35} strokeLinecap="round" />
-        <G opacity={0.9}>
-          <Path d="M276 92 q-9 -5 -10 -14 q9 3 10 14 Z" fill={accent} fillOpacity={0.35} stroke={accent} strokeWidth={1.2} />
-          <Path d="M276 92 q9 -5 10 -14 q-9 3 -10 14 Z" fill={wash} stroke={accent} strokeWidth={1.2} />
-        </G>
+        <Path d="M96 114 q18 -6 36 0 t36 0" stroke={accent} strokeWidth={1.1} opacity={0.28} strokeLinecap="round" />
+        {/* The lotus the drawing is named for. */}
+        <Path d="M276 104 q-9 -3 -9 -9 q6 -4 9 2 q3 -6 9 -2 q0 6 -9 9 Z" stroke={accent} strokeWidth={1.2} opacity={0.5} fill={wash} fillOpacity={0.5} />
+        <Path d="M268 110 q12 -4 24 0" stroke={accent} strokeWidth={1} opacity={0.35} strokeLinecap="round" />
+      </Layer>
+
+      <Layer index={5} animate={animate}>
+        <Path d="M44 30 q5 -4 10 0 q5 -4 10 0" stroke={accent} strokeWidth={1.2} opacity={0.4} fill="none" strokeLinecap="round" />
+        <Path d="M72 22 q4 -3 8 0 q4 -3 8 0" stroke={accent} strokeWidth={1.1} opacity={0.3} fill="none" strokeLinecap="round" />
       </Layer>
     </>
   );

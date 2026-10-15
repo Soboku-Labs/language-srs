@@ -798,9 +798,16 @@ a { color: var(--accent); }
   near things move most, and the drawing stops being flat.
 */
 .art__layer {
+  /*
+    Scaled for six planes, not three.
+
+    The drawings were redrawn with a far ridge, a city, roofs, the subject and
+    a foreground, and the old multiplier carried the nearest of those 42px on
+    a 14px pointer travel — which is not depth, it is a drawing coming apart.
+  */
   transform: translate3d(
-    calc(var(--px) * (var(--layer) + 1) * 0.5),
-    calc(var(--py) * (var(--layer) + 1) * 0.3),
+    calc(var(--px) * (var(--layer) + 1) * 0.26),
+    calc(var(--py) * (var(--layer) + 1) * 0.16),
     0
   );
   will-change: transform;

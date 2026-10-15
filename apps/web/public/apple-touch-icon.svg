@@ -2,15 +2,23 @@
   <title>Mon</title>
   <rect width="512" height="512" rx="96" fill="#FBFAF8"/>
   <!--
-    The same arch as apps/web/src/components/Logo.tsx, at 16x the scale.
-    Drawn as paths rather than set as the glyph 門: the previous icon was
-    `<text>` relying on Noto Sans SC or PingFang being installed, so it
-    rendered differently on every machine and as an empty box on one with
-    neither font. An icon is the one image that has to look the same
-    everywhere.
+    門, drawn as strokes. The same ten segments as
+    apps/web/src/components/Logo.tsx at 16x the scale.
+
+    Not `<text>門</text>`: an SVG favicon loads no fonts, so the glyph rendered
+    differently on every machine and as an empty box on one without a CJK font.
+    An icon is the one image that has to look the same everywhere.
   -->
-  <g stroke="#B8521F" fill="none" stroke-linecap="round">
-    <path d="M80 448V240a176 176 0 0 1 352 0v208" stroke-width="41.6"/>
-    <path d="M200 448v-96a56 56 0 0 1 112 0v96" stroke-width="35.2"/>
+  <g stroke="#B8521F" fill="none" stroke-width="41.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M88 144v304"/>
+    <path d="M88 144h120"/>
+    <path d="M88 240h120"/>
+    <path d="M88 336h120"/>
+    <path d="M208 144v192"/>
+    <path d="M304 144v192"/>
+    <path d="M304 144h120"/>
+    <path d="M304 240h120"/>
+    <path d="M304 336h120"/>
+    <path d="M424 144v304"/>
   </g>
 </svg>

@@ -18,6 +18,7 @@ import {
 } from 'react';
 import { api, deviceName, hasBackend } from './api';
 import {
+  adoptDeck,
   createDeviceAccount,
   forgetAccount,
   isRemote,
@@ -117,16 +118,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               )
             : await api().signIn({ email: credentials.email, password: credentials.password, device }, onWaking);
 
-        setAccount(
-          await saveAccount({
-            id: result.user.id,
-            displayName: result.user.displayName,
-            createdAt: result.user.createdAt,
-            email: result.user.email,
-            token: result.token,
-            expiresAt: result.expiresAt,
-          }),
-        );
+        const next: StoredAccount = {
+          id: result.user.id,
+          displayName: result.user.displayName,
+          createdAt: result.user.createdAt,
+          email: result.user.email,
+          token: result.token,
+          expiresAt: result.expiresAt,
+        };
+
+        /*
+         * Bring any work done before this along.
+         *
+         * Nothing stands between a visitor and studying any more, so the common
+         * path is to try the app first and sign in once it is worth keeping. An
+         * account reads its deck from its own prefix, so without this that
+         * studying would quietly stop being visible the moment they did.
+         *
+         * Only from a deck with nowhere else to live — a device profile, or no
+         * account at all. Signing in as somebody else must not drag the
+         * previous account's deck across; that one belongs on its own server.
+         *
+         * Written before the account changes, so the engine that mounts for it
+         * reads the adopted state rather than seeding an empty deck over it.
+         */
+        if (!isRemote(account)) await adoptDeck(storeFor(account), storeFor(next));
+
+        setAccount(await saveAccount(next));
       },
 
       signOut: async () => {

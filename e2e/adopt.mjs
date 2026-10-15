@@ -52,7 +52,12 @@ const accountReviews = async () => {
 
 await page.goto(BASE, { waitUntil: 'load' });
 await page.locator('[data-language]').first().click();
-await page.waitForTimeout(500);
+// Wait for the app to arrive, rather than guessing how long travelling takes.
+// Choosing a place runs a short animation and then navigates; a fixed sleep
+// races it, and the pending navigation lands *after* the next goto — which
+// leaves the test on the day screen looking for review options that are not
+// there. This is also what a learner does: they arrive, then they study.
+await page.waitForURL('**/home', { timeout: 15_000 });
 await page.goto(`${BASE}/review`, { waitUntil: 'load' });
 
 let graded = 0;

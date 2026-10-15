@@ -44,7 +44,7 @@ const LAYER_STAGGER_MS = 110;
 export function LanguageArt({
   code,
   width = 320,
-  height = 120,
+  height = 200,
   style,
   /** Skip the entrance — for a row that is already on screen. */
   animate = true,
@@ -62,7 +62,16 @@ export function LanguageArt({
 
   return (
     <View style={[{ width, height }, style]} accessible accessibilityLabel={`${culture.city}, drawn`}>
-      <Svg width={width} height={height} viewBox="0 0 320 120" fill="none">
+      {/*
+        Anchored to the bottom of its box, like the web.
+
+        The canvas is 320x200 now and both call sites here ask for a short,
+        wide box — a horizon band. Without this the drawing is fitted to the
+        middle of that box and shrinks away from both edges; with it the
+        ground sits on the floor and the sky is what gets cropped, which is
+        the same bargain the phone makes on the web.
+      */}
+      <Svg width={width} height={height} viewBox="0 -80 320 200" preserveAspectRatio="xMidYMax slice" fill="none">
         {MOTIFS[culture.motif]?.({ accent, wash, animate })}
       </Svg>
     </View>
@@ -110,6 +119,31 @@ function Layer({ index, animate, children }: { index: number; animate: boolean; 
 }
 
 /**
+ * One cherry blossom: five petals round a centre.
+ *
+ * Scattered petals were tried first and read as tadpoles — at this size a lone
+ * petal is a blob, and blobs in a sky are debris. Five round one point is
+ * unmistakably a flower, and a few on a branch is unmistakably spring.
+ */
+function Blossom({ cx, cy, r, accent, opacity = 0.5 }: { cx: number; cy: number; r: number; accent: string; opacity?: number }) {
+  const petals: [number, number][] = [
+    [0, -1],
+    [-0.95, -0.31],
+    [-0.59, 0.81],
+    [0.59, 0.81],
+    [0.95, -0.31],
+  ];
+  return (
+    <G opacity={opacity}>
+      {petals.map(([dx, dy], index) => (
+        <Circle key={index} cx={cx + dx * r} cy={cy + dy * r} r={r * 0.62} fill={accent} fillOpacity={0.28} stroke={accent} strokeWidth={0.5} />
+      ))}
+      <Circle cx={cx} cy={cy} r={r * 0.3} fill={accent} fillOpacity={0.6} />
+    </G>
+  );
+}
+
+/**
  * Beijing — a pagoda on its terrace, hutong roofs at its feet, a seal in the sky.
  *
  * Drawn at five depths rather than three, because the scenes crop in close now
@@ -130,6 +164,10 @@ function pagoda({ accent, wash, animate }: MotifProps) {
   return (
     <>
       <Layer index={0} animate={animate}>
+        {/* High cloud, drawn as three flat strokes rather than shapes. At this
+            weight a cloud with an outline becomes the loudest thing in the
+            sky. */}
+        <Path d="M96 -52 q32 -7 66 -2 M150 -72 q34 -8 68 -2 M118 -22 q28 -6 56 -1 M12 -40 q26 -6 52 -1" stroke={accent} strokeWidth={1.1} opacity={0.14} strokeLinecap="round" fill="none" />
         <Path d="M0 78 q44 -14 88 -7 t74 3 q46 5 86 -9 t72 -5" stroke={accent} strokeWidth={1} opacity={0.22} fill="none" />
         <Path d="M0 96 H320" stroke={accent} strokeWidth={1} opacity={0.35} />
       </Layer>
@@ -195,9 +233,27 @@ function pagoda({ accent, wash, animate }: MotifProps) {
         <Path d="M302 92 q-2 -8 2 -13 M310 88 q-1 -8 3 -12 M292 97 q-3 -7 0 -12" stroke={accent} strokeWidth={1} opacity={0.32} strokeLinecap="round" fill="none" />
       </Layer>
 
+      <Layer index={4} animate={animate}>
+        {/*
+          Kites, because that is what is actually in this sky.
+
+          A diamond, its cross-spars, and a long tail going slack — and the
+          line running all the way down to somebody out of frame, which is
+          what makes it a kite rather than a diamond floating in the air.
+        */}
+        <Path d="M132 -64 l13 17 -13 17 -13 -17 Z" stroke={accent} strokeWidth={1.4} opacity={0.55} fill={wash} fillOpacity={0.35} />
+        <Path d="M119 -47 h26 M132 -64 v34" stroke={accent} strokeWidth={0.9} opacity={0.4} />
+        <Path d="M132 -30 q5 9 -2 15 q-6 6 0 13 q5 6 -1 12" stroke={accent} strokeWidth={1} opacity={0.4} fill="none" strokeLinecap="round" />
+        <Path d="M132 -30 q14 40 26 72" stroke={accent} strokeWidth={0.7} opacity={0.22} fill="none" />
+
+        <Path d="M204 -26 l9 12 -9 12 -9 -12 Z" stroke={accent} strokeWidth={1.2} opacity={0.4} fill={wash} fillOpacity={0.25} />
+        <Path d="M195 -14 h18 M204 -26 v24" stroke={accent} strokeWidth={0.8} opacity={0.3} />
+        <Path d="M204 -2 q4 7 -2 11 q-4 4 0 9" stroke={accent} strokeWidth={0.9} opacity={0.3} fill="none" strokeLinecap="round" />
+      </Layer>
+
       <Layer index={5} animate={animate}>
-        <Rect x={252} y={24} width={22} height={22} rx={2} fill={accent} opacity={0.9} />
-        <Path d="M257 31 h12 M257 36 h12 M263 28 v14" stroke={wash} strokeWidth={1.4} strokeLinecap="round" />
+        <Rect x={236} y={-62} width={22} height={22} rx={2} fill={accent} opacity={0.9} />
+        <Path d="M241 -55 h12 M241 -50 h12 M247 -58 v14" stroke={wash} strokeWidth={1.4} strokeLinecap="round" />
       </Layer>
     </>
   );
@@ -228,6 +284,9 @@ function torii({ accent, wash, animate }: MotifProps) {
       <Layer index={1} animate={animate}>
         {/* Snow on the far ridge, and a treeline under it. */}
         <Path d="M198 54 l10 -10 10 9" stroke={accent} strokeWidth={1.3} opacity={0.5} />
+        {/* Mist lying in the folds, which is how these hills are always drawn
+            and also what they actually do at dawn. */}
+        <Path d="M156 70 q34 -5 66 0 M206 58 q28 -4 54 0 M0 72 q30 -4 58 0" stroke={accent} strokeWidth={2} opacity={0.3} strokeLinecap="round" fill="none" />
         {/* Cedars, not tick marks: tall and narrow is what a Kyoto hillside does. */}
         <Path d="M246 96 V80 M240 92 l6 -10 6 10 M242 86 l4 -7 4 7" stroke={accent} strokeWidth={1} opacity={0.3} fill="none" />
         <Path d="M266 96 V76 M259 90 l7 -12 7 12 M261 83 l5 -8 5 8" stroke={accent} strokeWidth={1} opacity={0.26} fill="none" />
@@ -269,9 +328,32 @@ function torii({ accent, wash, animate }: MotifProps) {
       </Layer>
 
       <Layer index={5} animate={animate}>
-        {/* Clear of the kasagi: at x58 the disc sat on the curve's left tip. */}
-        <Circle cx={40} cy={24} r={12} fill={accent} opacity={0.85} />
-        <Circle cx={40} cy={24} r={18} stroke={accent} strokeWidth={1} opacity={0.3} fill={wash} fillOpacity={0.15} />
+        {/*
+          Opposite the branch, not behind it.
+
+          It was moved left to clear the kasagi and then the bough was drawn
+          through it. The sky has two corners: the blossom takes one and the
+          sun takes the other.
+        */}
+        <Circle cx={196} cy={-64} r={13} fill={accent} opacity={0.85} />
+        <Circle cx={196} cy={-64} r={19} stroke={accent} strokeWidth={1} opacity={0.3} fill={wash} fillOpacity={0.15} />
+
+        {/*
+          A bough leaning in over the gate.
+
+          Blossom scattered through the sky looked like debris. On a branch it
+          is a tree just out of frame, which is both more legible and more
+          like standing under one.
+        */}
+        <Path d="M0 -76 q56 4 92 24 q24 13 36 32" stroke={accent} strokeWidth={1.6} opacity={0.45} fill="none" strokeLinecap="round" />
+        <Path d="M44 -68 q8 -12 24 -14 M90 -52 q14 -8 30 -5 M118 -32 q10 -10 24 -10" stroke={accent} strokeWidth={1.1} opacity={0.35} fill="none" strokeLinecap="round" />
+        <Blossom cx={70} cy={-83} r={4.2} accent={accent} opacity={0.5} />
+        <Blossom cx={122} cy={-58} r={3.8} accent={accent} opacity={0.45} />
+        <Blossom cx={144} cy={-42} r={4} accent={accent} opacity={0.4} />
+        <Blossom cx={36} cy={-72} r={3.2} accent={accent} opacity={0.35} />
+        {/* Two on their way down, from the branch rather than from nowhere. */}
+        <Blossom cx={160} cy={-14} r={3} accent={accent} opacity={0.3} />
+        <Blossom cx={186} cy={-36} r={2.6} accent={accent} opacity={0.25} />
       </Layer>
     </>
   );
@@ -295,6 +377,11 @@ function hanok({ accent, wash, animate }: MotifProps) {
       <Layer index={0} animate={animate}>
         <Path d="M0 96 H320" stroke={accent} strokeWidth={1} opacity={0.35} />
         <Path d="M196 96 V34 h18 v62 M220 96 V48 h14 v48 M242 96 V26 h20 v70 M268 96 V56 h16 v40 M290 96 V42 h18 v54" stroke={accent} strokeWidth={1.1} opacity={0.3} />
+        {/* Namsan, with the tower on it — the shape that says this city from
+            any direction. */}
+        <Path d="M104 42 q50 -38 102 0" stroke={accent} strokeWidth={1.4} opacity={0.3} fill={accent} fillOpacity={0.04} />
+        <Path d="M155 18 V-22 M148 -22 q7 -10 14 0 Z M150 -9 h10 M155 -22 V-40" stroke={accent} strokeWidth={1.3} opacity={0.35} fill="none" strokeLinecap="round" />
+        <Path d="M100 -46 q32 -7 66 -2 M146 -70 q36 -8 70 -2 M118 -18 q28 -6 56 -1 M8 -34 q26 -6 52 -1" stroke={accent} strokeWidth={1.1} opacity={0.13} strokeLinecap="round" fill="none" />
       </Layer>
 
       <Layer index={1} animate={animate}>
@@ -344,8 +431,14 @@ function hanok({ accent, wash, animate }: MotifProps) {
       </Layer>
 
       <Layer index={5} animate={animate}>
-        <Circle cx={272} cy={24} r={14} fill={wash} stroke={accent} strokeWidth={1.6} />
-        <Path d="M262 24 q10 -8 20 0" stroke={accent} strokeWidth={1} opacity={0.5} />
+        {/* The moon, which is also the moon jar: that is where the shape of
+            one comes from. */}
+        <Circle cx={194} cy={-62} r={15} fill={wash} stroke={accent} strokeWidth={1.6} />
+        <Path d="M183 -62 q11 -9 22 0" stroke={accent} strokeWidth={1} opacity={0.5} />
+
+        {/* Two magpies. In Korea they are the birds that bring news. */}
+        <Path d="M126 -64 q6 -5 12 0 q6 -5 12 0" stroke={accent} strokeWidth={1.2} opacity={0.35} fill="none" strokeLinecap="round" />
+        <Path d="M166 -44 q5 -4 10 0 q5 -4 10 0" stroke={accent} strokeWidth={1.1} opacity={0.28} fill="none" strokeLinecap="round" />
       </Layer>
     </>
   );
@@ -366,6 +459,9 @@ function junk({ accent, wash, animate }: MotifProps) {
     <>
       <Layer index={0} animate={animate}>
         <Path d="M0 96 H320" stroke={accent} strokeWidth={1} opacity={0.35} />
+        {/* One karst goes up past the old ceiling. They are vertical rock —
+            a bay of them all the same height is a row of hills. */}
+        <Path d="M150 96 q18 -96 40 -96 t38 96 Z" stroke={accent} strokeWidth={1.2} opacity={0.16} fill={accent} fillOpacity={0.03} />
         <Path d="M196 96 q14 -50 32 -50 t30 50 Z" stroke={accent} strokeWidth={1.2} opacity={0.22} fill="none" />
         <Path d="M252 96 q10 -34 23 -34 t21 34 Z" stroke={accent} strokeWidth={1.2} opacity={0.18} fill="none" />
         <Path d="M284 96 q8 -24 18 -24 t16 24 Z" stroke={accent} strokeWidth={1.2} opacity={0.15} fill="none" />
@@ -412,8 +508,12 @@ function junk({ accent, wash, animate }: MotifProps) {
       </Layer>
 
       <Layer index={5} animate={animate}>
-        <Path d="M44 30 q5 -4 10 0 q5 -4 10 0" stroke={accent} strokeWidth={1.2} opacity={0.4} fill="none" strokeLinecap="round" />
-        <Path d="M72 22 q4 -3 8 0 q4 -3 8 0" stroke={accent} strokeWidth={1.1} opacity={0.3} fill="none" strokeLinecap="round" />
+        {/* Mist between the rocks, which is what the bay is famous for. */}
+        <Path d="M140 42 q40 -6 78 0 M194 22 q32 -5 62 0 M0 54 q34 -5 66 0" stroke={accent} strokeWidth={2.2} opacity={0.26} strokeLinecap="round" fill="none" />
+
+        <Path d="M118 -40 q6 -5 12 0 q6 -5 12 0" stroke={accent} strokeWidth={1.2} opacity={0.4} fill="none" strokeLinecap="round" />
+        <Path d="M158 -58 q5 -4 10 0 q5 -4 10 0" stroke={accent} strokeWidth={1.1} opacity={0.32} fill="none" strokeLinecap="round" />
+        <Path d="M136 -18 q4 -3 8 0 q4 -3 8 0" stroke={accent} strokeWidth={1} opacity={0.26} fill="none" strokeLinecap="round" />
       </Layer>
     </>
   );

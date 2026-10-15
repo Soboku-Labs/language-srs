@@ -924,7 +924,7 @@ a { color: var(--accent); }
 .window {
   position: relative;
   flex: 1 1 0;
-  min-height: 112px;
+  min-height: 168px;
   overflow: hidden;
   text-align: left;
   isolation: isolate;
@@ -934,7 +934,7 @@ a { color: var(--accent); }
 
 /* The one being looked into takes more of the row. */
 .window--open { flex-grow: 1.6; }
-.window--open .scene__art { width: 126%; }
+.window--open .scene__art { width: 112%; }
 .window__more { padding-top: var(--space-xs); }
 .scene__art {
   transition:
@@ -1144,7 +1144,7 @@ a { color: var(--accent); }
 @media (min-width: 720px) {
   :root { --page: 600px; }
   .topbar__line { display: block; }
-  .window { min-height: 140px; }
+  .window { min-height: 190px; }
   .window__name { font-size: 26px; }
 }
 
@@ -1179,8 +1179,16 @@ a { color: var(--accent); }
     roofline, a mast — and opening the window steps away until the whole place
     is in frame. The crop does the work the width cannot.
   */
-  .window .scene__art { width: 280%; bottom: 21%; }
-  .window--open .scene__art { width: 140%; bottom: 17%; }
+  /*
+    Standing up, the window takes the whole view, sky included.
+
+    Scaled so the drawing's height fills the column — which crops it hard
+    across, leaving the subject and the air over it. That is the trade a
+    doorway-shaped frame makes, and it is the right way round: the sky is
+    the part that was empty.
+  */
+  .window .scene__art { width: 290%; bottom: 13%; }
+  .window--open .scene__art { width: 172%; bottom: 11%; }
   .window__badge { top: auto; bottom: var(--space-xl); left: auto; right: var(--space-lg); }
 
   .window__plate { inset: auto var(--space-lg) var(--space-xl) var(--space-xl); }

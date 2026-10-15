@@ -66,9 +66,9 @@ async function signIn(page, { register }) {
   await page.goto(`${BASE}/sign-in${register ? '?new=1' : ''}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(200);
 
-  if (register) await page.locator('input[autocomplete="name"]').fill('Vish');
-  await page.locator('input[type="email"]').fill(EMAIL);
-  await page.locator('input[type="password"]').fill(PASSWORD);
+  if (register) await page.locator('input[name="displayName"]').fill('Vish');
+  await page.locator('input[name="email"]').fill(EMAIL);
+  await page.locator('input[name="password"]').fill(PASSWORD);
   await page.getByRole('button', { name: register ? 'Create account' : 'Sign in' }).click();
   await page.waitForTimeout(3000);
   return page.url();

@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { createApp } from './app.ts';
+import { DEMO_EMAIL, DEMO_PASSWORD, demoLoginRefusal, demoLoginRequested, seedDemoAccount } from './services/demo.ts';
 import { VocabularyService } from './services/vocabulary.ts';
 import { JsonFileServerStore } from './store/json-file.ts';
 import { MemoryServerStore } from './store/memory.ts';
@@ -17,6 +18,9 @@ import type { ServerStore } from './store/types.ts';
  *   DATA_DIR          .data            — set to "memory" for a disposable server
  *   VOCAB_DIR         data/vocab       — the word lists this server hands out
  *   ALLOWED_ORIGINS   *                — comma-separated, e.g. https://example.com
+ *   DEMO_LOGIN        unset            — "1" seeds an admin/admin account for
+ *                                        development. Refuses to start with
+ *                                        NODE_ENV=production. See services/demo.ts.
  */
 const port = Number(process.env.PORT ?? 4000);
 const dataDir = process.env.DATA_DIR ?? '.data';
@@ -65,12 +69,41 @@ try {
  */
 const vocabulary = await VocabularyService.load(vocabDir);
 
+/*
+ * The demo login, if it was asked for.
+ *
+ * Refusing to start beats starting with a known password: a warning in a
+ * startup log is not a control, because nobody reads the startup logs of a
+ * server that started.
+ */
+const demoRefusal = demoLoginRefusal();
+if (demoRefusal) {
+  console.error(`[api] cannot start: ${demoRefusal}`);
+  console.error('[api] unset DEMO_LOGIN, or do not set NODE_ENV=production.');
+  process.exit(1);
+}
+
+let demoSeeded = false;
+if (demoLoginRequested()) {
+  demoSeeded = await seedDemoAccount(store);
+}
+
 const app = createApp({ store, vocabulary, allowedOrigins });
 
 app.listen(port, () => {
   console.log(`[api] listening on http://localhost:${port}`);
   console.log(`[api] accounts in ${dataDir === 'memory' ? 'memory (nothing is kept)' : dataDir}`);
   console.log(`[api] vocabulary from ${vocabDir}`);
+
+  if (demoLoginRequested()) {
+    // Loud on every boot, not just the one that created it, so an instance
+    // that has been running for a week still says what it is.
+    console.warn('[api] ================================================');
+    console.warn(`[api] DEMO LOGIN IS ON — ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
+    console.warn(`[api] ${demoSeeded ? 'account created' : 'account already present'}`);
+    console.warn('[api] Anyone who can reach this server can sign in.');
+    console.warn('[api] ================================================');
+  }
 });
 
 // A container stop should close connections rather than have them cut.

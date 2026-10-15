@@ -65,7 +65,7 @@ await bar.waitForTimeout(600);
 
 const barHeading = await heading(bar);
 const barButton = await bar.locator('.button').first().innerText();
-const barHasName = (await bar.locator('input[autocomplete="name"]').count()) > 0;
+const barHasName = (await bar.locator('input[name="displayName"]').count()) > 0;
 console.log(`bar "Sign in" -> "${barHeading}" / button "${barButton}" / name field: ${barHasName}`);
 
 if (!/sign in/i.test(barHeading)) {
@@ -109,10 +109,10 @@ if (await toggle.count()) {
   await toggle.click();
   await bar.waitForTimeout(300);
 }
-const nameField = bar.locator('input[autocomplete="name"]');
+const nameField = bar.locator('input[name="displayName"]');
 if (await nameField.count()) await nameField.fill('Vish');
-await bar.locator('input[type="email"]').fill(EMAIL);
-await bar.locator('input[type="password"]').fill(PASSWORD);
+await bar.locator('input[name="email"]').fill(EMAIL);
+await bar.locator('input[name="password"]').fill(PASSWORD);
 await bar.getByRole('button', { name: 'Create account' }).click();
 await bar.waitForTimeout(3000);
 if (!(await hasToken(bar))) failures.push('creating an account through the toggle did not sign anybody in');
@@ -134,8 +134,8 @@ if (!/create/i.test(lockedHeading)) {
 // And it must put you back where you were, not at the front door.
 await locked.getByText('I already have an account').click();
 await locked.waitForTimeout(300);
-await locked.locator('input[type="email"]').fill(EMAIL);
-await locked.locator('input[type="password"]').fill(PASSWORD);
+await locked.locator('input[name="email"]').fill(EMAIL);
+await locked.locator('input[name="password"]').fill(PASSWORD);
 await locked.getByRole('button', { name: 'Sign in' }).click();
 await locked.waitForTimeout(3500);
 
@@ -152,8 +152,8 @@ if (!importUsable) failures.push('the feature is still locked after signing in')
 const wrong = await device('wrong');
 await wrong.goto(`${BASE}/sign-in`, { waitUntil: 'networkidle' });
 await wrong.waitForTimeout(400);
-await wrong.locator('input[type="email"]').fill(EMAIL);
-await wrong.locator('input[type="password"]').fill('not-the-right-password');
+await wrong.locator('input[name="email"]').fill(EMAIL);
+await wrong.locator('input[name="password"]').fill('not-the-right-password');
 await wrong.getByRole('button', { name: 'Sign in' }).click();
 await wrong.waitForTimeout(2500);
 
@@ -167,8 +167,8 @@ if (!shown) failures.push('a wrong password was rejected silently');
 
 // An unknown email must not be distinguishable from a wrong password, or the
 // form becomes a way to find out who has an account here.
-await wrong.locator('input[type="email"]').fill(`nobody-${Date.now()}@example.com`);
-await wrong.locator('input[type="password"]').fill(PASSWORD);
+await wrong.locator('input[name="email"]').fill(`nobody-${Date.now()}@example.com`);
+await wrong.locator('input[name="password"]').fill(PASSWORD);
 await wrong.getByRole('button', { name: 'Sign in' }).click();
 await wrong.waitForTimeout(2500);
 const unknown = (await wrong.locator('.form-error').count())

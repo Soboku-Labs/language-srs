@@ -134,15 +134,33 @@ export function SignIn() {
               {registering ? (
                 <input
                   className="field"
+                  name="displayName"
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
                   placeholder="Your name (optional)"
                   autoComplete="name"
                 />
               ) : null}
+              {/*
+                `text`, not `email`.
+
+                The browser's own validation on `type="email"` is not the same
+                check as the server's, and two validators disagreeing about
+                one field is a field that rejects things the API would accept
+                — including the development `admin` login, which is
+                deliberately not an address. `inputMode` still asks a phone
+                for the email keyboard, and the server decides what is valid,
+                which it has to anyway.
+              */}
               <input
                 className="field"
-                type="email"
+                type="text"
+                inputMode="email"
+                /* Named, so a form is a form — and so the browser tests have
+                   something to select that does not move when the input's
+                   type or autocomplete hint changes, which is exactly what
+                   broke them when `type="email"` went. */
+                name="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="Email"
@@ -152,6 +170,7 @@ export function SignIn() {
               <input
                 className="field"
                 type="password"
+                name="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Password"

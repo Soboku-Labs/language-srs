@@ -30,6 +30,7 @@ import {
   type StoredAccount,
 } from './accounts';
 import { webStore } from './storage';
+import { seedDemoDeck } from './demo';
 
 /**
  * Who is using this browser, and their study engine.
@@ -104,7 +105,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
 
       useDemo: async () => {
-        setAccount(await createDemoAccount());
+        const next = await createDemoAccount();
+        /*
+         * Filled before the account changes, not after.
+         *
+         * Seeding afterwards would mean the engine mounts on an empty store,
+         * renders a screen of zeroes, and then has the deck appear underneath
+         * it — and two engines writing the same store at once is the kind of
+         * race the sync layer already taught us about.
+         */
+        await seedDemoDeck(storeFor(next));
+        setAccount(next);
       },
 
       /*

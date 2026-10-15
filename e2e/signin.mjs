@@ -249,6 +249,50 @@ if (demo.locked || !demo.usable) failures.push('the demo does not open the featu
 if (!demo.banner) failures.push('the demo does not say it is a demo, so somebody could think their work is being kept');
 if (demo.token) failures.push('the demo holds a token — it is supposed to be local only, with no account anywhere');
 
+/*
+ * And it has to have something in it.
+ *
+ * Four of the five features the demo opens work fine empty. Progress does
+ * not: retention per skill, the fortnight ahead and the streak are all views
+ * of a review history, and with none they are a screen of zeroes — which
+ * opens the feature while demonstrating nothing.
+ *
+ * Asserted on the streak rather than on the seeding, because the streak is
+ * computed by the ordinary engine from the ordinary log. If it is there, the
+ * history is real.
+ */
+await demo.page.goto(`${BASE}/stats`, { waitUntil: 'networkidle' });
+await demo.page.waitForTimeout(1200);
+/*
+ * Read the section headings, not the whole body.
+ *
+ * `body.innerText()` did not contain "BY SKILL" even when the section was on
+ * screen — the headings are uppercased in CSS and the rolled-up body text did
+ * not reflect it. Querying the headings themselves is both more reliable and
+ * a better statement of what is being asserted.
+ */
+const sections = (await demo.page.locator('.section__title').allInnerTexts()).map((t) =>
+  t.trim().toUpperCase(),
+);
+const languages = await demo.page.locator('.lang').count();
+const reviews = await demo.page.evaluate(
+  () => JSON.parse(localStorage.getItem('acct:demo:srs:v1:logs') ?? '[]').length,
+);
+console.log(`demo history   reviews=${reviews} languages=${languages} sections=${sections.length}`);
+
+if (reviews === 0) failures.push('the demo has no review history, so its progress screens show nothing');
+if (languages < 2) {
+  failures.push('the demo studies one language, so the per-language row has nothing to compare');
+}
+if (!sections.includes('BY SKILL')) {
+  failures.push(
+    `the demo has no per-skill retention, which is one of the things an account is for — sections were: ${sections.join(', ')}`,
+  );
+}
+if (!sections.includes('NEXT TWO WEEKS')) {
+  failures.push('the demo has no forecast, so the fortnight ahead is empty');
+}
+
 // -------------------------------------------------------------- verdict
 
 console.log('\n================ VERDICT ================');

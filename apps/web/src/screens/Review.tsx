@@ -420,7 +420,7 @@ export function Review() {
         <div className="track">
           <div
             className="track__fill"
-            style={{ width: `${total > 0 ? (session.reviewed / total) * 100 : 0}%` }}
+            style={{ ['--fill' as string]: total > 0 ? session.reviewed / total : 0 }}
           />
         </div>
       </div>

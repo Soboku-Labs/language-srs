@@ -164,7 +164,7 @@ export function WordRow({ row, onClick }: { row: DeckEntry; onClick: () => void 
             <span
               className="track__fill"
               style={{
-                width: `${Math.max(2, Math.round(row.weakest * 100))}%`,
+                ['--fill' as string]: Math.max(0.02, row.weakest),
                 ...(row.status === 'suspended' ? { background: 'var(--ink-faint)' } : {}),
               }}
             />

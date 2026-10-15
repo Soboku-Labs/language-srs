@@ -220,7 +220,7 @@ export function ProgressBar({ value, color }: { value: number; color?: string })
   const percent = Math.max(0, Math.min(1, value)) * 100;
   return (
     <div className="track" role="progressbar" aria-valuenow={Math.round(percent)}>
-      <div className="track__fill" style={{ width: `${percent}%`, ...(color ? { background: color } : {}) }} />
+      <div className="track__fill" style={{ ['--fill' as string]: percent / 100, ...(color ? { background: color } : {}) }} />
     </div>
   );
 }

@@ -172,7 +172,7 @@ export function Stats() {
                   <span
                     className="track__fill"
                     style={{
-                      width: `${Math.max(2, Math.round(row.trueRetention * 100))}%`,
+                      ['--fill' as string]: Math.max(0.02, row.trueRetention),
                       background:
                         row.trueRetention >= profile.desiredRetention ? palette.good : palette.warning,
                     }}

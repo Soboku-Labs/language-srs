@@ -130,7 +130,7 @@ export function Practice({ id }: { id: string }) {
           </button>
         </div>
         <div className="track">
-          <div className="track__fill" style={{ width: `${(at / exercises.length) * 100}%` }} />
+          <div className="track__fill" style={{ ['--fill' as string]: at / exercises.length }} />
         </div>
       </div>
 

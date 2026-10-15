@@ -53,7 +53,23 @@ async function device(label) {
 }
 
 const heading = (page) => page.locator('.section__title').first().innerText();
-const hasToken = (page) => page.evaluate(() => Boolean(localStorage.getItem('srs:v1:account')));
+/**
+ * Whether this browser holds an account record of any kind.
+ *
+ * Not the same as holding a bearer token: a device profile and the demo both
+ * store a record and neither has one. This was called `hasToken`, which is
+ * what it looked like it meant, and the demo assertion below read it as "has
+ * credentials" and failed on a correct implementation.
+ */
+const hasAccountRecord = (page) =>
+  page.evaluate(() => Boolean(localStorage.getItem('srs:v1:account')));
+
+/** Whether there is an actual bearer token — i.e. an account on a server. */
+const hasBearerToken = (page) =>
+  page.evaluate(() => {
+    const raw = localStorage.getItem('srs:v1:account');
+    return raw ? Boolean(JSON.parse(raw).token) : false;
+  });
 
 // ------------------------------------------------ the bar says "Sign in"
 
@@ -115,7 +131,7 @@ await bar.locator('input[name="email"]').fill(EMAIL);
 await bar.locator('input[name="password"]').fill(PASSWORD);
 await bar.getByRole('button', { name: 'Create account' }).click();
 await bar.waitForTimeout(3000);
-if (!(await hasToken(bar))) failures.push('creating an account through the toggle did not sign anybody in');
+if (!(await hasAccountRecord(bar))) failures.push('creating an account through the toggle did not sign anybody in');
 
 // -------------------------------- a locked feature offers to create one
 
@@ -160,7 +176,7 @@ await wrong.waitForTimeout(2500);
 const shown = (await wrong.locator('.form-error').count())
   ? await wrong.locator('.form-error').innerText()
   : '';
-const letIn = await hasToken(wrong);
+const letIn = await hasAccountRecord(wrong);
 console.log(`wrong password -> "${shown || 'no message'}", signed in: ${letIn}`);
 if (letIn) failures.push('a wrong password signed somebody in');
 if (!shown) failures.push('a wrong password was rejected silently');
@@ -178,6 +194,60 @@ console.log(`unknown email  -> "${unknown || 'no message'}"`);
 if (unknown !== shown) {
   failures.push(`an unknown email says "${unknown}" but a wrong password says "${shown}" — the form tells a stranger which emails are registered`);
 }
+
+// ------------------------------------- the four states, and what each opens
+
+/*
+ * The gate was decorative and silently so.
+ *
+ * It keyed on "has a local profile", which is true for a device profile —
+ * pressing "Use this device", which creates no account and sends nothing
+ * anywhere, opened every account-only feature. Nobody noticed because the
+ * locks *did* appear for somebody who had chosen nothing yet, which is the
+ * state anybody checking it would be in.
+ *
+ * So all four states are asserted together, which is the only way the one
+ * that was wrong stands out.
+ */
+async function openness(label, setup) {
+  const page = await device(label);
+  if (setup) await setup(page);
+  await page.goto(`${BASE}/import`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+  return {
+    locked: (await page.locator('.locked').count()) > 0,
+    usable: (await page.locator('textarea').count()) > 0,
+    banner: (await page.locator('.demo').count()) > 0,
+    token: await hasBearerToken(page),
+    page,
+  };
+}
+
+const nobody = await openness('nobody');
+console.log(`no account     locked=${nobody.locked} usable=${nobody.usable}`);
+if (!nobody.locked || nobody.usable) failures.push('an account-only feature is open to somebody with no account');
+
+const deviceOnly = await openness('device', async (page) => {
+  await page.goto(`${BASE}/sign-in`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  await page.getByRole('button', { name: 'Use this device' }).click();
+  await page.waitForTimeout(1800);
+});
+console.log(`device profile locked=${deviceOnly.locked} usable=${deviceOnly.usable}`);
+if (!deviceOnly.locked || deviceOnly.usable) {
+  failures.push('"Use this device" opens the account-only features — it creates no account and sends nothing anywhere');
+}
+
+const demo = await openness('demo', async (page) => {
+  await page.goto(`${BASE}/sign-in`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(500);
+  await page.getByText('Look around with a demo first').click();
+  await page.waitForTimeout(1800);
+});
+console.log(`demo           locked=${demo.locked} usable=${demo.usable} banner=${demo.banner} token=${demo.token}`);
+if (demo.locked || !demo.usable) failures.push('the demo does not open the features it exists to show');
+if (!demo.banner) failures.push('the demo does not say it is a demo, so somebody could think their work is being kept');
+if (demo.token) failures.push('the demo holds a token — it is supposed to be local only, with no account anywhere');
 
 // -------------------------------------------------------------- verdict
 

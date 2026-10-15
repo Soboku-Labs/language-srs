@@ -19,8 +19,10 @@ import {
 import { api, deviceName, hasBackend } from './api';
 import {
   adoptDeck,
+  createDemoAccount,
   createDeviceAccount,
   forgetAccount,
+  isDemo,
   isRemote,
   loadAccount,
   saveAccount,
@@ -45,6 +47,8 @@ interface AuthValue {
   isSignedIn: boolean;
   /** True when this account's progress is carried off the device. */
   synced: boolean;
+  /** True when this is a look around rather than somebody's own profile. */
+  demo: boolean;
   /** False when this build has no backend, so the UI offers no password field. */
   canSignIn: boolean;
   /** The slice of storage this account's engine reads and writes. */
@@ -53,6 +57,8 @@ interface AuthValue {
   token?: string;
   /** Use the app on this device only. */
   useThisDevice(displayName?: string): Promise<void>;
+  /** Open the account-only features to look at, without making an account. */
+  useDemo(): Promise<void>;
   /** Create or join a server account. Throws `ApiRequestError` for the form to read. */
   authenticate(
     mode: AuthMode,
@@ -88,12 +94,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ...(account ? { account } : {}),
       isSignedIn: Boolean(account),
       synced: isRemote(account),
+      demo: isDemo(account),
       canSignIn: hasBackend,
       store: storeFor(account),
       ...(account?.token ? { token: account.token } : {}),
 
       useThisDevice: async (displayName) => {
         setAccount(await createDeviceAccount(displayName ?? 'This device'));
+      },
+
+      useDemo: async () => {
+        setAccount(await createDemoAccount());
       },
 
       /*
@@ -142,7 +153,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
          * Written before the account changes, so the engine that mounts for it
          * reads the adopted state rather than seeding an empty deck over it.
          */
-        if (!isRemote(account)) await adoptDeck(storeFor(account), storeFor(next));
+        /*
+         * Never from the demo.
+         *
+         * The demo is a sandbox for looking at the app, not work somebody did
+         * — carrying it into a real account would seed their first day with
+         * whatever they poked at while deciding, and they would have no way
+         * to tell which of it was theirs.
+         */
+        if (!isRemote(account) && !isDemo(account)) {
+          await adoptDeck(storeFor(account), storeFor(next));
+        }
 
         setAccount(await saveAccount(next));
       },

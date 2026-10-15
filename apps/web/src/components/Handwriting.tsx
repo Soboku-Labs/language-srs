@@ -38,16 +38,34 @@ import { TextButton } from '../ui';
  * would compare against.
  */
 
-/** One continuous mark, as the points it passed through. */
-type Stroke = { x: number; y: number }[];
+/**
+ * One continuous mark, as the points it passed through.
+ *
+ * `pressure` is carried per point rather than per stroke because that is what
+ * a pen reports and what makes a stroke taper. A finger or a mouse reports a
+ * constant 0.5, so the same code draws an even line for them without a branch.
+ */
+type Point = { x: number; y: number; pressure: number };
+type Stroke = Point[];
 
 export function Handwriting({
   /** Shown faintly behind, once revealed, to compare against. */
   reveal,
   label,
+  /**
+   * `card` is the square inside a review card; `page` is the workbook, which
+   * takes as much of an iPad as it can get. Both work on a phone.
+   */
+  size = 'card',
+  /** Cleared when this changes, so moving to the next character starts blank. */
+  resetKey,
+  onStrokesChange,
 }: {
   reveal?: string;
   label: string;
+  size?: 'card' | 'page';
+  resetKey?: string;
+  onStrokesChange?: (count: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
@@ -60,45 +78,76 @@ export function Handwriting({
    * device-pixel-ratio resize below all need the whole picture again, and
    * keeping a parallel "what is on the canvas" state is how the two drift.
    */
+  // Moving to the next character must not inherit the last one's strokes.
+  useEffect(() => {
+    setStrokes([]);
+  }, [resetKey]);
+
+  useEffect(() => {
+    onStrokesChange?.(strokes.length);
+  }, [strokes.length, onStrokesChange]);
+
   const paint = useCallback(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
     if (!canvas || !context) return;
 
     const ratio = window.devicePixelRatio || 1;
-    const size = canvas.clientWidth;
-    if (canvas.width !== size * ratio) {
-      canvas.width = size * ratio;
-      canvas.height = size * ratio;
+    const pad = canvas.clientWidth;
+    if (canvas.width !== pad * ratio) {
+      canvas.width = pad * ratio;
+      canvas.height = pad * ratio;
     }
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    context.clearRect(0, 0, size, size);
+    context.clearRect(0, 0, pad, pad);
 
     // Guides: centre lines, the way squared practice paper is ruled.
     context.strokeStyle = getComputedStyle(canvas).getPropertyValue('--line') || '#E5E1D9';
     context.lineWidth = 1;
     context.setLineDash([4, 6]);
     context.beginPath();
-    context.moveTo(size / 2, 0);
-    context.lineTo(size / 2, size);
-    context.moveTo(0, size / 2);
-    context.lineTo(size, size / 2);
+    context.moveTo(pad / 2, 0);
+    context.lineTo(pad / 2, pad);
+    context.moveTo(0, pad / 2);
+    context.lineTo(pad, pad / 2);
     context.stroke();
     context.setLineDash([]);
 
     context.strokeStyle = getComputedStyle(canvas).getPropertyValue('--ink') || '#1B1A17';
-    context.lineWidth = Math.max(6, size / 28);
     context.lineCap = 'round';
     context.lineJoin = 'round';
 
+    /*
+     * Segment by segment, so a pen can taper.
+     *
+     * Drawing a whole stroke as one path means one line width for all of it,
+     * which is what a mouse deserves and what makes a pressure-sensitive pen
+     * feel like a mouse. Each segment is its own path at its own width; the
+     * round caps make the joins invisible.
+     */
+    const base = Math.max(5, pad / 26);
     for (const stroke of strokes) {
       if (stroke.length === 0) continue;
-      context.beginPath();
-      context.moveTo(stroke[0]!.x, stroke[0]!.y);
-      for (const point of stroke.slice(1)) context.lineTo(point.x, point.y);
-      // A single tap is a dot, which `lineTo` alone would not draw.
-      if (stroke.length === 1) context.lineTo(stroke[0]!.x + 0.1, stroke[0]!.y);
-      context.stroke();
+
+      if (stroke.length === 1) {
+        // A single tap is a dot, which no segment would draw.
+        context.lineWidth = base * stroke[0]!.pressure * 2;
+        context.beginPath();
+        context.moveTo(stroke[0]!.x, stroke[0]!.y);
+        context.lineTo(stroke[0]!.x + 0.1, stroke[0]!.y);
+        context.stroke();
+        continue;
+      }
+
+      for (let index = 1; index < stroke.length; index += 1) {
+        const from = stroke[index - 1]!;
+        const to = stroke[index]!;
+        context.lineWidth = base * (from.pressure + to.pressure);
+        context.beginPath();
+        context.moveTo(from.x, from.y);
+        context.lineTo(to.x, to.y);
+        context.stroke();
+      }
     }
   }, [strokes]);
 
@@ -114,13 +163,22 @@ export function Handwriting({
     return () => window.removeEventListener('resize', onResize);
   }, [paint]);
 
-  const pointAt = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const pointAt = (event: React.PointerEvent<HTMLCanvasElement>): Point => {
     const box = event.currentTarget.getBoundingClientRect();
-    return { x: event.clientX - box.left, y: event.clientY - box.top };
+    return {
+      x: event.clientX - box.left,
+      y: event.clientY - box.top,
+      /*
+       * A finger and a mouse both report 0 or 0.5 depending on the browser,
+       * and 0 would draw nothing at all. Anything that is not a pen is pinned
+       * to a constant, so only a real pen varies the width.
+       */
+      pressure: event.pointerType === 'pen' ? Math.max(0.15, event.pressure) : 0.5,
+    };
   };
 
   return (
-    <div className="hand">
+    <div className={`hand hand--${size}`}>
       <canvas
         ref={canvasRef}
         className="hand__pad"

@@ -356,6 +356,17 @@ export { cardId, parseCardId, reviewLogId, studySessionId } from './utils/id';
 export type { Appearance, Backdrop } from './settings';
 export { BRAND } from './theme/palettes';
 export {
+  CHAPTER_SIZE,
+  bookFraction,
+  buildBooks,
+  chapterFraction,
+  nextChapter,
+  type Book,
+  type BookSource,
+  type Chapter,
+  type ChapterProgress,
+} from './books';
+export {
   ANONYMOUS_HISTORY_DAYS,
   FEATURES,
   canUse,

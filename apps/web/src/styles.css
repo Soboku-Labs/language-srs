@@ -393,9 +393,20 @@ a { color: var(--accent); }
 .header:hover .header__back,
 .header:hover .header__chevron { color: var(--accent); }
 
-.modes { display: flex; gap: var(--space-sm); }
+/*
+  A grid, not a flex row.
+
+  Three tiles fitted a 320px screen; a fourth — writing — did not, and pushed
+  the page 26px wider than the viewport. Two columns that wrap is the right
+  answer rather than squeezing four into one row, because the label and the
+  detail under it need the width to stay on one line each.
+*/
+.modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: var(--space-sm);
+}
 .mode {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -1988,3 +1999,117 @@ a { color: var(--accent); }
   font-size: var(--text-micro);
   color: var(--ink-faint);
 }
+
+/* ---------------------------------------------------------------- writing app
+
+   Books, chapters, and a page to write on. Sized for a pen on a tablet first
+   and made to work on a phone, rather than the other way round.
+*/
+.book {
+  display: flex;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  transition: border-color var(--duration-instant) var(--ease);
+}
+.book:hover { border-color: var(--ink-faint); }
+/* A spine, so a shelf reads as a shelf rather than as a list of panels. */
+.book__spine {
+  flex: none;
+  width: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+.book__body { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.book__title { font-size: var(--text-body); font-weight: var(--weight-medium); }
+.book__line { font-size: var(--text-caption); color: var(--ink-muted); }
+.book__track { margin-top: var(--space-xs); }
+.book__meta { font-size: var(--text-micro); color: var(--ink-faint); }
+
+.chapter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-sm) 0;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.chapter__number {
+  flex: none;
+  width: 1.9em;
+  font-size: var(--text-caption);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.chapter__body { display: grid; gap: 5px; flex: 1; min-width: 0; }
+.chapter__title { font-size: var(--text-body); }
+.chapter__count {
+  flex: none;
+  font-size: var(--text-micro);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The page: head, pad, foot, with the pad taking everything left over. */
+.page {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--space-md);
+  min-height: calc(100dvh - 120px);
+  justify-items: center;
+}
+.page__head { display: grid; gap: 2px; justify-items: center; text-align: center; }
+.page__where { font-size: var(--text-micro); color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.page__gloss { font-size: var(--text-heading); font-weight: var(--weight-medium); }
+.page__reading { font-size: var(--text-caption); color: var(--ink-muted); }
+.page__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  width: 100%;
+  max-width: 520px;
+}
+
+/*
+  The writing surface.
+
+  `min(…)` against both viewport dimensions and the space the grid gives it,
+  so on an iPad in either orientation it is the largest square that fits —
+  a real writing surface rather than a phone control that has been stretched.
+*/
+.hand--page { width: 100%; }
+.hand--page .hand__pad,
+.hand--page .hand__reveal {
+  width: min(82vw, 68vh, 560px);
+}
+.hand--page .hand__reveal {
+  font-size: min(62vw, 52vh, 420px);
+  /*
+    Stronger than in a review card, because the job is different.
+
+    In a review the character appears after the answer, to compare against —
+    faint is right. In a workbook it is there the whole time to copy, and at
+    0.16 the strokes are too pale to follow. This is a workbook, not a test;
+    the deck already tests recall.
+  */
+  opacity: 0.22;
+}
+
+/*
+  The source word, with the character being practised picked out.
+
+  你 on its own is not "hello" — showing the word it came from, with the one
+  character highlighted, lets the gloss belong to something true.
+*/
+.page__in { color: var(--ink); }
+.page__of { color: var(--ink-faint); }

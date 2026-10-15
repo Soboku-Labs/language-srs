@@ -47,6 +47,8 @@ export type FeatureId =
   | 'exportVocabulary'
   /** Retention per skill, the forecast, and history beyond the last week. */
   | 'fullProgress'
+  /** The writing books: character practice, a chapter at a time. */
+  | 'writingBooks'
   /** Carrying the deck and its schedule between devices. */
   | 'sync'
   /** Practice books, and reading them in with the camera. Not built yet. */
@@ -92,6 +94,12 @@ export const FEATURES: Record<FeatureId, Feature> = {
     requires: 'account',
     name: 'Your full progress',
     line: 'Retention for each skill, the fortnight ahead, and history that goes back further than a week.',
+  },
+  writingBooks: {
+    id: 'writingBooks',
+    requires: 'account',
+    name: 'Writing practice',
+    line: 'Character workbooks, a chapter at a time, with your place kept across your devices.',
   },
   sync: {
     id: 'sync',

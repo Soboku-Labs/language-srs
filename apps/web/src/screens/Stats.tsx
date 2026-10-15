@@ -1,11 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   describeStruggle,
   findExamLevel,
+  getLanguageProfile,
   getExaminedSkills,
   getLadder,
   kindLabel,
   type KindRetention,
+  type LanguageCode,
 } from '@language-srs/core';
 import { useEngine } from '../providers';
 import { Locked } from '../components/Locked';
@@ -22,20 +24,41 @@ import { useTheme } from '../theme';
  */
 export function Stats() {
   const { engine, revision } = useEngine();
-  const { palette } = useTheme();
+  const { palette, colorsFor } = useTheme();
   const { navigate } = useRouter();
 
+  /*
+   * Which language is being *looked at*, which is not which one is active.
+   *
+   * Reading how Korean is going used to mean switching the whole app to
+   * Korean, which also changed what the review queue would serve next.
+   * Local state, so leaving the screen leaves the account where it was.
+   */
+  const [viewing, setViewing] = useState<LanguageCode | undefined>();
+
+  const summaries = useMemo(
+    () => engine.getLanguageSummaries(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [engine, revision],
+  );
+
+  const code =
+    viewing && summaries.some((row) => row.languageCode === viewing)
+      ? viewing
+      : engine.activeLanguage;
+
   const view = useMemo(() => {
-    const profile = engine.getProfile();
+    const profile = engine.getProfile(code);
     return {
       profile,
       level: findExamLevel(profile.targetLevelId),
-      stats: engine.getStats(),
-      readiness: engine.getReadiness(),
-      struggling: engine.getStrugglingCards(),
-      journey: engine.getJourney(),
+      stats: engine.getStats(code),
+      readiness: engine.getReadiness(code),
+      struggling: engine.getStrugglingCards(code),
+      journey: engine.getJourney(code),
     };
-  }, [engine, revision]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, revision, code]);
 
   const { profile, level, stats, readiness, struggling, journey } = view;
   const peak = Math.max(1, ...stats.forecast.map((day) => day.due));
@@ -60,6 +83,53 @@ export function Stats() {
 
   return (
     <Screen>
+      {/*
+        Every language you have opened, with the one you are reading at the
+        front. Only shown when there is more than one — a switcher with a
+        single option is a control that does nothing.
+
+        Selecting here changes what this screen reports and nothing else. The
+        active language, and therefore the review queue, is left alone: that
+        is the whole point of the row.
+      */}
+      {summaries.length > 1 ? (
+        <Rise index={0}>
+          <div className="langs">
+            {summaries.map((row) => (
+              <button
+                key={row.languageCode}
+                type="button"
+                className={`lang${row.languageCode === code ? ' lang--on' : ''}`}
+                aria-pressed={row.languageCode === code}
+                onClick={() => setViewing(row.languageCode)}
+                style={{ ['--lang-accent' as string]: colorsFor(row.languageCode).accent }}
+              >
+                <span className="lang__name">{getLanguageProfile(row.languageCode).name}</span>
+                <span className="lang__level">{row.levelName}</span>
+                <span className="lang__meta">
+                  {!row.started
+                    ? 'not started'
+                    : row.due > 0
+                      ? `${row.due} waiting`
+                      : 'nothing due'}
+                </span>
+                {row.daysToExam !== undefined ? (
+                  <span className="lang__exam">
+                    {row.daysToExam > 0 ? `${row.daysToExam}d to exam` : 'exam day'}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+          {code !== engine.activeLanguage ? (
+            <Caption>
+              Reading {getLanguageProfile(code).name}. You are still studying{' '}
+              {getLanguageProfile(engine.activeLanguage).name}.
+            </Caption>
+          ) : null}
+        </Rise>
+      ) : null}
+
       {/*
         "Ready" is a claim about the exam and is only made when there is an exam
         to be ready for. Without a date this is progress through the deck.

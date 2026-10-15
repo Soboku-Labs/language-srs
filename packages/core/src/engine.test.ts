@@ -1128,3 +1128,79 @@ describe('writing books', () => {
     expect(other.engine.getWritingProgress()[chapter.id]?.written).toHaveLength(1);
   });
 });
+
+/**
+ * Progress for every language, not just the active one.
+ *
+ * Progress used to be answerable only for whichever language happened to be
+ * active, so finding out how Korean was going meant switching the whole app
+ * over — which also changed what the review queue would serve next. Looking
+ * is not the same act as choosing.
+ */
+describe('all the languages at once', () => {
+  it('lists only languages that have been opened', async () => {
+    const { engine } = await makeEngine();
+    // A fresh engine has Mandarin, because it needs something to schedule.
+    expect(engine.getLanguageSummaries().map((row) => row.languageCode)).toEqual(['zh']);
+
+    await engine.setActiveLanguage('ko');
+    expect(engine.getLanguageSummaries().map((row) => row.languageCode)).toEqual(['zh', 'ko']);
+  });
+
+  it('calls a language started only once something has been reviewed', async () => {
+    const { engine } = await makeEngine();
+    expect(engine.getLanguageSummaries()[0]!.started).toBe(false);
+
+    const card = engine.getQueue().cards[0]!.card;
+    await engine.grade(card.id, 3);
+    expect(engine.getLanguageSummaries()[0]!.started).toBe(true);
+  });
+
+  it('reports each language against its own level', async () => {
+    const { engine } = await makeEngine();
+    await engine.setActiveLanguage('ja');
+
+    const summaries = engine.getLanguageSummaries();
+    const zh = summaries.find((row) => row.languageCode === 'zh')!;
+    const ja = summaries.find((row) => row.languageCode === 'ja')!;
+
+    // Two tracks, two level names. A shared one would mean the row was
+    // reporting the active language's level for everything.
+    expect(zh.levelName).not.toBe(ja.levelName);
+  });
+
+  it('counts what is waiting in each language separately', async () => {
+    const { engine } = await makeEngine();
+    await engine.setActiveLanguage('ja');
+
+    for (const row of engine.getLanguageSummaries()) {
+      expect(row.due).toBeGreaterThan(0);
+    }
+
+    // Studying Japanese must not change what Mandarin says is waiting.
+    const before = engine.getLanguageSummaries().find((row) => row.languageCode === 'zh')!.due;
+    const card = engine.getQueue({ code: 'ja' }).cards[0]!.card;
+    await engine.grade(card.id, 3);
+    expect(engine.getLanguageSummaries().find((row) => row.languageCode === 'zh')!.due).toBe(before);
+  });
+
+  it('carries an exam date only for the language that has one', async () => {
+    const { engine } = await makeEngine();
+    await engine.setActiveLanguage('ko');
+    await engine.updateProfile('ko', { examDate: '2026-06-01' });
+
+    const summaries = engine.getLanguageSummaries();
+    expect(summaries.find((row) => row.languageCode === 'ko')!.examDate).toBe('2026-06-01');
+    expect(summaries.find((row) => row.languageCode === 'zh')!.examDate).toBeUndefined();
+  });
+
+  it('does not change which language is active', async () => {
+    // The whole point: looking at Korean must not switch you to Korean.
+    const { engine } = await makeEngine();
+    await engine.setActiveLanguage('ko');
+    await engine.setActiveLanguage('zh');
+
+    engine.getLanguageSummaries();
+    expect(engine.activeLanguage).toBe('zh');
+  });
+});

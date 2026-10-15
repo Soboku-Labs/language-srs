@@ -355,6 +355,7 @@ export { cardId, parseCardId, reviewLogId, studySessionId } from './utils/id';
 // Engine
 export type { Appearance, Backdrop } from './settings';
 export { BRAND } from './theme/palettes';
+export type { LanguageSummary } from './engine';
 export {
   CHAPTER_SIZE,
   bookFraction,

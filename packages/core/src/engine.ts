@@ -2,10 +2,10 @@ import { buildQuestion, type AnswerMode, type Question } from './answer';
 import { createCard, generateCards } from './cards/factory';
 import { summariseDeck, type DeckEntry } from './deck';
 import { SEED_ENTRIES } from './data/seed';
-import { findExamTrack, getExamTrack, getLevelIdsInScope } from './exams';
+import { findExamLevel, findExamTrack, getExamTrack, getLevelIdsInScope } from './exams';
 import { getJourney, type Journey } from './journey';
 import { getDailyGoal, type DailyGoal } from './session/goal';
-import { buildStudyQueue, countTodaysWork, type StudyQueue } from './session/queue';
+import { buildStudyQueue, countTodaysWork, type DailyCounts, type StudyQueue } from './session/queue';
 import { DEFAULT_SCHEDULER_CONFIG, resolveSchedulerConfig, type SchedulerConfig } from './srs/params';
 import { gradeCard } from './srs/scheduler';
 import {
@@ -30,6 +30,7 @@ import {
   type Card,
   type LexicalEntry,
   type StudyProfile,
+  type DateOnly,
   type Timestamp,
 } from './types/card';
 import { LANGUAGE_CODES, getLanguageProfile, type LanguageCode } from './types/language';
@@ -82,6 +83,30 @@ const MAX_UNDO_DEPTH = 10;
  * not borrow the vocabulary scheduler.
  */
 const GRAMMAR_INTERVAL_DAYS = [1, 3, 7, 16, 35] as const;
+
+/**
+ * One language's headline numbers, for the row you scan before choosing.
+ *
+ * The streak is deliberately absent: it is counted from the review log, which
+ * is not split by language, so a per-language streak would be the same number
+ * repeated and would read as a fact about each one.
+ */
+export interface LanguageSummary {
+  languageCode: LanguageCode;
+  /** The level being studied for, short form. */
+  levelName: string;
+  /** Whether any card here has actually been reviewed. */
+  started: boolean;
+  /** Cards waiting right now — due, new and learning together. */
+  due: number;
+  /** Share of the level's published vocabulary known, 0-1. */
+  coverage: number;
+  entriesKnown: number;
+  /** Recall rate over the last 30 days, 0-1. */
+  retention: number;
+  examDate?: DateOnly;
+  daysToExam?: number;
+}
 
 /** What is remembered about a grammar point between sittings. */
 export interface GrammarProgress {
@@ -649,6 +674,28 @@ export class StudyEngine {
     };
   }
 
+  /**
+   * Today's work in one language.
+   *
+   * The daily caps are per language — `dailyNewLimit` lives on the profile —
+   * but the review log is one list for the whole account, so counting all of
+   * it against one language's cap meant the budgets were shared. Somebody
+   * studying Mandarin and Japanese with fifteen new cards a day in each was
+   * getting fifteen between them: grade a Japanese card and Mandarin's queue
+   * quietly got one shorter, with nothing on screen to explain it.
+   *
+   * Found by asserting that studying one language leaves the other's count
+   * alone, which is the kind of thing nobody checks by hand.
+   */
+  private todaysWorkFor(code: LanguageCode, now: Timestamp): DailyCounts {
+    const own = new Set(this.getAllCards(code).map((card) => card.id));
+    return countTodaysWork(
+      this.logs.filter((log) => own.has(log.cardId)),
+      now,
+      this.dayStartHour,
+    );
+  }
+
   getQueue(options: { code?: LanguageCode; sessionLimit?: number; now?: Timestamp } = {}): StudyQueue {
     const code = options.code ?? this.meta.activeLanguage;
     const profile = this.getProfile(code);
@@ -659,7 +706,7 @@ export class StudyEngine {
       profile,
       cards: this.getAllCards(code),
       entries: this.entriesById,
-      done: countTodaysWork(this.logs, now, this.dayStartHour),
+      done: this.todaysWorkFor(code, now),
       ...(options.sessionLimit !== undefined ? { sessionLimit: options.sessionLimit } : {}),
     });
   }
@@ -741,11 +788,58 @@ export class StudyEngine {
       retentionByKind: computeRetentionByKind(this.logs, { windowDays: 30, now }),
       coverage: computeCoverage(cards, level?.vocabularyTarget ?? 0),
       forecast: forecastReviews(cards, now, 14, this.dayStartHour),
-      today: countTodaysWork(this.logs, now, this.dayStartHour),
+      today: this.todaysWorkFor(code, now),
     };
   }
 
-  getReadiness(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): ExamReadiness {
+/**
+   * Every language this account is studying, at a glance.
+   *
+   * Progress has only ever been answerable for one language at a time —
+   * whichever happened to be active — so a learner doing Mandarin and Korean
+   * had to switch the whole app over to find out how Korean was going, which
+   * also changed what the review queue would serve them next. Looking is not
+   * the same act as choosing, and this separates them.
+   *
+   * Only languages with a profile: the engine creates one the moment a
+   * language is touched, so this is "ones you have opened" rather than "all
+   * four", and a list padded with three untouched languages is a list nobody
+   * reads.
+   *
+   * Deliberately the headline numbers and nothing else. The per-language
+   * detail already exists behind `getStats` and `getReadiness`; this is the
+   * row you scan to decide which one to open.
+   */
+  getLanguageSummaries(now: Timestamp = this.now()): LanguageSummary[] {
+    return LANGUAGE_CODES.filter((code) => this.hasProfile(code)).map((code) => {
+      const profile = this.getProfile(code);
+      const stats = this.getStats(code, now);
+      const readiness = this.getReadiness(code, now);
+      const queue = this.getQueue({ code, now });
+      const level = findExamLevel(profile.targetLevelId);
+
+      return {
+        languageCode: code,
+        levelName: level?.shortName ?? profile.targetLevelId,
+        /*
+         * Reviewed, not merely present.
+         *
+         * A profile is created by opening a language, so counting profiles as
+         * "started" would greet somebody with three languages they have never
+         * studied sitting at 0%.
+         */
+        started: this.getAllCards(code).some((card) => card.reps > 0),
+        due: queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning,
+        coverage: stats.coverage.fraction,
+        entriesKnown: stats.coverage.entriesKnown,
+        retention: stats.retention.trueRetention,
+        ...(profile.examDate ? { examDate: profile.examDate } : {}),
+        ...(readiness.daysToExam !== undefined ? { daysToExam: readiness.daysToExam } : {}),
+      };
+    });
+  }
+
+    getReadiness(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): ExamReadiness {
     // Scoped for the same reason as the stats: readiness is about this level.
     return computeExamReadiness(this.cardsInScope(code), this.getProfile(code), now);
   }
@@ -763,7 +857,7 @@ export class StudyEngine {
     const profile = this.getProfile(code);
     return getDailyGoal({
       breakdown: this.getQueue({ code, now }).breakdown,
-      done: countTodaysWork(this.logs, now, this.dayStartHour),
+      done: this.todaysWorkFor(code, now),
     });
   }
 

@@ -821,3 +821,32 @@ describe('grammar practice, spaced', () => {
     expect(engine.isGrammarLearned('zh-ma')).toBe(false);
   });
 });
+
+describe('how alive the background is', () => {
+  it('is calm until somebody says otherwise', async () => {
+    const { engine } = await makeEngine();
+    expect(engine.backdrop).toBe('calm');
+  });
+
+  it('remembers the choice, and carries it to the account', async () => {
+    const { engine, store } = await makeEngine();
+    await engine.setBackdrop('living');
+    expect(engine.backdrop).toBe('living');
+
+    const reopened = await StudyEngine.create({ store, seedEntries: SEED_ENTRIES, clock: fixedClock(NOW) });
+    expect(reopened.backdrop).toBe('living');
+
+    // It lives on meta, which is a synced key — a preference about motion is
+    // about the person, not the browser.
+    const phone = await makeEngine();
+    await phone.engine.importState(await engine.exportState());
+    expect(phone.engine.backdrop).toBe('living');
+  });
+
+  it('can be set back', async () => {
+    const { engine } = await makeEngine();
+    await engine.setBackdrop('living');
+    await engine.setBackdrop('calm');
+    expect(engine.backdrop).toBe('calm');
+  });
+});

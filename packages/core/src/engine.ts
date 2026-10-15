@@ -133,7 +133,25 @@ interface EngineMeta {
   activeLanguage: LanguageCode;
   profiles: Partial<Record<LanguageCode, StudyProfile>>;
   schedulerConfig: Partial<SchedulerConfig>;
+  /** How much the app moves of its own accord. Absent means calm. */
+  backdrop?: Backdrop;
 }
+
+/**
+ * How alive the background is.
+ *
+ * Not a skin. The two settings are a real disagreement about what a study app
+ * should be, and both sides of it are reasonable:
+ *
+ * - **calm** — the scene is a still drawing. It moves when the learner moves,
+ *   and otherwise it is a picture on a wall. Nothing competes with the card.
+ * - **living** — the weather runs. Cloud drifts, kites sway, water moves, the
+ *   light shifts across the sky. It is the same place, awake.
+ *
+ * It belongs to the account rather than the browser, because somebody who
+ * wants their app still wants it still on their phone too.
+ */
+export type Backdrop = 'calm' | 'living';
 
 export interface StudyEngineOptions {
   store: KeyValueStore;
@@ -360,6 +378,25 @@ export class StudyEngine {
     await this.persistMeta();
     await this.syncCards();
     return profile;
+  }
+
+  /** How much the background moves on its own. */
+  get backdrop(): Backdrop {
+    return this.meta.backdrop ?? 'calm';
+  }
+
+  /**
+   * Choose how alive the background is.
+   *
+   * Stored on the account's own meta, so it travels with the deck rather than
+   * being set again on every device — a preference about motion is about the
+   * person, not the browser they happen to be using.
+   */
+  async setBackdrop(backdrop: Backdrop): Promise<void> {
+    if (this.meta.backdrop === backdrop) return;
+    this.meta.backdrop = backdrop;
+    await this.persistMeta();
+    await this.notifyChanged();
   }
 
   async setActiveLanguage(code: LanguageCode): Promise<void> {

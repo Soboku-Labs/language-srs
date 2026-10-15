@@ -218,6 +218,37 @@ export function Settings() {
       </Rise>
 
       <Rise index={6}>
+        <Section title="Background">
+          {/*
+            Applies everywhere, not to this language. The four places keep
+            their own ink either way — what changes is whether the weather in
+            them is running.
+          */}
+          <Row wrap>
+            <Choice
+              label="Calm"
+              selected={engine.backdrop === 'calm'}
+              onClick={() => void mutate((instance) => instance.setBackdrop('calm'))}
+            />
+            <Choice
+              label="Living"
+              selected={engine.backdrop === 'living'}
+              onClick={() => void mutate((instance) => instance.setBackdrop('living'))}
+            />
+          </Row>
+          <Caption>
+            {engine.backdrop === 'living'
+              ? 'The sky moves, the light crosses it and the drawing drifts. Nothing is added — the same scene, awake.'
+              : 'The scene is a still drawing. It answers the pointer and otherwise holds its breath.'}
+          </Caption>
+          <Caption>
+            Kept with your account, so it is the same on your phone. If your system asks for
+            reduced motion, the background stays still whichever is chosen.
+          </Caption>
+        </Section>
+      </Rise>
+
+      <Rise index={7}>
         <Section title="Account">
           <DetailRow
             label={synced ? 'Signed in as' : 'Using this device as'}

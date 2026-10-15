@@ -370,5 +370,11 @@ export {
   type GrammarExample,
   type GrammarPoint,
 } from './grammar';
-export { STORAGE_KEYS, SYNCED_STORAGE_KEYS, StudyEngine, type GrammarProgress } from './engine';
+export {
+  STORAGE_KEYS,
+  SYNCED_STORAGE_KEYS,
+  StudyEngine,
+  type Backdrop,
+  type GrammarProgress,
+} from './engine';
 export type { StudyEngineOptions } from './engine';

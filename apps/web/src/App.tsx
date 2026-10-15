@@ -43,6 +43,19 @@ export function App() {
 function Themed() {
   const { engine, revision } = useEngine();
   const language = useMemo(() => engine.activeLanguage, [engine, revision]);
+  const backdrop = useMemo(() => engine.backdrop, [engine, revision]);
+
+  /*
+   * On the document, not on a component.
+   *
+   * How alive the background is affects the sky, the light, the drawing's
+   * layers and the grain over all of it — things in four different places that
+   * should never disagree. One attribute at the root means the stylesheet
+   * answers the question once.
+   */
+  useEffect(() => {
+    document.documentElement.dataset.backdrop = backdrop;
+  }, [backdrop]);
 
   return (
     <ThemeProvider languageCode={language}>

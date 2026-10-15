@@ -62,6 +62,20 @@ export function Scene({
       <div className="scene__sky" />
 
       {/*
+        The weather, for anybody who wants it running.
+
+        Two soft masses of colour that orbit slowly behind everything else —
+        the modern mesh-gradient look, but tied to this language's own ink
+        rather than dropped on top of it. Present in both settings and still
+        in the calm one, so switching is a change of motion rather than a
+        change of picture.
+      */}
+      <div className="scene__weather">
+        <span className="scene__mass scene__mass--one" />
+        <span className="scene__mass scene__mass--two" />
+      </div>
+
+      {/*
         The light in this sky.
 
         One soft source, placed off-centre and drifting with the pointer at the

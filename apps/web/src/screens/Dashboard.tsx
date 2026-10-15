@@ -7,7 +7,7 @@ import {
   kindLabel,
   type CardKind,
 } from '@language-srs/core';
-import { LanguageArt } from '../components/LanguageArt';
+import { Scene } from '../components/Scene';
 import { TeacherSays } from '../components/Teacher';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
@@ -67,6 +67,18 @@ export function Dashboard() {
 
   return (
     <Screen layer="day">
+      {/*
+        The place you chose, behind the day you are having in it.
+
+        Hazed almost to nothing — its job is to tint the room, not to be
+        looked at, and a screen read every morning cannot afford a picture
+        competing with the number on it. It is the same scene as the window
+        that was walked through, which is what makes arriving here feel like
+        having gone somewhere.
+
+        Not on the review loop. That one strips back to the card on purpose.
+      */}
+      <Scene code={profile.languageCode} variant="backdrop" className="screen__backdrop" />
       {/* Tapping the language is how you switch it — no menu needed. */}
       <Rise index={0}>
         <button type="button" className="header" onClick={() => navigate('/')}>
@@ -85,7 +97,6 @@ export function Dashboard() {
 
       <Rise index={1}>
         <div className="hero hero--placed">
-          <LanguageArt code={profile.languageCode} className="hero__art" />
           {goal.complete ? (
             <>
               {/*

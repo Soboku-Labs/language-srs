@@ -258,6 +258,15 @@ a { color: var(--accent); }
     animation-duration: 1ms !important;
     animation-delay: 0ms !important;
     transition-duration: 1ms !important;
+    /*
+      And once, not forever.
+
+      Flattening a one-shot entrance to 1ms makes it instant, which is the
+      intent. Doing the same to a looping background would run it a thousand
+      times a second — the living backdrop would become a strobe for exactly
+      the people who asked for less motion.
+    */
+    animation-iteration-count: 1 !important;
   }
 }
 
@@ -618,23 +627,14 @@ a { color: var(--accent); }
  * read. Faint enough to sit under text, and inert to the pointer.
  */
 .hero--placed { position: relative; isolation: isolate; }
-.hero__art {
-  position: absolute;
-  inset: auto 0 0 0;
-  z-index: -1;
-  opacity: 0.3;
-  pointer-events: none;
-  /*
-   * Fades out well before the count.
-   *
-   * The pagoda's upper tiers reach about two thirds of the way up the hero and
-   * were crossing "cards today" at full strength, which made the label harder to
-   * read than a label should ever be. The drawing is a watermark; where it
-   * competes with text, the text wins.
-   */
-  mask-image: linear-gradient(to top, #000 32%, transparent 78%);
-  -webkit-mask-image: linear-gradient(to top, #000 32%, transparent 78%);
-}
+/*
+  The day's watermark is gone.
+
+  It was a faded copy of the same drawing that now stands behind the whole
+  screen, so the day was showing the place twice — and when the canvas grew
+  taller its mask slid onto the horizon line, leaving a row of dashes under
+  the count. One scene behind the screen does the job the watermark was for.
+*/
 
 /* ------------------------------------------------------------- the teacher */
 
@@ -797,6 +797,20 @@ a { color: var(--accent); }
   the pointer offset by it is the whole of the effect — far things barely move,
   near things move most, and the drawing stops being flat.
 */
+/*
+  Registered so it can be animated.
+
+  A custom property is a string to the animation engine unless it has been
+  given a type, and an untyped one jumps between keyframes instead of moving
+  between them. The layers' drift rides on this alongside the pointer offset,
+  which is why it cannot simply be another transform.
+*/
+@property --sway {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
 .art__layer {
   /*
     Scaled for six planes, not three.
@@ -806,7 +820,7 @@ a { color: var(--accent); }
     a 14px pointer travel — which is not depth, it is a drawing coming apart.
   */
   transform: translate3d(
-    calc(var(--px) * (var(--layer) + 1) * 0.26),
+    calc(var(--px) * (var(--layer) + 1) * 0.26 + var(--sway)),
     calc(var(--py) * (var(--layer) + 1) * 0.16),
     0
   );
@@ -889,9 +903,24 @@ a { color: var(--accent); }
 }
 
 /* A backdrop is mostly ground: it tints the room rather than being looked at. */
-.scene--backdrop .scene__art { opacity: 0.45; }
-.scene--backdrop .scene__haze { height: 72%; }
+/* 150%, so the seal lands inside the frame instead of clipping against
+   the right edge as a red tab. */
+.scene--backdrop .scene__art { opacity: 0.13; width: 150%; left: 50%; transform: translateX(-50%); bottom: 0; }
+.scene--backdrop .scene__sky { opacity: 0.55; }
+.scene--backdrop .scene__haze { height: 74%; opacity: 0.95; }
+.scene--backdrop .scene__light { opacity: 0.6; }
 .scene--backdrop .scene__label { display: none; }
+.scene--backdrop::after { display: none; }
+/* Quieter again than a window's, since text is read straight over it. */
+/*
+  Tuned down twice.
+
+  At full strength the day was read over a pagoda and a pair of kites, with
+  the seal clipped against the right edge like a tab. A backdrop's job is to
+  say which place you are in, not to be looked at — this is the level where
+  the room is tinted and the number still wins.
+*/
+.scene--backdrop .scene__mass { filter: blur(70px); opacity: 0.55; }
 
 /* ----------------------------------------------------------------- the door
 
@@ -1385,3 +1414,116 @@ a { color: var(--accent); }
   color: var(--accent);
   white-space: nowrap;
 }
+
+/* ------------------------------------------------------- a living backdrop
+
+   The same four places, awake.
+
+   Everything below is motion only: no element appears or disappears between
+   the two settings, and no colour changes. Calm is this with the clocks
+   stopped, which is what makes switching feel like opening a window rather
+   than loading a different app.
+
+   All of it is transform and opacity, so it runs on the compositor and costs
+   no layout. Under prefers-reduced-motion the rule above stops every loop
+   after one pass, so the living backdrop is simply the still one.
+*/
+
+/* Two soft masses of the language's own ink, orbiting behind everything. */
+.scene__weather {
+  position: absolute;
+  inset: -20%;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms var(--ease);
+}
+.scene__mass {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  filter: blur(42px);
+}
+.scene__mass--one {
+  width: 56%;
+  height: 46%;
+  left: 6%;
+  top: 8%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--scene-accent) 34%, transparent), transparent 70%);
+}
+.scene__mass--two {
+  width: 48%;
+  height: 40%;
+  right: 4%;
+  top: 30%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--secondary, var(--scene-accent)) 28%, transparent), transparent 70%);
+}
+
+:root[data-backdrop='living'] .scene__weather { opacity: 1; }
+:root[data-backdrop='living'] .scene__mass--one { animation: drift-one 34s ease-in-out infinite alternate; }
+:root[data-backdrop='living'] .scene__mass--two { animation: drift-two 46s ease-in-out infinite alternate; }
+
+@keyframes drift-one {
+  from { transform: translate3d(-6%, -4%, 0) scale(1); }
+  to { transform: translate3d(10%, 8%, 0) scale(1.18); }
+}
+@keyframes drift-two {
+  from { transform: translate3d(6%, 6%, 0) scale(1.1); }
+  to { transform: translate3d(-8%, -6%, 0) scale(0.92); }
+}
+
+/* The sun crossing its own sky, slowly enough to notice only if you watch. */
+:root[data-backdrop='living'] .scene__light {
+  animation: sun 58s ease-in-out infinite alternate;
+}
+@keyframes sun {
+  from { transform: translate3d(-5%, 2%, 0) scale(1); opacity: 0.85; }
+  to { transform: translate3d(7%, -3%, 0) scale(1.12); opacity: 1; }
+}
+
+/*
+  The drawing breathing.
+
+  Each plane drifts by its own depth and on its own clock, so the far ridge
+  barely moves while the foreground travels — the same rule as the parallax,
+  which is why they can share a transform.
+*/
+:root[data-backdrop='living'] .art__layer {
+  animation: sway calc(26s + var(--layer) * 5s) ease-in-out infinite alternate;
+  animation-delay: calc(var(--layer) * -3s);
+}
+@keyframes sway {
+  from { --sway: -2px; }
+  to { --sway: 6px; }
+}
+
+/* And the air itself, moving over the horizon. */
+:root[data-backdrop='living'] .scene__haze {
+  animation: breathe 24s ease-in-out infinite alternate;
+}
+@keyframes breathe {
+  from { opacity: 0.8; transform: translate3d(0, 2%, 0); }
+  to { opacity: 1; transform: translate3d(0, -2%, 0); }
+}
+
+/*
+  A scene standing behind a screenful of text.
+
+  Fixed rather than absolute, so it stays put while the day scrolls — a
+  backdrop that scrolls with the content is wallpaper, and wallpaper moving
+  under a column of numbers is the thing that makes a page feel cheap.
+*/
+.screen__backdrop {
+  position: fixed;
+  inset: 0;
+  /*
+    Zero, not minus one.
+
+    A negative z-index puts it behind its stacking context, and the page's
+    canvas colour is painted from `body` — so at -1 the whole scene was
+    rendered underneath an opaque background and never seen. It sits at the
+    bottom of the content instead, with the day's own rows lifted above it.
+  */
+  z-index: 0;
+}
+.screen--day > *:not(.screen__backdrop) { position: relative; z-index: 1; }

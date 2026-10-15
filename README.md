@@ -251,6 +251,22 @@ npm run server    # the account API on :4000 — optional, studying works withou
 The app talks to whatever `EXPO_PUBLIC_API_URL` says at build time, defaulting to
 `http://localhost:4000`. Signing in is the only thing that needs it.
 
+#### Signing in while building
+
+```sh
+DEMO_LOGIN=1 npm run server   # seeds an account: admin / admin
+```
+
+Off unless asked for, so that credential does not exist on a server that was
+not started with it. It is a seeded account rather than a special case in
+sign-in: `AuthService` has never heard of it, hashes its password with the
+same parameters as anybody's, and applies the same lockout after failed
+attempts — there is no branch in the authentication to get wrong.
+
+Setting it with `NODE_ENV=production` **stops the server** rather than starting
+one with a known password. A warning in a startup log is not a control, because
+nobody reads the startup logs of a server that started.
+
 ### Deploying the web build
 
 Pushing to `main` builds and publishes to GitHub Pages via

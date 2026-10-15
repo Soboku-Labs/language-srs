@@ -92,7 +92,9 @@ console.log('slices before signing in:', JSON.stringify(await slices()));
 
 // ------------------------------------------------------------- then sign in
 
-await page.goto(`${BASE}/sign-in`, { waitUntil: 'load' });
+// `?new=1`: this test creates an account, and a bare /sign-in is now the
+// sign-in form rather than the sign-up one.
+await page.goto(`${BASE}/sign-in?new=1`, { waitUntil: 'load' });
 await page.locator('input[autocomplete="name"]').fill('Vish');
 await page.locator('input[type="email"]').fill(EMAIL);
 await page.locator('input[type="password"]').fill(PASSWORD);

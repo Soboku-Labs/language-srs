@@ -38,9 +38,33 @@ const MESSAGES: Partial<Record<AuthErrorCode | 'offline', string>> = {
 
 export function SignIn() {
   const { useThisDevice, authenticate, canSignIn } = useAuth();
-  const { navigate } = useRouter();
+  const { navigate, query } = useRouter();
 
-  const [mode, setMode] = useState<AuthMode>('register');
+  /*
+   * Which of the two this is, decided by what was pressed to get here.
+   *
+   * This screen used to open on "Create an account" however you arrived, so
+   * the "Sign in" button in the bar led to a page headed Create an account,
+   * with a name field and a Create account button — and the only way to
+   * actually sign in was to notice a line of small text underneath. The
+   * button was lying about where it went.
+   *
+   * `?new=1` is set by the things that genuinely mean "make one" — the
+   * locked-feature panels. Everything else means sign in, which is also what
+   * the route is called.
+   */
+  const [mode, setMode] = useState<AuthMode>(query.get('new') === '1' ? 'register' : 'signIn');
+
+  /*
+   * Where to go afterwards.
+   *
+   * Somebody who hit a locked feature on /import and made an account was
+   * returned to the front door, having to find their way back to the thing
+   * they were doing. Only same-site paths are honoured: `from` arrives in a
+   * URL, and a URL is something anybody can write.
+   */
+  const from = query.get('from');
+  const back = from && from.startsWith('/') && !from.startsWith('//') ? from : '/';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -55,7 +79,7 @@ export function SignIn() {
     void (async () => {
       try {
         await action();
-        navigate('/', { replace: true });
+        navigate(back, { replace: true });
       } catch (cause) {
         setError(
           cause instanceof ApiRequestError

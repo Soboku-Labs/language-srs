@@ -49,6 +49,8 @@ export const STORAGE_KEYS = {
   pending: `${KEY_PREFIX}:pending`,
   /** Finished sittings, for the account and progress screens. */
   sessions: `${KEY_PREFIX}:sessions`,
+  /** Grammar points the learner has worked through, by id. */
+  grammar: `${KEY_PREFIX}:grammar`,
   /** The flattened snapshot the native widget reads. Never read back by the app. */
   widget: `${KEY_PREFIX}:widget`,
 } as const;
@@ -74,6 +76,7 @@ export const SYNCED_STORAGE_KEYS: string[] = [
   STORAGE_KEYS.logs,
   STORAGE_KEYS.entries,
   STORAGE_KEYS.sessions,
+  STORAGE_KEYS.grammar,
 ];
 
 /**
@@ -151,6 +154,8 @@ export class StudyEngine {
   private importedEntries: LexicalEntry[];
   private pending: PendingWidgetGrade[];
   private sessions: StudySessionRecord[];
+  /** Grammar point id -> when it was marked understood. */
+  private grammar: Record<string, string>;
   /**
    * Vocabulary handed in at runtime, from the API.
    *
@@ -180,6 +185,7 @@ export class StudyEngine {
       importedEntries: LexicalEntry[];
       pending: PendingWidgetGrade[];
       sessions: StudySessionRecord[];
+      grammar: Record<string, string>;
     },
   ) {
     this.clock = options.clock ?? systemClock;
@@ -189,6 +195,7 @@ export class StudyEngine {
     this.importedEntries = state.importedEntries;
     this.pending = state.pending;
     this.sessions = state.sessions;
+    this.grammar = state.grammar;
     this.reindexEntries();
   }
 
@@ -210,6 +217,7 @@ export class StudyEngine {
       importedEntries: await readJson<LexicalEntry[]>(store, STORAGE_KEYS.entries, []),
       pending: await readJson<PendingWidgetGrade[]>(store, STORAGE_KEYS.pending, []),
       sessions: await readJson<StudySessionRecord[]>(store, STORAGE_KEYS.sessions, []),
+      grammar: await readJson<Record<string, string>>(store, STORAGE_KEYS.grammar, {}),
     });
 
     // A fresh install has no profile and no cards; a returning one may have new
@@ -810,6 +818,39 @@ export class StudyEngine {
    * what is uploaded is exactly what is on disk — including any key written by a
    * newer version of the app than the one doing the reading.
    */
+  /**
+   * Grammar points the learner has worked through.
+   *
+   * Marked by hand rather than scheduled. A grammar point is not a fact that
+   * fades on a curve — it is understood or it is not, and the cards that
+   * practise it are what the scheduler is for. So this records that somebody
+   * has read and accepted a point, and nothing here competes with the deck.
+   */
+  isGrammarLearned(id: string): boolean {
+    return this.grammar[id] !== undefined;
+  }
+
+  /** When a point was marked, if it has been. */
+  grammarLearnedAt(id: string): string | undefined {
+    return this.grammar[id];
+  }
+
+  /** How many of the given points are marked, for a syllabus's progress. */
+  countGrammarLearned(ids: string[]): number {
+    return ids.filter((id) => this.grammar[id] !== undefined).length;
+  }
+
+  /** Mark a point understood, or take the mark off again. */
+  async setGrammarLearned(id: string, learned: boolean): Promise<void> {
+    if (learned === this.isGrammarLearned(id)) return;
+
+    if (learned) this.grammar[id] = this.clock();
+    else delete this.grammar[id];
+
+    await writeJson(this.options.store, STORAGE_KEYS.grammar, this.grammar);
+    await this.notifyChanged();
+  }
+
   async exportState(): Promise<Record<string, string>> {
     const values: Record<string, string> = {};
     for (const key of SYNCED_STORAGE_KEYS) {
@@ -839,6 +880,10 @@ export class StudyEngine {
     this.logs = await readJson<import('./types/review').ReviewLog[]>(this.options.store, STORAGE_KEYS.logs, []);
     this.importedEntries = await readJson<LexicalEntry[]>(this.options.store, STORAGE_KEYS.entries, []);
     this.sessions = await readJson<StudySessionRecord[]>(this.options.store, STORAGE_KEYS.sessions, []);
+    // Reloaded like everything else: the values are written to the store above,
+    // and a field left unread here would keep the previous device's answer in
+    // memory until the next launch.
+    this.grammar = await readJson<Record<string, string>>(this.options.store, STORAGE_KEYS.grammar, {});
     this.reindexEntries();
 
     await this.ensureProfile(this.meta.activeLanguage);

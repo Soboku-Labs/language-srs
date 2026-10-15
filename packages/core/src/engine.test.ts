@@ -699,3 +699,51 @@ describe('the card window', () => {
     expect(engine.getQueue().cards.length).toBeGreaterThan(0);
   });
 });
+
+describe('grammar progress', () => {
+  it('records a point as understood, and persists it', async () => {
+    const { engine, store } = await makeEngine();
+    expect(engine.isGrammarLearned('zh-shi')).toBe(false);
+
+    await engine.setGrammarLearned('zh-shi', true);
+    expect(engine.isGrammarLearned('zh-shi')).toBe(true);
+    expect(engine.grammarLearnedAt('zh-shi')).toBe(NOW);
+
+    const reopened = await StudyEngine.create({ store, seedEntries: SEED_ENTRIES, clock: fixedClock(NOW) });
+    expect(reopened.isGrammarLearned('zh-shi')).toBe(true);
+  });
+
+  it('takes the mark off again', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-le', true);
+    await engine.setGrammarLearned('zh-le', false);
+
+    expect(engine.isGrammarLearned('zh-le')).toBe(false);
+    expect(engine.grammarLearnedAt('zh-le')).toBeUndefined();
+  });
+
+  it('counts how many of a syllabus is done', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-shi', true);
+    await engine.setGrammarLearned('zh-ma', true);
+
+    expect(engine.countGrammarLearned(['zh-shi', 'zh-ma', 'zh-le'])).toBe(2);
+    expect(engine.countGrammarLearned([])).toBe(0);
+  });
+
+  it('travels with the account rather than staying on one device', async () => {
+    // The point of putting it in the synced keys: a point read on the laptop is
+    // not re-read on the phone.
+    const laptop = await makeEngine();
+    await laptop.engine.setGrammarLearned('zh-hen-adj', true);
+
+    const phone = await makeEngine();
+    expect(phone.engine.isGrammarLearned('zh-hen-adj')).toBe(false);
+
+    await phone.engine.importState(await laptop.engine.exportState());
+
+    // In memory, not merely in the store — importState reloads every field, and
+    // one left out would keep answering with the old value until a relaunch.
+    expect(phone.engine.isGrammarLearned('zh-hen-adj')).toBe(true);
+  });
+});

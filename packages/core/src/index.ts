@@ -351,5 +351,12 @@ export type { Clock } from './utils/date';
 export { cardId, parseCardId, reviewLogId, studySessionId } from './utils/id';
 
 // Engine
+export {
+  findGrammarPoint,
+  getGrammarPoints,
+  getGrammarPointsForLevel,
+  type GrammarExample,
+  type GrammarPoint,
+} from './grammar';
 export { STORAGE_KEYS, SYNCED_STORAGE_KEYS, StudyEngine } from './engine';
 export type { StudyEngineOptions } from './engine';

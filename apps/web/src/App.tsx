@@ -11,6 +11,8 @@ import { Word } from './screens/Word';
 import { Stats } from './screens/Stats';
 import { Settings } from './screens/Settings';
 import { Import } from './screens/Import';
+import { Learn } from './screens/Learn';
+import { GrammarPoint } from './screens/GrammarPoint';
 import { SignIn } from './screens/SignIn';
 import { StorageWarning } from './components/StorageWarning';
 import { Caption, Screen, TextButton, Title } from './ui';
@@ -60,6 +62,8 @@ function Themed() {
  * header competing with the card for the only thing that should be looked at.
  */
 const TITLES: { pattern: string; title: string }[] = [
+  { pattern: '/learn', title: 'Grammar' },
+  { pattern: '/learn/:id', title: 'Grammar' },
   { pattern: '/words', title: 'Words' },
   { pattern: '/word/:id', title: 'Word' },
   { pattern: '/stats', title: 'Progress' },
@@ -121,6 +125,7 @@ function Routes() {
   if (path === '/home') return <Dashboard />;
   if (path === '/review') return <Review />;
 
+  if (path === '/learn') return <Learn />;
   if (path === '/words') return <Words />;
   if (path === '/stats') return <Stats />;
   if (path === '/settings') return <Settings />;
@@ -129,6 +134,9 @@ function Routes() {
   // The picker is the door now. Kept so a bookmark from the old structure
   // lands somewhere sensible rather than on "not found".
   if (path === '/languages') return <Redirect to="/" />;
+
+  const grammar = matchPath('/learn/:id', path);
+  if (grammar?.id) return <GrammarPoint id={grammar.id} />;
 
   const word = matchPath('/word/:id', path);
   if (word?.id) return <Word id={word.id} />;

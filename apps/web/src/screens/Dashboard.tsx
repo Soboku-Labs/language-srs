@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  getGrammarPoints,
   describePlace,
   findExamLevel,
   getLanguageProfile,
@@ -35,10 +36,20 @@ export function Dashboard() {
       readiness: engine.getReadiness(),
       journey: engine.getJourney(),
       goal: engine.getDailyGoal(),
+      grammar: (() => {
+        const points = getGrammarPoints(profile.languageCode);
+        return { total: points.length, learned: engine.countGrammarLearned(points.map((p) => p.id)) };
+      })(),
     };
   }, [engine, revision]);
 
-  const { profile, language, level, queue, stats, readiness, journey, goal } = view;
+  const { profile, language, level, queue, stats, readiness, journey, goal, grammar } = view;
+  const grammarDetail =
+    grammar.total === 0
+      ? 'nothing yet'
+      : grammar.learned === grammar.total
+        ? `all ${grammar.total} read`
+        : `${grammar.total - grammar.learned} to read`;
   // The calendar day, as the seed for the teacher's greeting.
   const today = engine.now().slice(0, 10);
   const waiting = queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning;
@@ -143,6 +154,13 @@ export function Dashboard() {
       */}
       <Rise index={5}>
         <div className="modes">
+          {/* Reviewing is one way of learning. Grammar is the other, and it
+              sits beside the deck rather than behind a settings menu. */}
+          <ModeLink
+            label="Grammar"
+            detail={grammarDetail}
+            onClick={() => navigate('/learn')}
+          />
           <ModeLink
             label="Words"
             detail={`${stats.coverage.entriesStarted} started`}

@@ -1013,3 +1013,96 @@ a { color: var(--accent); }
   :root { --page: 820px; }
   .screen--door { max-width: 1120px; }
 }
+
+/* ------------------------------------------------------------- the grammar
+
+   Reading, not answering. So this reads like a page of notes rather than a
+   deck: longer measure, quieter chrome, and the form itself set large enough
+   to find by scanning, because somebody checking a point already knows what
+   they are looking for.
+*/
+.syllabus { display: flex; flex-direction: column; gap: var(--space-md); }
+.syllabus__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.syllabus__count {
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.points { display: flex; flex-direction: column; gap: var(--space-sm); }
+.point {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  text-align: left;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--surface);
+  border-radius: var(--radius-card);
+}
+.point__form {
+  flex: 0 0 auto;
+  min-width: 2.2em;
+  font-size: var(--text-heading);
+  font-weight: var(--weight-strong);
+  color: var(--accent);
+}
+.point__form--large { font-size: var(--text-target-small); color: var(--accent); }
+.point__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.point__title { font-size: var(--text-body); font-weight: var(--weight-medium); }
+.point__summary { font-size: var(--text-caption); color: var(--ink-muted); line-height: 18px; }
+.point__check { margin-left: auto; color: var(--good); font-weight: var(--weight-strong); }
+.point--learned .point__title { color: var(--ink-muted); }
+
+/* The shape, set apart from the prose that explains it. */
+.pattern {
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  text-align: center;
+}
+
+.prose { margin: 0; font-size: var(--text-body); line-height: 24px; max-width: 38em; }
+
+.example {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--line);
+}
+.example:last-child { border-bottom: none; }
+.example__target { font-size: var(--text-heading); line-height: 1.5; }
+.example__reading { font-size: var(--text-caption); color: var(--ink-muted); }
+.example__gloss { font-size: var(--text-caption); color: var(--ink-muted); }
+
+.pitfall {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--caution) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--caution) 28%, transparent);
+}
+.pitfall__label {
+  font-size: var(--text-micro);
+  font-weight: var(--weight-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--caution);
+}
+.pitfall__body { font-size: var(--text-caption); line-height: 20px; }
+
+/* Two columns of points once there is room for them. */
+@media (min-width: 1024px) {
+  .points { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
+}

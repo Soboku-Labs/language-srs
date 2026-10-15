@@ -699,3 +699,154 @@ describe('the card window', () => {
     expect(engine.getQueue().cards.length).toBeGreaterThan(0);
   });
 });
+
+describe('grammar progress', () => {
+  it('records a point as understood, and persists it', async () => {
+    const { engine, store } = await makeEngine();
+    expect(engine.isGrammarLearned('zh-shi')).toBe(false);
+
+    await engine.setGrammarLearned('zh-shi', true);
+    expect(engine.isGrammarLearned('zh-shi')).toBe(true);
+    expect(engine.grammarLearnedAt('zh-shi')).toBe(NOW);
+
+    const reopened = await StudyEngine.create({ store, seedEntries: SEED_ENTRIES, clock: fixedClock(NOW) });
+    expect(reopened.isGrammarLearned('zh-shi')).toBe(true);
+  });
+
+  it('takes the mark off again', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-le', true);
+    await engine.setGrammarLearned('zh-le', false);
+
+    expect(engine.isGrammarLearned('zh-le')).toBe(false);
+    expect(engine.grammarLearnedAt('zh-le')).toBeUndefined();
+  });
+
+  it('counts how many of a syllabus is done', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-shi', true);
+    await engine.setGrammarLearned('zh-ma', true);
+
+    expect(engine.countGrammarLearned(['zh-shi', 'zh-ma', 'zh-le'])).toBe(2);
+    expect(engine.countGrammarLearned([])).toBe(0);
+  });
+
+  it('travels with the account rather than staying on one device', async () => {
+    // The point of putting it in the synced keys: a point read on the laptop is
+    // not re-read on the phone.
+    const laptop = await makeEngine();
+    await laptop.engine.setGrammarLearned('zh-hen-adj', true);
+
+    const phone = await makeEngine();
+    expect(phone.engine.isGrammarLearned('zh-hen-adj')).toBe(false);
+
+    await phone.engine.importState(await laptop.engine.exportState());
+
+    // In memory, not merely in the store — importState reloads every field, and
+    // one left out would keep answering with the old value until a relaunch.
+    expect(phone.engine.isGrammarLearned('zh-hen-adj')).toBe(true);
+  });
+});
+
+describe('grammar practice, spaced', () => {
+  it('falls due immediately after reading, since reading is not the test', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-shi', true);
+
+    expect(engine.grammarDue('zh-shi')).toBe(NOW);
+    expect(engine.grammarDueNow(['zh-shi', 'zh-ma'])).toEqual(['zh-shi']);
+  });
+
+  it('widens the interval with each clean sitting', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-shi', true);
+
+    await engine.recordGrammarPractice('zh-shi', true);
+    expect(engine.grammarStreak('zh-shi')).toBe(1);
+    const first = engine.grammarDue('zh-shi')!;
+
+    await engine.recordGrammarPractice('zh-shi', true);
+    expect(engine.grammarStreak('zh-shi')).toBe(2);
+    // Each rung is further out than the one before it.
+    expect(engine.grammarDue('zh-shi')!.localeCompare(first)).toBeGreaterThan(0);
+  });
+
+  it('drops a failed point to the bottom rather than down one rung', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-shi', true);
+    await engine.recordGrammarPractice('zh-shi', true);
+    await engine.recordGrammarPractice('zh-shi', true);
+    expect(engine.grammarStreak('zh-shi')).toBe(2);
+
+    await engine.recordGrammarPractice('zh-shi', false);
+    // Getting a rule wrong means the understanding was not there, which is not
+    // the same as having forgotten it.
+    expect(engine.grammarStreak('zh-shi')).toBe(0);
+    expect(engine.grammarDue('zh-shi')).toBe(addDays(NOW, 1));
+  });
+
+  it('keeps a point out of the queue until it is due again', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-shi', true);
+    await engine.recordGrammarPractice('zh-shi', true);
+
+    // The bottom rung, one day, is where a *failed* point lands; a clean
+    // sitting goes straight to the second, three days out.
+    expect(engine.grammarDue('zh-shi')).toBe(addDays(NOW, 3));
+    expect(engine.grammarDueNow(['zh-shi'])).toEqual([]);
+    expect(engine.grammarDueNow(['zh-shi'], addDays(NOW, 2))).toEqual([]);
+    expect(engine.grammarDueNow(['zh-shi'], addDays(NOW, 3))).toEqual(['zh-shi']);
+  });
+
+  it('reads forward progress stored before practice was scheduled', async () => {
+    // The first version kept a bare timestamp per point. Those are real
+    // progress on somebody's device, so they are migrated rather than dropped.
+    const store = new MemoryStore();
+    await store.set(STORAGE_KEYS.grammar, JSON.stringify({ 'zh-shi': '2026-02-01T09:00:00.000Z' }));
+
+    const engine = await StudyEngine.create({ store, seedEntries: SEED_ENTRIES, clock: fixedClock(NOW) });
+
+    expect(engine.isGrammarLearned('zh-shi')).toBe(true);
+    expect(engine.grammarLearnedAt('zh-shi')).toBe('2026-02-01T09:00:00.000Z');
+    // Read and never practised, so it is due now.
+    expect(engine.grammarDueNow(['zh-shi'])).toEqual(['zh-shi']);
+  });
+
+  it('ignores a corrupt record rather than failing to open', async () => {
+    const store = new MemoryStore();
+    await store.set(STORAGE_KEYS.grammar, JSON.stringify({ 'zh-shi': { nonsense: true }, 'zh-ma': null }));
+
+    const engine = await StudyEngine.create({ store, seedEntries: SEED_ENTRIES, clock: fixedClock(NOW) });
+    expect(engine.isGrammarLearned('zh-shi')).toBe(false);
+    expect(engine.isGrammarLearned('zh-ma')).toBe(false);
+  });
+});
+
+describe('how alive the background is', () => {
+  it('is calm until somebody says otherwise', async () => {
+    const { engine } = await makeEngine();
+    expect(engine.backdrop).toBe('calm');
+  });
+
+  it('remembers the choice, and carries it to the account', async () => {
+    const { engine, store } = await makeEngine();
+    await engine.setBackdrop('living');
+    expect(engine.backdrop).toBe('living');
+
+    const reopened = await StudyEngine.create({ store, seedEntries: SEED_ENTRIES, clock: fixedClock(NOW) });
+    expect(reopened.backdrop).toBe('living');
+
+    // It lives on meta, which is a synced key — a preference about motion is
+    // about the person, not the browser.
+    const phone = await makeEngine();
+    await phone.engine.importState(await engine.exportState());
+    expect(phone.engine.backdrop).toBe('living');
+  });
+
+  it('can be set back', async () => {
+    const { engine } = await makeEngine();
+    await engine.setBackdrop('living');
+    await engine.setBackdrop('calm');
+    expect(engine.backdrop).toBe('calm');
+  });
+});

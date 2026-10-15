@@ -1,16 +1,19 @@
 import { useEffect, useMemo } from 'react';
-import { useAuth, useEngine, AuthProvider, EngineProvider } from './providers';
+import { useEngine, AuthProvider, EngineProvider } from './providers';
 import { SyncProvider } from './sync';
 import { RouterProvider, matchPath, useRouter } from './router';
 import { ThemeProvider } from './theme';
 import { Dashboard } from './screens/Dashboard';
+import { Landing } from './screens/Landing';
 import { Review } from './screens/Review';
 import { Words } from './screens/Words';
 import { Word } from './screens/Word';
 import { Stats } from './screens/Stats';
 import { Settings } from './screens/Settings';
-import { Languages } from './screens/Languages';
 import { Import } from './screens/Import';
+import { Learn } from './screens/Learn';
+import { Practice } from './screens/Practice';
+import { GrammarPoint } from './screens/GrammarPoint';
 import { SignIn } from './screens/SignIn';
 import { StorageWarning } from './components/StorageWarning';
 import { Caption, Screen, TextButton, Title } from './ui';
@@ -40,6 +43,19 @@ export function App() {
 function Themed() {
   const { engine, revision } = useEngine();
   const language = useMemo(() => engine.activeLanguage, [engine, revision]);
+  const backdrop = useMemo(() => engine.backdrop, [engine, revision]);
+
+  /*
+   * On the document, not on a component.
+   *
+   * How alive the background is affects the sky, the light, the drawing's
+   * layers and the grain over all of it — things in four different places that
+   * should never disagree. One attribute at the root means the stylesheet
+   * answers the question once.
+   */
+  useEffect(() => {
+    document.documentElement.dataset.backdrop = backdrop;
+  }, [backdrop]);
 
   return (
     <ThemeProvider languageCode={language}>
@@ -48,33 +64,41 @@ function Themed() {
   );
 }
 
-/** Page titles, and the back affordance for everything that is not the dashboard. */
+/**
+ * Page titles, and the back affordance for everything that is not a layer root.
+ *
+ * `/` and `/home` are roots: the door and the day. Neither gets a back arrow,
+ * because there is nothing behind the door, and the day is reached by choosing
+ * a language rather than by descending into it.
+ *
+ * `/review` is deliberately absent too. The loop renders its own chrome — a
+ * progress bar and a way out — and a title bar above it would be a second
+ * header competing with the card for the only thing that should be looked at.
+ */
 const TITLES: { pattern: string; title: string }[] = [
-  { pattern: '/review', title: 'Review' },
+  { pattern: '/learn', title: 'Grammar' },
+  { pattern: '/learn/:id', title: 'Grammar' },
   { pattern: '/words', title: 'Words' },
   { pattern: '/word/:id', title: 'Word' },
   { pattern: '/stats', title: 'Progress' },
   { pattern: '/settings', title: 'Settings' },
-  { pattern: '/languages', title: 'Languages' },
+  { pattern: '/account', title: 'Account' },
   { pattern: '/import', title: 'Add words' },
 ];
 
 function Chrome() {
   const { path, navigate, back } = useRouter();
-  const { isSignedIn } = useAuth();
 
   const titled = TITLES.find((candidate) => matchPath(candidate.pattern, path));
 
-  /**
-   * First run sends a visitor to sign-in once.
+  /*
+   * Nothing is redirected to sign-in any more.
    *
-   * A redirect rather than a wall: every other route stays reachable, because a
-   * deep link into a specific word should not be swallowed by a login form for
-   * someone who simply chose the device profile.
+   * The front page used to bounce a first-time visitor straight to a password
+   * field for an app they had been told nothing about. Signing in is an offer —
+   * it carries progress to a second device — and the app is complete without
+   * it, so it is reached from the door rather than standing in front of it.
    */
-  useEffect(() => {
-    if (!isSignedIn && path !== '/sign-in') navigate('/sign-in', { replace: true });
-  }, [isSignedIn, path, navigate]);
 
   useEffect(() => {
     document.title = titled ? `${titled.title} · Mon` : 'Mon';
@@ -97,18 +121,39 @@ function Chrome() {
   );
 }
 
+/** Sends the browser somewhere else without leaving a step in the history. */
+function Redirect({ to }: { to: string }) {
+  const { navigate } = useRouter();
+  useEffect(() => navigate(to, { replace: true }), [navigate, to]);
+  return null;
+}
+
 function Routes() {
   const { path } = useRouter();
   const { navigate } = useRouter();
 
   if (path === '/sign-in') return <SignIn />;
-  if (path === '/' || path === '') return <Dashboard />;
+
+  // The door, the day, the loop.
+  if (path === '/' || path === '') return <Landing />;
+  if (path === '/home') return <Dashboard />;
   if (path === '/review') return <Review />;
+
+  if (path === '/learn') return <Learn />;
   if (path === '/words') return <Words />;
   if (path === '/stats') return <Stats />;
   if (path === '/settings') return <Settings />;
-  if (path === '/languages') return <Languages />;
   if (path === '/import') return <Import />;
+
+  // The picker is the door now. Kept so a bookmark from the old structure
+  // lands somewhere sensible rather than on "not found".
+  if (path === '/languages') return <Redirect to="/" />;
+
+  const practice = matchPath('/practice/:id', path);
+  if (practice?.id) return <Practice id={practice.id} />;
+
+  const grammar = matchPath('/learn/:id', path);
+  if (grammar?.id) return <GrammarPoint id={grammar.id} />;
 
   const word = matchPath('/word/:id', path);
   if (word?.id) return <Word id={word.id} />;

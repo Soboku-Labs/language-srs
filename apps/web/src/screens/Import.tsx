@@ -99,7 +99,7 @@ export function Import() {
         <Rise index={2}>
           <Row center>
             <TextButton label="Import more" onClick={() => setDone(undefined)} />
-            <TextButton label="Back home" muted onClick={() => navigate('/')} />
+            <TextButton label="Back home" muted onClick={() => navigate('/home')} />
           </Row>
         </Rise>
       </Screen>

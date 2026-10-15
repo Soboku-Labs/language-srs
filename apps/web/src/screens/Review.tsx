@@ -349,7 +349,7 @@ export function Review() {
         ) : null}
 
         <Rise index={3}>
-          <BigButton label="Back home" onClick={() => navigate('/')} />
+          <BigButton label="Back home" onClick={() => navigate('/home')} />
         </Rise>
         <Rise index={4}>
           <Row center>
@@ -364,11 +364,30 @@ export function Review() {
   const typingFeasible = isTypingFeasible(current.card, current.entry);
 
   return (
-    <Screen>
+    <Screen layer="loop">
+      {/*
+        The loop's own chrome, and all of it.
+
+        There is no title bar above this screen — a header saying "Review" over
+        a card the learner is already looking at is a second thing competing
+        for the only attention that matters. What is left is where you are and
+        a quiet way out, and the way out has to be here precisely because the
+        shared one is gone.
+      */}
       <div className="progress">
-        <Caption>
-          {session.reviewed + 1} of {total}
-        </Caption>
+        <div className="progress__row">
+          <Caption>
+            {session.reviewed + 1} of {total}
+          </Caption>
+          <button
+            type="button"
+            className="progress__leave"
+            onClick={() => navigate('/home')}
+            aria-label="Leave this session"
+          >
+            Done
+          </button>
+        </div>
         <div className="track">
           <div
             className="track__fill"

@@ -1,4 +1,9 @@
-import { PrefixedStore, type KeyValueStore } from '@language-srs/core';
+import {
+  PrefixedStore,
+  STORAGE_KEYS,
+  SYNCED_STORAGE_KEYS,
+  type KeyValueStore,
+} from '@language-srs/core';
 import { webStore } from './storage';
 
 /**
@@ -94,3 +99,48 @@ export function storeFor(account: StoredAccount | undefined): KeyValueStore {
 
 /** Memoised, so returning to an account does not remount the engine. */
 const stores = new Map<string, KeyValueStore>();
+
+/**
+ * Carry work done before signing in into the account that now owns it.
+ *
+ * The app can be used without an account, which means somebody can study for a
+ * week and then decide to sign in. An account keeps its deck under its own
+ * prefix, so without this that week would simply stop being visible: still on
+ * disk, under a prefix nothing looks at any more, which to the person who
+ * studied it is indistinguishable from having been deleted by signing in.
+ *
+ * Two conditions, both narrow on purpose:
+ *
+ * - **Only from a deck with no other home.** A device profile, or no account at
+ *   all. Never from one signed-in account into another — that deck belongs
+ *   somewhere and is waiting on its own server.
+ * - **Only into an empty one.** If the account already has cards here, it has
+ *   been used in this browser before and its own state is the truth.
+ *
+ * What lands on the server afterwards is then the ordinary sync: this writes
+ * locally, the engine mounts on it, and the first push either creates the
+ * account's state or conflicts and merges with what is already there.
+ */
+export async function adoptDeck(from: KeyValueStore, to: KeyValueStore): Promise<number> {
+  const existing = await to.get(STORAGE_KEYS.cards);
+  if (existing && existing !== '[]') return 0;
+
+  let carried = 0;
+  for (const key of SYNCED_STORAGE_KEYS) {
+    const value = await from.get(key);
+    if (value === null) continue;
+    await to.set(key, value);
+    if (key === STORAGE_KEYS.logs) carried = countReviews(value);
+  }
+  return carried;
+}
+
+/** How much was carried, for saying so. Never worth a throw. */
+function countReviews(raw: string): number {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    return 0;
+  }
+}

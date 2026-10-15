@@ -54,7 +54,9 @@ async function device(label) {
 }
 
 async function signIn(page, { register }) {
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  // Explicitly, because the app no longer sends anybody here. The front page
+  // is the door now and signing in is an offer reached from it.
+  await page.goto(`${BASE}/sign-in`, { waitUntil: 'networkidle' });
   if (!register) await page.getByText('I already have an account').click();
   await page.waitForTimeout(200);
 

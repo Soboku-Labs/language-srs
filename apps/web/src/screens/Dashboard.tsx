@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import {
+  getGrammarPoints,
   describePlace,
   findExamLevel,
   getLanguageProfile,
   kindLabel,
   type CardKind,
 } from '@language-srs/core';
-import { LanguageArt } from '../components/LanguageArt';
+import { Scene } from '../components/Scene';
 import { TeacherSays } from '../components/Teacher';
 import { useEngine } from '../providers';
 import { useRouter } from '../router';
@@ -35,19 +36,52 @@ export function Dashboard() {
       readiness: engine.getReadiness(),
       journey: engine.getJourney(),
       goal: engine.getDailyGoal(),
+      grammar: (() => {
+        const ids = getGrammarPoints(profile.languageCode).map((point) => point.id);
+        return {
+          total: ids.length,
+          learned: engine.countGrammarLearned(ids),
+          due: engine.grammarDueNow(ids).length,
+        };
+      })(),
     };
   }, [engine, revision]);
 
-  const { profile, language, level, queue, stats, readiness, journey, goal } = view;
+  const { profile, language, level, queue, stats, readiness, journey, goal, grammar } = view;
+  /*
+   * In priority order: practice that is waiting, then points never read, then
+   * the quiet state. Due practice leads because it is the only one of the
+   * three with a deadline attached to it.
+   */
+  const grammarDetail =
+    grammar.total === 0
+      ? 'nothing yet'
+      : grammar.due > 0
+        ? `${grammar.due} to practise`
+        : grammar.learned < grammar.total
+          ? `${grammar.total - grammar.learned} to read`
+          : 'all caught up';
   // The calendar day, as the seed for the teacher's greeting.
   const today = engine.now().slice(0, 10);
   const waiting = queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning;
 
   return (
-    <Screen>
+    <Screen layer="day">
+      {/*
+        The place you chose, behind the day you are having in it.
+
+        Hazed almost to nothing — its job is to tint the room, not to be
+        looked at, and a screen read every morning cannot afford a picture
+        competing with the number on it. It is the same scene as the window
+        that was walked through, which is what makes arriving here feel like
+        having gone somewhere.
+
+        Not on the review loop. That one strips back to the card on purpose.
+      */}
+      <Scene code={profile.languageCode} variant="backdrop" className="screen__backdrop" />
       {/* Tapping the language is how you switch it — no menu needed. */}
       <Rise index={0}>
-        <button type="button" className="header" onClick={() => navigate('/languages')}>
+        <button type="button" className="header" onClick={() => navigate('/')}>
           <span className="header__text">
             <Title>{language.name}</Title>
             <Caption>
@@ -63,7 +97,6 @@ export function Dashboard() {
 
       <Rise index={1}>
         <div className="hero hero--placed">
-          <LanguageArt code={profile.languageCode} className="hero__art" />
           {goal.complete ? (
             <>
               {/*
@@ -143,6 +176,13 @@ export function Dashboard() {
       */}
       <Rise index={5}>
         <div className="modes">
+          {/* Reviewing is one way of learning. Grammar is the other, and it
+              sits beside the deck rather than behind a settings menu. */}
+          <ModeLink
+            label="Grammar"
+            detail={grammarDetail}
+            onClick={() => navigate('/learn')}
+          />
           <ModeLink
             label="Words"
             detail={`${stats.coverage.entriesStarted} started`}

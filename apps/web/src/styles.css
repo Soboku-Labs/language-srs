@@ -35,6 +35,17 @@
   --weight-medium: 500;
   --weight-strong: 600;
 
+  /*
+   * The page width, as a token rather than a number repeated in three places.
+   *
+   * The app was a 480px column at every size, which on a laptop is 38% of the
+   * screen and on a wide monitor 29% — not broken, but unmistakably a phone
+   * app that had been opened on a desktop. It widens in steps now, and the
+   * layers widen by different amounts because they want different things:
+   * see the breakpoints at the end of this file.
+   */
+  --page: 480px;
+
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
     'Noto Sans', 'Noto Sans SC', 'Noto Sans JP', 'Noto Sans KR', sans-serif;
 
@@ -66,7 +77,7 @@ a { color: var(--accent); }
 /* ------------------------------------------------------------------ layout */
 
 .screen {
-  max-width: 480px;
+  max-width: var(--page);
   margin: 0 auto;
   min-height: 100%;
   padding: calc(var(--space-lg) + env(safe-area-inset-top)) var(--space-xl)
@@ -247,6 +258,15 @@ a { color: var(--accent); }
     animation-duration: 1ms !important;
     animation-delay: 0ms !important;
     transition-duration: 1ms !important;
+    /*
+      And once, not forever.
+
+      Flattening a one-shot entrance to 1ms makes it instant, which is the
+      intent. Doing the same to a looping background would run it a thousand
+      times a second — the living backdrop would become a strobe for exactly
+      the people who asked for less motion.
+    */
+    animation-iteration-count: 1 !important;
   }
 }
 
@@ -344,6 +364,21 @@ a { color: var(--accent); }
 /* ---------------------------------------------------------------- review */
 
 .progress { display: flex; flex-direction: column; gap: var(--space-sm); align-items: center; }
+.progress__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  width: 100%;
+}
+/* Quiet on purpose: the way out should be findable, not inviting. */
+.progress__leave {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+  padding: 0 var(--space-xs);
+}
+.progress__leave:hover { color: var(--ink); }
 .progress .track { align-self: stretch; }
 
 .question { display: flex; flex-direction: column; gap: var(--space-lg); }
@@ -448,7 +483,7 @@ a { color: var(--accent); }
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  max-width: 480px;
+  max-width: var(--page);
   margin: 0 auto;
   padding: calc(var(--space-md) + env(safe-area-inset-top)) var(--space-xl) var(--space-md);
   background: var(--canvas);
@@ -592,23 +627,14 @@ a { color: var(--accent); }
  * read. Faint enough to sit under text, and inert to the pointer.
  */
 .hero--placed { position: relative; isolation: isolate; }
-.hero__art {
-  position: absolute;
-  inset: auto 0 0 0;
-  z-index: -1;
-  opacity: 0.3;
-  pointer-events: none;
-  /*
-   * Fades out well before the count.
-   *
-   * The pagoda's upper tiers reach about two thirds of the way up the hero and
-   * were crossing "cards today" at full strength, which made the label harder to
-   * read than a label should ever be. The drawing is a watermark; where it
-   * competes with text, the text wins.
-   */
-  mask-image: linear-gradient(to top, #000 32%, transparent 78%);
-  -webkit-mask-image: linear-gradient(to top, #000 32%, transparent 78%);
-}
+/*
+  The day's watermark is gone.
+
+  It was a faded copy of the same drawing that now stands behind the whole
+  screen, so the day was showing the place twice — and when the canvas grew
+  taller its mask slid onto the horizon line, leaving a row of dashes under
+  the count. One scene behind the screen does the job the watermark was for.
+*/
 
 /* ------------------------------------------------------------- the teacher */
 
@@ -645,78 +671,7 @@ a { color: var(--accent); }
 
 /* ------------------------------------------------------- the language cards */
 
-.places { display: flex; flex-direction: column; gap: var(--space-lg); }
 
-/*
- * One language, as a place.
- *
- * Every colour here comes from `--place-accent`, set per card from that
- * language's own theme — so four cards read as four places rather than as one
- * palette applied four times.
- */
-.place {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  width: 100%;
-  text-align: left;
-  padding: 0 0 var(--space-lg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  overflow: hidden;
-  transition: border-color 160ms ease, transform 160ms ease;
-}
-.place:hover { border-color: var(--place-accent); }
-.place:active { transform: scale(0.995); }
-.place--chosen { border-color: var(--place-accent); }
-
-/* The drawing is the card's lid: full bleed, on its own wash. */
-.place__art { background: var(--place-wash); padding-top: var(--space-md); }
-
-.place__head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg) 0;
-}
-.place__name { flex: 1; font-size: var(--text-title); font-weight: var(--weight-medium); }
-.place__endonym { color: var(--ink-faint); font-weight: var(--weight-regular); }
-.place__check { color: var(--place-accent); font-weight: var(--weight-strong); }
-
-.place__where {
-  padding: 0 var(--space-lg);
-  font-size: var(--text-caption);
-  color: var(--place-accent);
-  font-weight: var(--weight-medium);
-}
-.place__line {
-  padding: 0 var(--space-lg);
-  font-size: var(--text-caption);
-  color: var(--ink-muted);
-  line-height: 1.5;
-}
-
-.place .teacher { padding: var(--space-sm) var(--space-lg) 0; }
-
-.place__palette {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-lg) 0;
-  font-size: var(--text-micro);
-  color: var(--ink-faint);
-  line-height: 1.5;
-}
-.place__swatch {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  margin-top: 2px;
-  border-radius: 3px;
-  background: var(--place-accent);
-}
-.place__palette b { color: var(--ink-muted); font-weight: var(--weight-medium); }
 
 /*
   The unsaved-work warning.
@@ -733,7 +688,7 @@ a { color: var(--accent); }
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-xs) var(--space-sm);
-  max-width: 480px;
+  max-width: var(--page);
   margin: 0 auto;
   padding: calc(var(--space-sm) + env(safe-area-inset-top)) var(--space-xl) var(--space-sm);
   background: color-mix(in srgb, var(--again) 14%, var(--canvas));
@@ -753,3 +708,822 @@ a { color: var(--accent); }
   text-underline-offset: 2px;
 }
 .alert + .chrome { padding-top: var(--space-md); }
+
+/* --------------------------------------------------------------- the scenes
+
+   A place with air in it.
+
+   The drawings were always built in layers — sky, buildings, the bright thing
+   in front — and all that was missing was everything around them. A scene puts
+   the same artwork inside weather: light from a point in its own sky, haze
+   over the distance, and layers at different depths so moving across them
+   moves them against each other.
+
+   `--px` and `--py` are written onto the scene by the parallax hook, once per
+   frame, outside React. Nothing here reads them except transforms.
+*/
+.scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* Zero until the hook starts, so a scene with no script is simply still. */
+  --px: 0px;
+  --py: 0px;
+}
+
+.scene__sky {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--scene-accent) 22%, var(--canvas)) 0%,
+      color-mix(in srgb, var(--scene-accent) 9%, var(--canvas)) 38%,
+      var(--scene-wash) 74%,
+      color-mix(in srgb, var(--scene-accent) 24%, var(--scene-wash)) 100%
+    );
+}
+
+/* One soft source, off-centre, moving least because it is furthest away. */
+.scene__light {
+  position: absolute;
+  inset: -10%;
+  background: radial-gradient(
+    42% 38% at 72% 24%,
+    color-mix(in srgb, white 70%, var(--scene-wash)) 0%,
+    transparent 70%
+  );
+  transform: translate3d(calc(var(--px) * -0.15), calc(var(--py) * -0.15), 0);
+  will-change: transform;
+}
+
+/*
+  Scaled past the frame, and cropped by it.
+
+  A 320x120 drawing laid across a tall window at its own width is a watermark
+  in a lot of empty sky. Oversizing it and letting the frame cut the edges is
+  what makes it a view of somewhere rather than a picture hung in the middle:
+  the eye reads the part it can see and supplies the rest.
+*/
+.scene__art {
+  position: absolute;
+  /*
+    The ground line sits above the name, not through it.
+
+    The drawing is anchored by its own base, so lifting it clears the plate
+    and leaves the space beneath as ground — which is what the scrim then
+    tints. At the bottom of the frame the pagoda ran straight through
+    "Mandarin Chinese".
+  */
+  /*
+    Lying down, the whole place fits.
+
+    A phone band is wide and short — the opposite of a column — so the crop
+    that makes a tall window feel close up turns a horizontal strip into
+    abstract lines. Near its own width, the silhouette reads whole.
+  */
+  bottom: 0;
+  left: 50%;
+  width: 112%;
+  height: auto;
+  transform: translateX(-50%);
+}
+
+/*
+  Depth.
+
+  Each layer of the drawing already carries its order in `--layer`, which is
+  also its distance: the sky is 0 and the nearest thing is highest. Multiplying
+  the pointer offset by it is the whole of the effect — far things barely move,
+  near things move most, and the drawing stops being flat.
+*/
+/*
+  Registered so it can be animated.
+
+  A custom property is a string to the animation engine unless it has been
+  given a type, and an untyped one jumps between keyframes instead of moving
+  between them. The layers' drift rides on this alongside the pointer offset,
+  which is why it cannot simply be another transform.
+*/
+@property --sway {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+.art__layer {
+  /*
+    Scaled for six planes, not three.
+
+    The drawings were redrawn with a far ridge, a city, roofs, the subject and
+    a foreground, and the old multiplier carried the nearest of those 42px on
+    a 14px pointer travel — which is not depth, it is a drawing coming apart.
+  */
+  transform: translate3d(
+    calc(var(--px) * (var(--layer) + 1) * 0.26 + var(--sway)),
+    calc(var(--py) * (var(--layer) + 1) * 0.16),
+    0
+  );
+  will-change: transform;
+}
+
+/* Air between the drawing and the ground it stands on. */
+/*
+  Air between the drawing and the words in front of it.
+
+  Doubles as the scrim the name plate needs: the horizon band runs behind the
+  plate, and without something between them the language's name is read
+  through a roofline.
+*/
+.scene__haze {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 58%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--scene-wash) 55%, white) 60%,
+    color-mix(in srgb, var(--scene-wash) 80%, white) 100%
+  );
+  pointer-events: none;
+}
+
+/*
+  A low scrim, under the name only.
+
+  The horizon band runs behind the plate, and a language's name read through a
+  roofline is the thing this exists to prevent. Short and soft: any taller and
+  it becomes the fog that buried the drawing.
+*/
+.scene__scrim {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 34%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--scene-wash) 55%, white) 70%,
+    color-mix(in srgb, var(--scene-wash) 78%, white) 100%
+  );
+  pointer-events: none;
+}
+
+/* Collides with the drawing in a short band, and the endonym already says
+   where this is. Shown only in a column. */
+.scene__label {
+  display: none;
+  position: absolute;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  font-size: var(--text-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--scene-accent) 70%, transparent);
+  transform: translate3d(calc(var(--px) * 0.4), calc(var(--py) * 0.4), 0);
+}
+
+/*
+  Shade under the name where the name is at the top.
+
+  ::after rather than ::before, because it has to paint over the drawing: a
+  torii beam runs exactly through "Japanese" at band height. Dropped on wide
+  screens, where the plate sits at the foot of the column instead.
+*/
+.scene::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 42%;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--scene-wash) 78%, white) 10%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* A backdrop is mostly ground: it tints the room rather than being looked at. */
+/* 150%, so the seal lands inside the frame instead of clipping against
+   the right edge as a red tab. */
+.scene--backdrop .scene__art { opacity: 0.13; width: 150%; left: 50%; transform: translateX(-50%); bottom: 0; }
+.scene--backdrop .scene__sky { opacity: 0.55; }
+.scene--backdrop .scene__haze { height: 74%; opacity: 0.95; }
+.scene--backdrop .scene__light { opacity: 0.6; }
+.scene--backdrop .scene__label { display: none; }
+.scene--backdrop::after { display: none; }
+/* Quieter again than a window's, since text is read straight over it. */
+/*
+  Tuned down twice.
+
+  At full strength the day was read over a pagoda and a pair of kites, with
+  the seal clipped against the right edge like a tab. A backdrop's job is to
+  say which place you are in, not to be looked at — this is the level where
+  the room is tinted and the number still wins.
+*/
+.scene--backdrop .scene__mass { filter: blur(70px); opacity: 0.55; }
+
+/* ----------------------------------------------------------------- the door
+
+   Four windows, open at once.
+
+   Not a list of languages with pictures on it — four places you can see into,
+   where the one under the pointer opens wider and the others give way. On a
+   phone they stack into bands, which is the same idea lying down.
+*/
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: 0 var(--space-xl) var(--space-md);
+  border-bottom: 1px solid var(--line);
+}
+.topbar__brand { display: flex; align-items: baseline; gap: var(--space-md); min-width: 0; }
+.wordmark { font-size: var(--text-heading); font-weight: var(--weight-strong); letter-spacing: 0.04em; }
+.topbar__line { font-size: var(--text-caption); color: var(--ink-muted); display: none; }
+
+.windows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Everything left under the bar, so all four are on the first screen. */
+  min-height: calc(100dvh - 140px);
+}
+
+.window {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 168px;
+  overflow: hidden;
+  text-align: left;
+  isolation: isolate;
+  transition: flex-grow var(--duration-base) var(--ease);
+}
+.windows--travelling .window { pointer-events: none; }
+
+/* The one being looked into takes more of the row. */
+.window--open { flex-grow: 1.6; }
+.window--open .scene__art { width: 112%; }
+.window__more { padding-top: var(--space-xs); }
+.scene__art {
+  transition:
+    width var(--duration-base) var(--ease),
+    bottom var(--duration-base) var(--ease);
+}
+
+/* Going in: it swallows the screen, and the others step back. */
+.window--entering { flex-grow: 14; }
+.window--leaving { flex-grow: 0.01; opacity: 0; }
+
+/* The name plate, floating in front of the weather. */
+/*
+  Name at the top of a band, at the foot of a column.
+
+  A phone band is too short to hold a whole view and a name under it — one of
+  them ends up drawn through the other. Lying down, the words take the sky and
+  the place keeps the floor. Standing up there is room for both, and the name
+  belongs low where a plaque would be.
+*/
+.window__plate {
+  position: absolute;
+  inset: var(--space-md) var(--space-lg) auto var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 1;
+  transform: translate3d(calc(var(--px) * 0.8), 0, 0);
+}
+.window__endonym {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--scene-accent, var(--accent));
+}
+.window__name {
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+}
+.window__badge {
+  position: absolute;
+  top: var(--space-lg);
+  left: var(--space-xl);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--scene-accent, var(--accent));
+}
+
+/*
+  The second line of each plate, revealed by looking.
+
+  Four places each showing a line of description is four descriptions nobody
+  reads. Shown for the one being looked into, which is the only one it is
+  about.
+*/
+.window__more {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--duration-base) var(--ease),
+    opacity var(--duration-base) var(--ease);
+}
+.window--open .window__more { grid-template-rows: 1fr; opacity: 1; }
+.window__more > * { overflow: hidden; }
+.window__line {
+  display: block;
+  max-width: 30em;
+  padding-top: var(--space-xs);
+  font-size: var(--text-caption);
+  line-height: 19px;
+  color: var(--ink-muted);
+}
+.window__teacher { display: flex; align-items: center; gap: var(--space-sm); padding-top: var(--space-sm); }
+.window__teacher-name { font-size: var(--text-caption); color: var(--ink-muted); }
+
+/* The one row about the learner rather than the places. */
+.resume {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin: 0 var(--space-xl);
+  padding: var(--space-md) var(--space-lg);
+  text-align: left;
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.resume__label {
+  font-size: var(--text-micro);
+  font-weight: var(--weight-strong);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.resume__language { font-size: var(--text-body); font-weight: var(--weight-strong); }
+.resume__count { font-size: var(--text-caption); color: var(--ink-muted); margin-left: auto; }
+
+/* Everything that is not a doorway lives below the horizon. */
+.below {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-xxl) var(--space-xl) 0;
+}
+
+.faq { display: flex; flex-direction: column; gap: var(--space-xs); }
+.faq__item { border-bottom: 1px solid var(--line); padding: var(--space-sm) 0; }
+.faq__question {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.faq__question::-webkit-details-marker { display: none; }
+.faq__question::after { content: '+'; color: var(--ink-muted); font-weight: var(--weight-regular); }
+.faq__item[open] .faq__question::after { content: '\2013'; }
+.faq__answer {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-caption);
+  line-height: 20px;
+  color: var(--ink-muted);
+  max-width: 38em;
+}
+
+/* ------------------------------------------------------- the three layers
+
+   Door, day and loop are not the same kind of page and should not read as
+   one. The rhythm tightens as you go deeper: the door is read once by
+   somebody deciding whether to stay, the day is glanced at every morning,
+   and the loop is answered dozens of times in a row.
+*/
+
+/* Most generous. This one is allowed to breathe — it is a page about the
+   product, not a page you are working in. */
+.screen--door { gap: var(--space-xxl); }
+
+/* The day sits between the two, which is the base rhythm already. */
+
+/*
+  The loop holds the viewport instead of scrolling.
+
+  Everything else here is a document: it starts at the top, runs down, and
+  ends. A review session is not — it is one card at a time, usually on a
+  phone, and a card that starts at the top leaves the answers floating in
+  the middle of the screen with dead space beneath them and nothing within
+  reach of a thumb. So the card takes the space it needs in the middle and
+  the answers sit at the bottom where the hand already is.
+*/
+.screen--loop {
+  /* Exactly the viewport, not merely at least it: the card region below scrolls
+     within this, which it cannot do if the page itself is free to grow. */
+  height: 100dvh;
+  gap: var(--space-lg);
+  padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom));
+}
+/*
+  The card takes the middle and scrolls if it has to.
+
+  Answering expands this a lot — the reading, the meaning, an example sentence
+  and every option marked right or wrong — and on a small phone that pushed the
+  grading buttons off the bottom of the screen. Measured at 390x664: 92px of
+  the answered state was below the fold, so the most repeated action in the app
+  needed a scroll first. Scrolling here instead keeps the grades where the
+  thumb already is.
+*/
+.screen--loop .deal {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-lg);
+  min-height: 0;
+  overflow-y: auto;
+  /* Nothing to scroll means nothing should feel scrollable. */
+  overscroll-behavior: contain;
+}
+/* The grading row and the card's own actions stay put at the bottom. */
+.screen--loop > .grades,
+.screen--loop > .row { flex: 0 0 auto; }
+
+/* ------------------------------------------------------------ wider screens
+
+   One column that grows is not a responsive design — it is the same design
+   with more air around it. So the width steps up, and the three layers step
+   up by different amounts, because they want different things from space.
+
+   - The **door** wants it. It is a page about the product, with four language
+     cards and an FAQ that read far better side by side than stacked into a
+     mile of scrolling.
+   - The **day** does not. It is a short summary — a number, a button, a line
+     from the teacher — and stretching it to 1000px would leave a handful of
+     elements marooned at the top of an empty page.
+   - The **loop** actively does not want it. It is one card, read closely, and
+     a line of text 900px wide is harder to read, not easier.
+
+   Everything else — words, progress, settings, import — is a list or a form,
+   and those take the middle width.
+*/
+@media (min-width: 720px) {
+  :root { --page: 600px; }
+  .topbar__line { display: block; }
+  .window { min-height: 190px; }
+  .window__name { font-size: 26px; }
+}
+
+@media (min-width: 1024px) {
+  :root { --page: 760px; }
+
+  /* The doors take the full width of the screen; the reading below does not. */
+  .screen--door { max-width: none; }
+  .topbar, .resume, .below { max-width: 1100px; margin-inline: auto; }
+
+  /*
+    Four windows side by side, floor to ceiling.
+
+    This is the arrangement the whole idea rests on: four places open at once,
+    the one under the pointer widening while the others narrow — which only
+    works across a row, because a column of four cannot give its neighbours
+    their width back.
+  */
+  .windows {
+    flex-direction: row;
+    min-height: calc(100dvh - 150px);
+    gap: 2px;
+  }
+  .window { min-height: 0; }
+  .window--open { flex-grow: 2.2; }
+
+  /*
+    Closed is close up; open pulls back.
+
+    A narrow window at the drawing's own width shows a thin band of it in a
+    column of sky. Pushed in hard it shows a fragment at arm's length — a
+    roofline, a mast — and opening the window steps away until the whole place
+    is in frame. The crop does the work the width cannot.
+  */
+  /*
+    Standing up, the window takes the whole view, sky included.
+
+    Scaled so the drawing's height fills the column — which crops it hard
+    across, leaving the subject and the air over it. That is the trade a
+    doorway-shaped frame makes, and it is the right way round: the sky is
+    the part that was empty.
+  */
+  .window .scene__art { width: 290%; bottom: 13%; }
+  .window--open .scene__art { width: 172%; bottom: 11%; }
+  .window__badge { top: auto; bottom: var(--space-xl); left: auto; right: var(--space-lg); }
+
+  .window__plate { inset: auto var(--space-lg) var(--space-xl) var(--space-xl); }
+  .scene__label { display: block; }
+  .scene::after { display: none; }
+  .window__name { font-size: 30px; }
+
+  /* Held back on purpose — a card is read closely, not travelled into. */
+  .screen--day { max-width: 560px; }
+  .screen--loop { max-width: 620px; }
+}
+
+@media (min-width: 1440px) {
+  :root { --page: 820px; }
+  .topbar, .resume, .below { max-width: 1280px; }
+  .window__name { font-size: 34px; }
+}
+
+/* ------------------------------------------------------------- the grammar
+
+   Reading, not answering. So this reads like a page of notes rather than a
+   deck: longer measure, quieter chrome, and the form itself set large enough
+   to find by scanning, because somebody checking a point already knows what
+   they are looking for.
+*/
+.syllabus { display: flex; flex-direction: column; gap: var(--space-md); }
+.syllabus__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.syllabus__count {
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.points { display: flex; flex-direction: column; gap: var(--space-sm); }
+.point {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  text-align: left;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--surface);
+  border-radius: var(--radius-card);
+}
+.point__form {
+  flex: 0 0 auto;
+  min-width: 2.2em;
+  font-size: var(--text-heading);
+  font-weight: var(--weight-strong);
+  color: var(--accent);
+}
+.point__form--large { font-size: var(--text-target-small); color: var(--accent); }
+.point__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.point__title { font-size: var(--text-body); font-weight: var(--weight-medium); }
+.point__summary { font-size: var(--text-caption); color: var(--ink-muted); line-height: 18px; }
+.point__check { margin-left: auto; color: var(--good); font-weight: var(--weight-strong); }
+.point--learned .point__title { color: var(--ink-muted); }
+
+/* The shape, set apart from the prose that explains it. */
+.pattern {
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  text-align: center;
+}
+
+.prose { margin: 0; font-size: var(--text-body); line-height: 24px; max-width: 38em; }
+
+.example {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--line);
+}
+.example:last-child { border-bottom: none; }
+.example__target { font-size: var(--text-heading); line-height: 1.5; }
+.example__reading { font-size: var(--text-caption); color: var(--ink-muted); }
+.example__gloss { font-size: var(--text-caption); color: var(--ink-muted); }
+
+.pitfall {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--caution) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--caution) 28%, transparent);
+}
+.pitfall__label {
+  font-size: var(--text-micro);
+  font-weight: var(--weight-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--caution);
+}
+.pitfall__body { font-size: var(--text-caption); line-height: 20px; }
+
+/* Two columns of points once there is room for them. */
+@media (min-width: 1024px) {
+  .points { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
+}
+
+/* ----------------------------------------------------------- practising it
+
+   Four shapes in one sitting, so this is mostly about making them feel like
+   one thing: the same card, the same gap, the same green when it is right.
+*/
+
+/* The sentence under practice, with its gap. */
+.card--quiet { gap: var(--space-sm); align-items: center; text-align: center; }
+.sentence {
+  margin: 0;
+  font-size: var(--text-target-small);
+  line-height: 1.5;
+  text-align: center;
+}
+.sentence__gloss { font-size: var(--text-caption); color: var(--ink-muted); }
+
+/* The gap holds its own width so the sentence does not jump when it fills. */
+.gap {
+  display: inline-block;
+  min-width: 2ch;
+  padding: 0 2px;
+  color: var(--ink-faint);
+  border-bottom: 2px solid var(--accent);
+  transition: color var(--duration-instant) var(--ease);
+}
+.gap--right { color: var(--good); border-bottom-color: var(--good); }
+.gap--wrong { color: var(--again); border-bottom-color: var(--again); }
+
+.field--answer { text-align: center; font-size: var(--text-heading); }
+
+/* Matching: two columns of chips, tap one then the other. */
+.match { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); }
+.match__column { display: flex; flex-direction: column; gap: var(--space-sm); }
+.chip {
+  padding: var(--space-md);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: var(--text-caption);
+  line-height: 18px;
+  text-align: left;
+  border: 1.5px solid transparent;
+  transition:
+    background var(--duration-instant) var(--ease),
+    border-color var(--duration-instant) var(--ease),
+    opacity var(--duration-base) var(--ease);
+}
+.chip--picked { border-color: var(--accent); background: var(--accent-soft); }
+.chip--solved { opacity: 0.4; background: color-mix(in srgb, var(--good) 14%, var(--surface)); }
+/* A shake rather than a red wall: a mispair is a normal part of matching. */
+.chip--wrong { animation: nudge 240ms var(--ease); border-color: var(--again); }
+
+@keyframes nudge {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.recall__form {
+  font-size: var(--text-target-small);
+  font-weight: var(--weight-strong);
+  color: var(--accent);
+}
+.pattern--inline { width: 100%; }
+
+/* The two self-graded answers, weighted so neither is the obvious tap. */
+.verdict__button {
+  flex: 1;
+  padding: var(--space-md);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+}
+.verdict__button--good { background: color-mix(in srgb, var(--good) 14%, var(--surface)); color: var(--good); }
+
+/* Due outranks done, so it is a word rather than a tick. */
+.point__due {
+  margin-left: auto;
+  font-size: var(--text-micro);
+  font-weight: var(--weight-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------- a living backdrop
+
+   The same four places, awake.
+
+   Everything below is motion only: no element appears or disappears between
+   the two settings, and no colour changes. Calm is this with the clocks
+   stopped, which is what makes switching feel like opening a window rather
+   than loading a different app.
+
+   All of it is transform and opacity, so it runs on the compositor and costs
+   no layout. Under prefers-reduced-motion the rule above stops every loop
+   after one pass, so the living backdrop is simply the still one.
+*/
+
+/* Two soft masses of the language's own ink, orbiting behind everything. */
+.scene__weather {
+  position: absolute;
+  inset: -20%;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms var(--ease);
+}
+.scene__mass {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  filter: blur(42px);
+}
+.scene__mass--one {
+  width: 56%;
+  height: 46%;
+  left: 6%;
+  top: 8%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--scene-accent) 34%, transparent), transparent 70%);
+}
+.scene__mass--two {
+  width: 48%;
+  height: 40%;
+  right: 4%;
+  top: 30%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--secondary, var(--scene-accent)) 28%, transparent), transparent 70%);
+}
+
+:root[data-backdrop='living'] .scene__weather { opacity: 1; }
+:root[data-backdrop='living'] .scene__mass--one { animation: drift-one 34s ease-in-out infinite alternate; }
+:root[data-backdrop='living'] .scene__mass--two { animation: drift-two 46s ease-in-out infinite alternate; }
+
+@keyframes drift-one {
+  from { transform: translate3d(-6%, -4%, 0) scale(1); }
+  to { transform: translate3d(10%, 8%, 0) scale(1.18); }
+}
+@keyframes drift-two {
+  from { transform: translate3d(6%, 6%, 0) scale(1.1); }
+  to { transform: translate3d(-8%, -6%, 0) scale(0.92); }
+}
+
+/* The sun crossing its own sky, slowly enough to notice only if you watch. */
+:root[data-backdrop='living'] .scene__light {
+  animation: sun 58s ease-in-out infinite alternate;
+}
+@keyframes sun {
+  from { transform: translate3d(-5%, 2%, 0) scale(1); opacity: 0.85; }
+  to { transform: translate3d(7%, -3%, 0) scale(1.12); opacity: 1; }
+}
+
+/*
+  The drawing breathing.
+
+  Each plane drifts by its own depth and on its own clock, so the far ridge
+  barely moves while the foreground travels — the same rule as the parallax,
+  which is why they can share a transform.
+*/
+:root[data-backdrop='living'] .art__layer {
+  animation: sway calc(26s + var(--layer) * 5s) ease-in-out infinite alternate;
+  animation-delay: calc(var(--layer) * -3s);
+}
+@keyframes sway {
+  from { --sway: -2px; }
+  to { --sway: 6px; }
+}
+
+/* And the air itself, moving over the horizon. */
+:root[data-backdrop='living'] .scene__haze {
+  animation: breathe 24s ease-in-out infinite alternate;
+}
+@keyframes breathe {
+  from { opacity: 0.8; transform: translate3d(0, 2%, 0); }
+  to { opacity: 1; transform: translate3d(0, -2%, 0); }
+}
+
+/*
+  A scene standing behind a screenful of text.
+
+  Fixed rather than absolute, so it stays put while the day scrolls — a
+  backdrop that scrolls with the content is wallpaper, and wallpaper moving
+  under a column of numbers is the thing that makes a page feel cheap.
+*/
+.screen__backdrop {
+  position: fixed;
+  inset: 0;
+  /*
+    Zero, not minus one.
+
+    A negative z-index puts it behind its stacking context, and the page's
+    canvas colour is painted from `body` — so at -1 the whole scene was
+    rendered underneath an opaque background and never seen. It sits at the
+    bottom of the content instead, with the day's own rows lifted above it.
+  */
+  z-index: 0;
+}
+.screen--day > *:not(.screen__backdrop) { position: relative; z-index: 1; }

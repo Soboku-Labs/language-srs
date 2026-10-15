@@ -14,8 +14,30 @@ import type { LanguageCode } from '@language-srs/core';
  * semantics and the shared vocabulary, not to hold CSS.
  */
 
-export function Screen({ children, flush = false }: { children: ReactNode; flush?: boolean }) {
-  return <main className={`screen${flush ? ' screen--flush' : ''}`}>{children}</main>;
+/**
+ * A page.
+ *
+ * `layer` says which of the app's three depths this is, because they are not
+ * the same kind of thing and should not read as one. The door and the day are
+ * documents: they scroll, they explain, they are looked over. The loop is not —
+ * it is one card at a time, answered dozens of times in a row, usually on a
+ * phone, and it holds the viewport so the card sits in the middle and the
+ * answers sit under the thumb rather than drifting up the screen.
+ */
+export function Screen({
+  children,
+  flush = false,
+  layer,
+}: {
+  children: ReactNode;
+  flush?: boolean;
+  layer?: 'door' | 'day' | 'loop';
+}) {
+  return (
+    <main className={`screen${flush ? ' screen--flush' : ''}${layer ? ` screen--${layer}` : ''}`}>
+      {children}
+    </main>
+  );
 }
 
 /** Staggered entrance. `index` orders siblings top to bottom as you would read them. */

@@ -44,6 +44,7 @@ function Themed() {
   const { engine, revision } = useEngine();
   const language = useMemo(() => engine.activeLanguage, [engine, revision]);
   const backdrop = useMemo(() => engine.backdrop, [engine, revision]);
+  const appearance = useMemo(() => engine.appearance, [engine, revision]);
 
   /*
    * On the document, not on a component.
@@ -58,7 +59,7 @@ function Themed() {
   }, [backdrop]);
 
   return (
-    <ThemeProvider languageCode={language}>
+    <ThemeProvider languageCode={language} appearance={appearance}>
       <Chrome />
     </ThemeProvider>
   );

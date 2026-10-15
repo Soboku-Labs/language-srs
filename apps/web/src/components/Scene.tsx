@@ -1,7 +1,7 @@
-import { useRef } from 'react';
-import { getCulture, getLanguageTheme, type LanguageCode } from '@language-srs/core';
+import { memo } from 'react';
+import { getCulture, type LanguageCode } from '@language-srs/core';
 import { LanguageArt } from './LanguageArt';
-import { useParallax } from '../motion/parallax';
+import { useTheme } from '../theme';
 
 /**
  * A place, with air in it.
@@ -24,7 +24,7 @@ import { useParallax } from '../motion/parallax';
  * under weather reads as a place without insisting on which corner of it.
  */
 
-export function Scene({
+function SceneInner({
   code,
   className,
   /**
@@ -40,21 +40,17 @@ export function Scene({
   className?: string;
   variant?: 'window' | 'backdrop';
 }) {
-  const theme = getLanguageTheme(code);
+  const { colorsFor } = useTheme();
+  const colors = colorsFor(code);
   const culture = getCulture(code);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useParallax(ref);
-
   return (
     <div
-      ref={ref}
       className={`scene scene--${variant}${className ? ` ${className}` : ''}`}
       // Falls back to its own language's ink when nothing above has set it,
       // so a scene works standing alone as well as inside a window.
       style={{
-        ['--scene-accent' as string]: theme.colors.accent,
-        ['--scene-wash' as string]: theme.colors.accentSoft,
+        ['--scene-accent' as string]: colors.accent,
+        ['--scene-wash' as string]: colors.accentSoft,
       }}
       aria-hidden="true"
     >
@@ -78,10 +74,9 @@ export function Scene({
       {/*
         The light in this sky.
 
-        One soft source, placed off-centre and drifting with the pointer at the
-        shallowest depth of anything here — the sun moves least because it is
-        furthest away, which is the only reason parallax reads as distance
-        rather than as wobble.
+        One soft source, off-centre, crossing its own sky on a clock of its
+        own. It travels least of anything here because it is furthest away,
+        which is what makes the motion read as distance rather than wobble.
       */}
       <div className="scene__light" />
 
@@ -110,3 +105,6 @@ export function Scene({
     </div>
   );
 }
+
+/** Memoised for the same reason the drawing inside it is. */
+export const Scene = memo(SceneInner);

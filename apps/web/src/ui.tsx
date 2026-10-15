@@ -164,6 +164,42 @@ export function TextButton({
   );
 }
 
+/**
+ * A small group of mutually exclusive settings, shown as one control.
+ *
+ * Separate buttons would need a label each to say what they belong to; a
+ * segmented group says it once and shows the current answer without a word
+ * like "selected". Narrow enough to sit in a bar, which is the point — these
+ * are the settings worth changing from the page they affect.
+ */
+export function Segmented({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="segmented" role="group" aria-label={label}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          className="segmented__option"
+          aria-pressed={option.value === value}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function Choice({
   label,
   selected,

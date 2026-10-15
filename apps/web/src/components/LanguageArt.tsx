@@ -1,5 +1,5 @@
 import { getCulture, getLanguageTheme, type LanguageCode } from '@language-srs/core';
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 
 /**
  * A place, drawn.
@@ -26,7 +26,7 @@ import type { ReactNode } from 'react';
  * you stop seeing by the second week.
  */
 
-export function LanguageArt({
+function LanguageArtInner({
   code,
   className,
   /** Skip the entrance — for art that is already on screen, or repeated in a list. */
@@ -501,5 +501,15 @@ function junk({ accent, wash }: MotifProps) {
     </>
   );
 }
+
+/**
+ * Memoised, because hovering must not rebuild it.
+ *
+ * Each drawing is around 120 SVG nodes and four are on screen at once. The
+ * door sets state when the pointer enters a window, so without this every
+ * hover asked React to reconcile roughly five hundred nodes that had not
+ * changed — which is most of the jank in a transition that should be free.
+ */
+export const LanguageArt = memo(LanguageArtInner);
 
 const MOTIFS: Record<string, (props: MotifProps) => ReactNode> = { pagoda, torii, hanok, junk };

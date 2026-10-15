@@ -71,6 +71,8 @@ export interface LanguageTheme {
   inspiration: string;
   mode: ThemeMode;
   colors: ThemeColors;
+  /** The same theme after dark. */
+  dark: ThemeColors;
   radius: ThemeRadius;
   /** Letter spacing on headings. Shared; kept on the theme for the widgets. */
   headingLetterSpacing: number;
@@ -119,6 +121,26 @@ const PAPER = {
  * These are a scale, not decoration: Again through Easy has to read the same way
  * every time, in every language, or the four buttons stop being muscle memory.
  */
+/**
+ * The same room at night.
+ *
+ * Not the light palette inverted — an inversion makes a bright wall out of
+ * what was a dark line, and the whole point of this design is ink on paper.
+ * These are the values of a dim room: a near-black that is warm rather than
+ * blue, surfaces that lift by a few points rather than by a lot, and a border
+ * that is visible without being a grid.
+ */
+const SLATE = {
+  background: '#141311',
+  surface: '#1C1B18',
+  surfaceRaised: '#242220',
+  border: '#332F2A',
+
+  text: '#F2EFE9',
+  textMuted: '#A7A098',
+  textFaint: '#7D766D',
+} as const;
+
 const GRADES = {
   again: '#B4483C',
   hard: '#90681F',
@@ -153,13 +175,38 @@ interface InkOptions {
   accent: string;
   /** A pale wash of the accent, for chips and tinted chrome. */
   accentSoft: string;
+  /** The same ink, chosen again to be legible on slate rather than on paper. */
+  accentDark: string;
+  /** A deep wash of the accent, for tinted chrome in the dark. */
+  accentSoftDark: string;
   /** Used sparingly: the streak, and highlights that must not read as the accent. */
   secondary: string;
+  secondaryDark: string;
   toneRamp?: string[];
 }
 
 /** Build a theme from the shared ground plus one language's ink. */
-function ink({ code, name, inspiration, accent, accentSoft, secondary, toneRamp }: InkOptions): LanguageTheme {
+/**
+ * Lift an accent off a dark ground.
+ *
+ * An ink chosen to sit on paper is too dark to read on slate: Indigo at
+ * #2C4A7C against #141311 is almost invisible. Each language names its own
+ * night accent rather than having one computed, because a mechanically
+ * lightened colour drifts — Cinnabar lightens towards pink, Celadon towards
+ * mint — and these four colours are the product's identity.
+ */
+function ink({
+  code,
+  name,
+  inspiration,
+  accent,
+  accentSoft,
+  accentDark,
+  accentSoftDark,
+  secondary,
+  secondaryDark,
+  toneRamp,
+}: InkOptions): LanguageTheme {
   return {
     languageCode: code,
     name,
@@ -170,6 +217,17 @@ function ink({ code, name, inspiration, accent, accentSoft, secondary, toneRamp 
       accent,
       accentSoft,
       secondary,
+      ...GRADES,
+      success: GRADES.good,
+      warning: GRADES.hard,
+      danger: GRADES.again,
+    },
+    /** The same theme after dark. Chosen by the app, not by the palette. */
+    dark: {
+      ...SLATE,
+      accent: accentDark,
+      accentSoft: accentSoftDark,
+      secondary: secondaryDark,
       ...GRADES,
       success: GRADES.good,
       warning: GRADES.hard,
@@ -190,7 +248,10 @@ export const LANGUAGE_THEMES: Record<LanguageCode, LanguageTheme> = {
     inspiration: 'The red of a seal, stamped once on a page of black ink.',
     accent: '#B03A2B',
     accentSoft: '#F7EAE7',
+    accentDark: '#E2705E',
+    accentSoftDark: '#2E1E1B',
     secondary: '#8E6A16',
+    secondaryDark: '#D0A84A',
     // 1 high level, 2 rising, 3 falling-rising, 4 falling, 5 neutral. The neutral
     // tone is deliberately the quietest: it is the unstressed one.
     toneRamp: ['#2C4A7C', '#14776A', '#8E6A16', '#B03A2B', '#7C766C'],
@@ -201,7 +262,10 @@ export const LANGUAGE_THEMES: Record<LanguageCode, LanguageTheme> = {
     inspiration: 'Aizome indigo, the working colour of everyday cloth.',
     accent: '#2C4A7C',
     accentSoft: '#E9EDF6',
+    accentDark: '#7FA3DC',
+    accentSoftDark: '#1A2133',
     secondary: '#B4483C',
+    secondaryDark: '#E2705E',
   }),
   ko: ink({
     code: 'ko',
@@ -209,7 +273,10 @@ export const LANGUAGE_THEMES: Record<LanguageCode, LanguageTheme> = {
     inspiration: 'The green-blue glaze of Goryeo celadon.',
     accent: '#14776A',
     accentSoft: '#E2F1EE',
+    accentDark: '#5FBFAC',
+    accentSoftDark: '#152A28',
     secondary: '#35618E',
+    secondaryDark: '#7FA3DC',
   }),
   vi: ink({
     code: 'vi',
@@ -217,7 +284,10 @@ export const LANGUAGE_THEMES: Record<LanguageCode, LanguageTheme> = {
     inspiration: 'Gold leaf laid over sơn mài lacquer.',
     accent: '#8E6A16',
     accentSoft: '#F5EEDD',
+    accentDark: '#D9B05C',
+    accentSoftDark: '#2B2414',
     secondary: '#A34A5E',
+    secondaryDark: '#D98A9B',
     // 1 ngang, 2 huyền, 3 sắc, 4 hỏi, 5 ngã, 6 nặng. Ngang leads quietly for the
     // same reason as the Mandarin neutral tone: it is the unmarked one, and
     // colouring it loudly teaches the opposite of how it looks on the page.

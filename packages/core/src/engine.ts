@@ -135,7 +135,20 @@ interface EngineMeta {
   schedulerConfig: Partial<SchedulerConfig>;
   /** How much the app moves of its own accord. Absent means calm. */
   backdrop?: Backdrop;
+  /** Light, dark, or whatever the device is set to. Absent means the device. */
+  appearance?: Appearance;
 }
+
+/**
+ * Light or dark, or neither decided here.
+ *
+ * `system` is the default and follows the device, which is right for most
+ * people most of the time. The two explicit settings exist because the device
+ * is not always right: a phone that flips to dark at sunset is wrong for
+ * somebody studying under a desk lamp, and the reverse is wrong on a train at
+ * night.
+ */
+export type Appearance = 'system' | 'light' | 'dark';
 
 /**
  * How alive the background is.
@@ -395,6 +408,19 @@ export class StudyEngine {
   async setBackdrop(backdrop: Backdrop): Promise<void> {
     if (this.meta.backdrop === backdrop) return;
     this.meta.backdrop = backdrop;
+    await this.persistMeta();
+    await this.notifyChanged();
+  }
+
+  /** Light, dark, or the device's own setting. */
+  get appearance(): Appearance {
+    return this.meta.appearance ?? 'system';
+  }
+
+  /** Kept with the account, for the same reason the backdrop is. */
+  async setAppearance(appearance: Appearance): Promise<void> {
+    if (this.meta.appearance === appearance) return;
+    this.meta.appearance = appearance;
     await this.persistMeta();
     await this.notifyChanged();
   }

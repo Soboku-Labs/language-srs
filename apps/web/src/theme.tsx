@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
+  type Appearance,
   getLanguageTheme,
   getToneColor,
   getToneColors,
@@ -40,6 +41,17 @@ interface ThemeValue {
   theme: LanguageTheme;
   /** `theme.colors`, under the name the screens ask for. */
   palette: LanguageTheme['colors'];
+  /** Whether the app is currently dark, however that was decided. */
+  dark: boolean;
+  /**
+   * The resolved colours of *another* language.
+   *
+   * The door shows four languages at once, none of which is necessarily the
+   * active one, so every one of them needs its own palette resolved for the
+   * mode the app is in. Without this the scenes kept their paper washes after
+   * dark and the windows faded to pale grey at the bottom.
+   */
+  colorsFor: (code: LanguageCode) => LanguageTheme['colors'];
   toneColor: (tone: number) => string;
 }
 
@@ -73,18 +85,45 @@ const VARIABLES: Record<string, string> = {
   danger: '--critical',
 };
 
+/**
+ * Whether the device is asking for dark, watched rather than read once.
+ *
+ * Somebody whose phone flips at sunset should not have to reload to see it,
+ * and on a laptop the setting can change while the app is open.
+ */
+function useSystemDark(): boolean {
+  const [dark, setDark] = useState(
+    () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false,
+  );
+
+  useEffect(() => {
+    const query = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!query) return;
+
+    const onChange = (event: MediaQueryListEvent) => setDark(event.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+
+  return dark;
+}
+
 export function ThemeProvider({
   languageCode,
+  appearance = 'system',
   children,
 }: {
   languageCode: LanguageCode;
+  appearance?: Appearance;
   children: ReactNode;
 }) {
   const theme = useMemo(() => getLanguageTheme(languageCode), [languageCode]);
+  const systemDark = useSystemDark();
+  const dark = appearance === 'system' ? systemDark : appearance === 'dark';
 
   useEffect(() => {
     const root = document.documentElement;
-    const colors = theme.colors as unknown as Record<string, string>;
+    const colors = (dark ? theme.dark : theme.colors) as unknown as Record<string, string>;
     for (const [key, variable] of Object.entries(VARIABLES)) {
       const value = colors[key];
       if (value) root.style.setProperty(variable, value);
@@ -100,18 +139,35 @@ export function ThemeProvider({
     root.style.setProperty('--radius-control', `${theme.radius.control}px`);
     root.style.setProperty('--radius-pill', `${theme.radius.pill}px`);
     // So form controls and scrollbars match the theme rather than the OS default.
-    root.style.colorScheme = theme.mode;
-  }, [theme]);
+    root.style.colorScheme = dark ? 'dark' : 'light';
+
+    /*
+     * The canvas colour goes on the root, not only on the body.
+     *
+     * Declaring support for both schemes makes the browser paint a dark canvas
+     * on the root when the device is dark. That stops the body's background
+     * propagating, so the body painted only its own box — one viewport tall —
+     * and everything scrolled past it showed the UA's black through. The
+     * footer was unreadable and the cause was nowhere near the footer.
+     */
+    root.style.background = colors.background ?? '';
+    root.dataset.appearance = dark ? 'dark' : 'light';
+  }, [theme, dark]);
 
   const value = useMemo<ThemeValue>(
     () => ({
       languageCode,
-      mode: theme.mode,
+      mode: dark ? 'dark' : 'light',
+      dark,
+      colorsFor: (code: LanguageCode) => {
+        const other = getLanguageTheme(code);
+        return dark ? other.dark : other.colors;
+      },
       theme,
-      palette: theme.colors,
+      palette: dark ? theme.dark : theme.colors,
       toneColor: (tone: number) => getToneColor(theme, tone),
     }),
-    [languageCode, theme],
+    [languageCode, theme, dark],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

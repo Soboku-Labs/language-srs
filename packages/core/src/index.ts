@@ -374,6 +374,7 @@ export {
   STORAGE_KEYS,
   SYNCED_STORAGE_KEYS,
   StudyEngine,
+  type Appearance,
   type Backdrop,
   type GrammarProgress,
 } from './engine';

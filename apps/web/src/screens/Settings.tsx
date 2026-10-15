@@ -9,6 +9,9 @@ import {
 } from '@language-srs/core';
 import { SyncStatus } from '../components/SyncStatus';
 import { useAuth, useEngine } from '../providers';
+import { useSettings } from '../settings';
+import { DateField } from '../components/DateField';
+import { Maker } from '../components/Maker';
 import { useRouter } from '../router';
 import { Caption, Choice, DetailRow, Rise, Row, Screen, Section, TextButton } from '../ui';
 
@@ -23,6 +26,15 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function Settings() {
   const { engine, revision, mutate } = useEngine();
+  const {
+    backdrop,
+    dayStartHour,
+    setBackdrop,
+    setDayStartHour,
+    setExamTrack,
+    updateLanguage,
+    error,
+  } = useSettings();
   const { account, synced, canSignIn, signOut } = useAuth();
   const { navigate } = useRouter();
 
@@ -35,26 +47,21 @@ export function Settings() {
   const level = track?.levels.find((candidate) => candidate.id === profile.targetLevelId);
 
   const [dateDraft, setDateDraft] = useState(profile.examDate ?? '');
-  const [dateError, setDateError] = useState<string | undefined>();
 
   const suggestedNewLimit =
     profile.examDate && DATE_PATTERN.test(profile.examDate)
       ? suggestDailyNewLimit(profile.targetLevelId, engine.now(), profile.examDate)
       : undefined;
 
+  /*
+   * No format check any more.
+   *
+   * `<input type="date">` returns `YYYY-MM-DD` or an empty string and cannot
+   * return anything else, so the pattern test and its error message were
+   * guarding a state the control makes impossible.
+   */
   const commitDate = async (value: string) => {
-    const trimmed = value.trim();
-    if (trimmed.length === 0) {
-      setDateError(undefined);
-      await mutate((instance) => instance.updateProfile(code, { examDate: undefined }));
-      return;
-    }
-    if (!DATE_PATTERN.test(trimmed)) {
-      setDateError('Use YYYY-MM-DD, for example 2026-12-06.');
-      return;
-    }
-    setDateError(undefined);
-    await mutate((instance) => instance.updateProfile(code, { examDate: trimmed }));
+    await updateLanguage({ examDate: value ? value : null });
   };
 
   const shortfall = level ? Math.max(0, level.vocabularyTarget - available) : 0;
@@ -62,7 +69,16 @@ export function Settings() {
   return (
     <Screen>
       <Rise index={0}>
-        <Caption>Settings apply to {language.name}. Each language keeps its own.</Caption>
+        <Caption>
+          Exam, level and daily amounts apply to {language.name}. Your day and the background
+          apply everywhere.
+        </Caption>
+        {/*
+          Said, not hidden, and not undone. A failed push leaves the setting
+          applied here — rolling back a choice somebody just made because the
+          network blinked is worse than it being a moment behind the server.
+        */}
+        {error ? <Caption>Saved on this device. Not reaching the server: {error}</Caption> : null}
       </Rise>
 
       {tracks.length > 1 ? (
@@ -74,7 +90,7 @@ export function Settings() {
                   key={candidate.id}
                   label={candidate.name}
                   selected={candidate.id === profile.examTrackId}
-                  onClick={() => void mutate((instance) => instance.setExamTrack(code, candidate.id))}
+                  onClick={() => void setExamTrack(candidate.id)}
                 />
               ))}
             </Row>
@@ -91,11 +107,7 @@ export function Settings() {
                 key={candidate.id}
                 label={candidate.shortName}
                 selected={candidate.id === profile.targetLevelId}
-                onClick={() =>
-                  void mutate((instance) =>
-                    instance.updateProfile(code, { targetLevelId: candidate.id }),
-                  )
-                }
+                onClick={() => void updateLanguage({ targetLevelId: candidate.id })}
               />
             ))}
           </Row>
@@ -138,21 +150,27 @@ export function Settings() {
 
       <Rise index={3}>
         <Section title="Exam date">
+          {/*
+            A calendar, not a text box expecting YYYY-MM-DD. Somebody booking
+            an exam wants to see which day of the week it lands on and count
+            the weeks to it, which a text box cannot do — and the native
+            control cannot return a malformed date, so the format error this
+            section used to show is gone with the thing that caused it.
+          */}
+          <DateField
+            label="Exam date"
+            value={dateDraft}
+            min={toDateOnly(engine.now())}
+            onChange={(next) => {
+              setDateDraft(next);
+              void commitDate(next);
+            }}
+          />
           <Row wrap>
-            <input
-              className="field"
-              style={{ flex: 1, minWidth: 160 }}
-              value={dateDraft}
-              onChange={(event) => setDateDraft(event.target.value)}
-              onBlur={() => void commitDate(dateDraft)}
-              placeholder="YYYY-MM-DD"
-              inputMode="numeric"
-              aria-label="Exam date"
-            />
             {[30, 90, 180].map((days) => (
               <Choice
                 key={days}
-                label={`${days}d`}
+                label={`In ${days} days`}
                 selected={false}
                 onClick={() => {
                   const next = toDateOnly(addDays(engine.now(), days));
@@ -161,8 +179,17 @@ export function Settings() {
                 }}
               />
             ))}
+            {dateDraft ? (
+              <Choice
+                label="Clear"
+                selected={false}
+                onClick={() => {
+                  setDateDraft('');
+                  void commitDate('');
+                }}
+              />
+            ) : null}
           </Row>
-          {dateError ? <Caption>{dateError}</Caption> : null}
           <Caption>
             With a date set, intervals tighten as the exam approaches so nothing lands after the paper.
           </Caption>
@@ -182,7 +209,7 @@ export function Settings() {
             step={5}
             min={0}
             max={200}
-            onChange={(value) => void mutate((i) => i.updateProfile(code, { dailyNewLimit: value }))}
+            onChange={(value) => void updateLanguage({ dailyNewLimit: value })}
           />
           <Stepper
             label="Reviews"
@@ -190,7 +217,7 @@ export function Settings() {
             step={20}
             min={20}
             max={999}
-            onChange={(value) => void mutate((i) => i.updateProfile(code, { dailyReviewLimit: value }))}
+            onChange={(value) => void updateLanguage({ dailyReviewLimit: value })}
           />
           <Stepper
             label="Target retention"
@@ -199,9 +226,7 @@ export function Settings() {
             min={70}
             max={97}
             suffix="%"
-            onChange={(value) =>
-              void mutate((i) => i.updateProfile(code, { desiredRetention: value / 100 }))
-            }
+            onChange={(value) => void updateLanguage({ desiredRetention: value / 100 })}
           />
           <Caption>
             Higher retention means shorter intervals and more reviews. 90% is where most learners get
@@ -218,6 +243,29 @@ export function Settings() {
       </Rise>
 
       <Rise index={6}>
+        <Section title="Your day">
+          {/*
+            A user setting, not a language one — and until now one with no
+            control at all: it was stored on each language's profile, defaulted
+            to four, and could not be changed from anywhere in the app.
+          */}
+          <Stepper
+            label="Day starts at"
+            value={dayStartHour}
+            step={1}
+            min={0}
+            max={23}
+            suffix=":00"
+            onChange={(value) => void setDayStartHour(value)}
+          />
+          <Caption>
+            Reviews before this hour count towards the previous day, so finishing at 2am does not
+            start a second day's work. Applies to every language.
+          </Caption>
+        </Section>
+      </Rise>
+
+      <Rise index={6}>
         <Section title="Background">
           {/*
             Applies everywhere, not to this language. The four places keep
@@ -227,17 +275,17 @@ export function Settings() {
           <Row wrap>
             <Choice
               label="Calm"
-              selected={engine.backdrop === 'calm'}
-              onClick={() => void mutate((instance) => instance.setBackdrop('calm'))}
+              selected={backdrop === 'calm'}
+              onClick={() => void setBackdrop('calm')}
             />
             <Choice
               label="Living"
-              selected={engine.backdrop === 'living'}
-              onClick={() => void mutate((instance) => instance.setBackdrop('living'))}
+              selected={backdrop === 'living'}
+              onClick={() => void setBackdrop('living')}
             />
           </Row>
           <Caption>
-            {engine.backdrop === 'living'
+            {backdrop === 'living'
               ? 'The sky moves, the light crosses it and the drawing drifts. Nothing is added — the same scene, awake.'
               : 'The scene is a still drawing. It answers the pointer and otherwise holds its breath.'}
           </Caption>
@@ -287,12 +335,17 @@ export function Settings() {
 
       <Rise index={7}>
         <Section title="More">
+          <TextButton label="What's coming next" onClick={() => navigate('/upcoming')} />
           <TextButton
             label="Reset all progress"
             color="var(--critical)"
             onClick={() => void mutate((instance) => instance.reset())}
           />
         </Section>
+      </Rise>
+
+      <Rise index={8}>
+        <Maker />
       </Rise>
     </Screen>
   );

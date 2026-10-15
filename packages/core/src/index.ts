@@ -32,8 +32,10 @@ export type { LanguageCode, LanguageProfile, ScriptId } from './types/language';
 export {
   LANGUAGE_CODES,
   LANGUAGE_PROFILES,
+  cardKindsForLanguage,
   getLanguageProfile,
   isLanguageCode,
+  usesCharacterWriting,
 } from './types/language';
 export type { GradeResult, Rating, ReviewLog, ReviewSource } from './types/review';
 export {
@@ -351,6 +353,29 @@ export type { Clock } from './utils/date';
 export { cardId, parseCardId, reviewLogId, studySessionId } from './utils/id';
 
 // Engine
+export type { Appearance, Backdrop } from './settings';
+export { BRAND } from './theme/palettes';
+export {
+  ANONYMOUS_HISTORY_DAYS,
+  FEATURES,
+  canUse,
+  featuresUnlockedBy,
+  tierFor,
+  tierReaches,
+  type AccessTier,
+  type Feature,
+  type FeatureId,
+} from './access';
+export {
+  DEFAULT_LANGUAGE_SETTINGS,
+  DEFAULT_USER_SETTINGS,
+  SETTINGS_LIMITS,
+  normaliseLanguageSettings,
+  normaliseUserSettings,
+  type LanguageSettings,
+  type LanguageSettingsPatch,
+  type UserSettings,
+} from './settings';
 export {
   BLANK,
   buildGrammarExercises,
@@ -374,8 +399,6 @@ export {
   STORAGE_KEYS,
   SYNCED_STORAGE_KEYS,
   StudyEngine,
-  type Appearance,
-  type Backdrop,
   type GrammarProgress,
 } from './engine';
 export type { StudyEngineOptions } from './engine';

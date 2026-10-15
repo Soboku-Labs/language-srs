@@ -8,6 +8,7 @@ import {
   type KindRetention,
 } from '@language-srs/core';
 import { useEngine } from '../providers';
+import { Locked } from '../components/Locked';
 import { useRouter } from '../router';
 import { Caption, DetailRow, Pill, ProgressBar, Rise, Row, Screen, Section, Stat, TextButton, Title } from '../ui';
 import { Ladder, RankBand } from '../components/Journey';
@@ -155,6 +156,14 @@ export function Stats() {
       */}
       {stats.retentionByKind.length > 1 ? (
         <Rise index={5}>
+          {/*
+            Per-skill retention is the view that only starts meaning something
+            after a few weeks, which is exactly when somebody has decided this
+            is worth keeping. The streak and the week above it stay free: those
+            are what make the first few sessions feel like they went somewhere,
+            and charging for them would be charging for the thing that works.
+          */}
+          <Locked feature="fullProgress">
           <Section title="By skill">
             {stats.retentionByKind.map((row) => (
               <div key={row.kind} className="skill">
@@ -163,7 +172,7 @@ export function Stats() {
                   <span
                     className="track__fill"
                     style={{
-                      width: `${Math.max(2, Math.round(row.trueRetention * 100))}%`,
+                      ['--fill' as string]: Math.max(0.02, row.trueRetention),
                       background:
                         row.trueRetention >= profile.desiredRetention ? palette.good : palette.warning,
                     }}
@@ -180,6 +189,7 @@ export function Stats() {
               />
             ) : null}
           </Section>
+          </Locked>
         </Rise>
       ) : null}
 

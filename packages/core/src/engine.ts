@@ -35,6 +35,7 @@ import {
 import { LANGUAGE_CODES, getLanguageProfile, type LanguageCode } from './types/language';
 import type { GradeResult, Rating, ReviewSource } from './types/review';
 import { addDays, endOfStudyDay, systemClock, type Clock } from './utils/date';
+import { SETTINGS_LIMITS, type Appearance, type Backdrop } from './settings';
 import { buildWidgetSnapshot, buildWidgetTimeline, pickSpotlight, type WidgetSnapshot, type WidgetTimeline } from './widget/payload';
 import { applyPendingGrades, type PendingWidgetGrade } from './widget/pending';
 
@@ -128,6 +129,30 @@ const ENTRY_WINDOW = 200;
 
 
 
+/**
+ * Carry a stored meta forward to what this version expects.
+ *
+ * Only `dayStartHour` so far, which moved from each language's profile to the
+ * account. Somebody who set it to 2am for Mandarin before this change should
+ * find it still 2am afterwards, in every language — the alternative is their
+ * study day silently moving back to four and a day's streak breaking for no
+ * reason they can see.
+ *
+ * Takes the first non-default value it finds rather than the active language's,
+ * because the active language may well be one they never changed. Profiles keep
+ * their copy: it is dead weight rather than a second source of truth, and
+ * removing it would break an older build reading the same synced blob.
+ */
+function migrateMeta(meta: EngineMeta): EngineMeta {
+  if (meta.dayStartHour !== undefined) return meta;
+
+  const moved = Object.values(meta.profiles)
+    .map((profile) => profile?.dayStartHour)
+    .find((hour) => typeof hour === 'number' && hour !== DEFAULT_STUDY_PROFILE.dayStartHour);
+
+  return moved === undefined ? meta : { ...meta, dayStartHour: moved };
+}
+
 interface EngineMeta {
   version: number;
   activeLanguage: LanguageCode;
@@ -137,34 +162,18 @@ interface EngineMeta {
   backdrop?: Backdrop;
   /** Light, dark, or whatever the device is set to. Absent means the device. */
   appearance?: Appearance;
+  /**
+   * Hour the study day rolls over, for every language. Absent means four.
+   *
+   * It used to live on each language's profile, where it meant one person
+   * could have two study days: changing it for Mandarin left Japanese rolling
+   * over at a different hour, so a late-night sitting counted towards
+   * different dates depending on which language it was in. It is a fact about
+   * the person's sleep, so it is stored once. `readMeta` carries the old
+   * per-language value up.
+   */
+  dayStartHour?: number;
 }
-
-/**
- * Light or dark, or neither decided here.
- *
- * `system` is the default and follows the device, which is right for most
- * people most of the time. The two explicit settings exist because the device
- * is not always right: a phone that flips to dark at sunset is wrong for
- * somebody studying under a desk lamp, and the reverse is wrong on a train at
- * night.
- */
-export type Appearance = 'system' | 'light' | 'dark';
-
-/**
- * How alive the background is.
- *
- * Not a skin. The two settings are a real disagreement about what a study app
- * should be, and both sides of it are reasonable:
- *
- * - **calm** — the scene is a still drawing. It moves when the learner moves,
- *   and otherwise it is a picture on a wall. Nothing competes with the card.
- * - **living** — the weather runs. Cloud drifts, kites sway, water moves, the
- *   light shifts across the sky. It is the same place, awake.
- *
- * It belongs to the account rather than the browser, because somebody who
- * wants their app still wants it still on their phone too.
- */
-export type Backdrop = 'calm' | 'living';
 
 export interface StudyEngineOptions {
   store: KeyValueStore;
@@ -253,12 +262,14 @@ export class StudyEngine {
     const { store } = options;
     const clock = options.clock ?? systemClock;
 
-    const meta = await readJson<EngineMeta>(store, STORAGE_KEYS.meta, {
-      version: STORAGE_VERSION,
-      activeLanguage: 'zh',
-      profiles: {},
-      schedulerConfig: {},
-    });
+    const meta = migrateMeta(
+      await readJson<EngineMeta>(store, STORAGE_KEYS.meta, {
+        version: STORAGE_VERSION,
+        activeLanguage: 'zh',
+        profiles: {},
+        schedulerConfig: {},
+      }),
+    );
 
     const engine = new StudyEngine(options, {
       meta,
@@ -425,6 +436,29 @@ export class StudyEngine {
     await this.notifyChanged();
   }
 
+  /**
+   * The hour the study day rolls over, for every language.
+   *
+   * One value per person, not per language. Four in the morning by default, so
+   * a late-night sitting counts towards the day it started in rather than
+   * splitting one session across two dates.
+   */
+  get dayStartHour(): number {
+    return this.meta.dayStartHour ?? DEFAULT_STUDY_PROFILE.dayStartHour;
+  }
+
+  async setDayStartHour(hour: number): Promise<void> {
+    const clamped = Math.round(
+      Math.min(SETTINGS_LIMITS.dayStartHour.max, Math.max(SETTINGS_LIMITS.dayStartHour.min, hour)),
+    );
+    if (this.meta.dayStartHour === clamped) return;
+    this.meta.dayStartHour = clamped;
+    await this.persistMeta();
+    // Every streak, forecast and daily count is measured against this, so they
+    // all have to be read again.
+    await this.notifyChanged();
+  }
+
   async setActiveLanguage(code: LanguageCode): Promise<void> {
     await this.ensureProfile(code);
     this.meta.activeLanguage = code;
@@ -475,6 +509,7 @@ export class StudyEngine {
   async syncCards(): Promise<void> {
     const existing = new Map(this.cards.map((card) => [card.id, card]));
     const next = new Map(existing);
+    let changed = false;
 
     for (const code of LANGUAGE_CODES) {
       const profile = this.meta.profiles[code];
@@ -488,11 +523,43 @@ export class StudyEngine {
       });
 
       for (const card of generated) {
-        if (!next.has(card.id)) next.set(card.id, card);
+        const current = next.get(card.id);
+        if (!current) {
+          next.set(card.id, card);
+          changed = true;
+          continue;
+        }
+
+        /*
+         * Re-tag a card whose level moved under it.
+         *
+         * Card ids are `entryId:kind`, which is what makes this idempotent —
+         * an entry with review history keeps it. But it also meant a
+         * regenerated card was discarded as a duplicate *including its level
+         * tag*, and the queue filters on exactly that tag. Switch from HSK 3
+         * to HSK 2 and every card still said `hsk3-1` while the queue was
+         * asking for `hsk2-1`, so the app went silently, completely empty:
+         * 27 words in scope, 119 cards in storage, nothing served.
+         *
+         * Only the tag changes. Every scheduling field — stability,
+         * difficulty, due date, reps — is the learner's history and is none of
+         * this function's business.
+         */
+        if (current.levelId !== card.levelId) {
+          next.set(card.id, { ...current, levelId: card.levelId });
+          changed = true;
+        }
       }
     }
 
-    if (next.size !== existing.size) {
+    /*
+     * Keyed on whether anything changed, not on the count.
+     *
+     * The guard used to compare `next.size` against `existing.size`, which is
+     * blind to a card being updated in place — the re-tag above would have
+     * been computed, held in memory, and lost on the next launch.
+     */
+    if (changed) {
       this.cards = [...next.values()];
       await this.persistCards();
     }
@@ -584,7 +651,7 @@ export class StudyEngine {
       profile,
       cards: this.getAllCards(code),
       entries: this.entriesById,
-      done: countTodaysWork(this.logs, now, profile.dayStartHour),
+      done: countTodaysWork(this.logs, now, this.dayStartHour),
       ...(options.sessionLimit !== undefined ? { sessionLimit: options.sessionLimit } : {}),
     });
   }
@@ -632,26 +699,47 @@ export class StudyEngine {
 
   // ---------------------------------------------------------------- stats
 
+  /**
+   * The cards this language's current level is actually about.
+   *
+   * The session queue has always filtered on the levels in scope; coverage and
+   * readiness were computed over every card the language had ever generated,
+   * and the two disagreeing is a bug with a very bad symptom. Switch track and
+   * some card kinds stop being generated — HSK 2 and HSK 3 weight them
+   * differently — so those cards keep the old level's tag and can never be
+   * served again. `entriesKnown` counts an entry only when *all* of its cards
+   * are known, so a single unservable leftover held the whole entry back:
+   * coverage read 0% forever, to somebody who had studied every word in the
+   * level. The cards are kept, because deleting review history to reflect a
+   * settings change would be indefensible — they are simply not this level's
+   * question.
+   */
+  private cardsInScope(code: LanguageCode): Card[] {
+    const scope = new Set(getLevelIdsInScope(this.getProfile(code).targetLevelId));
+    return this.getAllCards(code).filter((card) => scope.has(card.levelId));
+  }
+
   getStats(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()) {
     const profile = this.getProfile(code);
-    const cards = this.getAllCards(code);
+    const cards = this.cardsInScope(code);
     const trackLevels = getExamTrack(profile.examTrackId).levels;
     const level = trackLevels.find((candidate) => candidate.id === profile.targetLevelId);
 
     return {
-      streak: computeStreak(this.logs, now, profile.dayStartHour),
+      streak: computeStreak(this.logs, now, this.dayStartHour),
       retention: computeRetention(this.logs, 30, now),
       // Per skill as well as overall: 88% hides "comfortable recognising a word
       // and losing its tones", which is the part a learner can act on.
       retentionByKind: computeRetentionByKind(this.logs, { windowDays: 30, now }),
       coverage: computeCoverage(cards, level?.vocabularyTarget ?? 0),
-      forecast: forecastReviews(cards, now, 14, profile.dayStartHour),
-      today: countTodaysWork(this.logs, now, profile.dayStartHour),
+      forecast: forecastReviews(cards, now, 14, this.dayStartHour),
+      today: countTodaysWork(this.logs, now, this.dayStartHour),
     };
   }
 
   getReadiness(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): ExamReadiness {
-    return computeExamReadiness(this.getAllCards(code), this.getProfile(code), now);
+    // Scoped for the same reason as the stats: readiness is about this level.
+    return computeExamReadiness(this.cardsInScope(code), this.getProfile(code), now);
   }
 
   /**
@@ -667,7 +755,7 @@ export class StudyEngine {
     const profile = this.getProfile(code);
     return getDailyGoal({
       breakdown: this.getQueue({ code, now }).breakdown,
-      done: countTodaysWork(this.logs, now, profile.dayStartHour),
+      done: countTodaysWork(this.logs, now, this.dayStartHour),
     });
   }
 
@@ -755,7 +843,7 @@ export class StudyEngine {
 
     const card = this.cards[index]!;
     const profile = this.getProfile(card.languageCode);
-    const buriedUntil = until ?? endOfStudyDay(this.now(), profile.dayStartHour);
+    const buriedUntil = until ?? endOfStudyDay(this.now(), this.dayStartHour);
 
     this.cards[index] = { ...card, buriedUntil };
     await this.persistCards();
@@ -857,7 +945,7 @@ export class StudyEngine {
       now,
       ...(options.days !== undefined ? { days: options.days } : {}),
       ...(options.recentLimit !== undefined ? { recentLimit: options.recentLimit } : {}),
-      dayStartHour: profile?.dayStartHour ?? 4,
+      dayStartHour: this.dayStartHour,
     });
   }
 
@@ -1001,13 +1089,50 @@ export class StudyEngine {
    * right move — see `AccountState` on why this is last-writer-wins.
    */
   async importState(values: Record<string, string>): Promise<void> {
+    /*
+     * The account's own preferences are not the blob's to decide.
+     *
+     * Appearance, backdrop and the hour the day starts have their own
+     * endpoints now, and the blob carries a copy of them because they sit in
+     * the same `meta` key as the deck's bookkeeping. Letting that copy win
+     * means two carriers for one value and the later arrival deciding, which
+     * is how choosing dark on one device gets undone by a sync from another
+     * that has not heard yet.
+     *
+     * Found by disabling the settings reconciliation and watching a browser
+     * still turn dark: the blob was quietly doing the job, so the test could
+     * not tell a working reconciliation from a broken one.
+     *
+     * Held across the import and put back. Kept in the blob on the way out,
+     * because an older build reading it still expects them to be there.
+     */
+    const preserved = {
+      appearance: this.meta.appearance,
+      backdrop: this.meta.backdrop,
+      dayStartHour: this.meta.dayStartHour,
+    };
+
     for (const key of SYNCED_STORAGE_KEYS) {
       const value = values[key];
       if (value === undefined) await this.options.store.remove(key);
       else await this.options.store.set(key, value);
     }
 
-    this.meta = await readJson<EngineMeta>(this.options.store, STORAGE_KEYS.meta, this.meta);
+    // Migrated here as well as on load: this is a blob from another device,
+    // which may be running a build that still kept the hour on each profile.
+    const incoming = migrateMeta(
+      await readJson<EngineMeta>(this.options.store, STORAGE_KEYS.meta, this.meta),
+    );
+    this.meta = {
+      ...incoming,
+      // `undefined` means "never chosen here", which must not overwrite a
+      // value the blob does carry — a device that has only ever used the
+      // defaults should take the account's choice, not impose its silence.
+      appearance: preserved.appearance ?? incoming.appearance,
+      backdrop: preserved.backdrop ?? incoming.backdrop,
+      dayStartHour: preserved.dayStartHour ?? incoming.dayStartHour,
+    };
+    await writeJson(this.options.store, STORAGE_KEYS.meta, this.meta);
     this.cards = await readJson<Card[]>(this.options.store, STORAGE_KEYS.cards, []);
     this.logs = await readJson<import('./types/review').ReviewLog[]>(this.options.store, STORAGE_KEYS.logs, []);
     this.importedEntries = await readJson<LexicalEntry[]>(this.options.store, STORAGE_KEYS.entries, []);
@@ -1039,7 +1164,7 @@ export class StudyEngine {
       now,
       profile,
       queue,
-      streak: computeStreak(this.logs, now, profile.dayStartHour),
+      streak: computeStreak(this.logs, now, this.dayStartHour),
       readiness: this.getReadiness(code, now),
       ...(queue.cards.length === 0
         ? { spotlight: pickSpotlight(this.getAllCards(code), this.entriesById, now) }
@@ -1055,7 +1180,7 @@ export class StudyEngine {
       now,
       profile,
       queue: this.getQueue({ code, now }),
-      streak: computeStreak(this.logs, now, profile.dayStartHour),
+      streak: computeStreak(this.logs, now, this.dayStartHour),
       readiness: this.getReadiness(code, now),
       // Recompute the queue at each future instant so a timeline entry three
       // hours out shows the counts that will actually be true then.

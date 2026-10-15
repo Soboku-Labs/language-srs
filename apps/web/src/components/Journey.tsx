@@ -68,7 +68,7 @@ export function RankBand({ journey, onClick }: { journey: Journey; onClick?: () 
         <span className="track rank__track">
           <span
             className="track__fill"
-            style={{ width: `${Math.max(2, Math.round(journey.progress * 100))}%` }}
+            style={{ ['--fill' as string]: Math.max(0.02, journey.progress) }}
           />
         </span>
       </span>

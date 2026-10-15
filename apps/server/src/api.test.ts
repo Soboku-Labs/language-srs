@@ -569,3 +569,141 @@ describe('the HTTP surface itself', () => {
     expect(body.ok).toBe(true);
   });
 });
+
+describe('settings, kept apart from the state blob', () => {
+  it('answers with defaults before anybody has chosen anything', async () => {
+    const harness = start();
+    const account = await withAccount(harness);
+
+    const { status, body } = await harness.call('GET', '/settings', { token: account.token });
+
+    expect(status).toBe(200);
+    // Never a 404: an account that has set nothing still has settings.
+    expect(body).toMatchObject({ appearance: 'system', backdrop: 'calm', dayStartHour: 4 });
+  });
+
+  it('stores what it is sent, and leaves the rest alone', async () => {
+    const harness = start();
+    const account = await withAccount(harness);
+
+    await harness.call('PUT', '/settings', { token: account.token, body: { appearance: 'dark' } });
+    const { body } = await harness.call('PUT', '/settings', {
+      token: account.token,
+      body: { backdrop: 'living' },
+    });
+
+    // A patch is a patch: setting the backdrop must not reset the appearance.
+    expect(body).toMatchObject({ appearance: 'dark', backdrop: 'living', dayStartHour: 4 });
+  });
+
+  it('clamps rather than refusing, so one bad field cannot brick the screen', async () => {
+    const harness = start();
+    const account = await withAccount(harness);
+
+    const { status, body } = await harness.call('PUT', '/settings', {
+      token: account.token,
+      body: { dayStartHour: 99, appearance: 'neon' },
+    });
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ dayStartHour: 23, appearance: 'system' });
+  });
+
+  it('gives a language its own settings, defaulted from that language', async () => {
+    const harness = start();
+    const account = await withAccount(harness);
+
+    const { status, body } = await harness.call('GET', '/settings/languages/ja', {
+      token: account.token,
+    });
+
+    expect(status).toBe(200);
+    // Not HSK: the track comes from the language rather than from a constant.
+    expect(body).toMatchObject({ languageCode: 'ja', examTrackId: 'jlpt' });
+  });
+
+  it('keeps one language out of another', async () => {
+    const harness = start();
+    const account = await withAccount(harness);
+
+    const mandarin = await harness.call('PUT', '/settings/languages/zh', {
+      token: account.token,
+      body: { dailyNewLimit: 25, examDate: '2026-06-01' },
+    });
+    const japanese = await harness.call('GET', '/settings/languages/ja', { token: account.token });
+
+    // Asserted so the test cannot pass by the write silently failing: if the
+    // PUT 404'd, Japanese would still be at its defaults and the real check
+    // below would look satisfied.
+    expect(mandarin.status).toBe(200);
+    expect(mandarin.body).toMatchObject({ dailyNewLimit: 25, examDate: '2026-06-01' });
+
+    // This is the whole point of the split: an exam booked for Mandarin is not
+    // an exam booked for Japanese.
+    expect(japanese.body).toMatchObject({ dailyNewLimit: 15 });
+    expect((japanese.body as { examDate?: string }).examDate).toBeUndefined();
+  });
+
+  it('lists only the languages that have been set', async () => {
+    const harness = start();
+    const account = await withAccount(harness);
+
+    await harness.call('PUT', '/settings/languages/ko', {
+      token: account.token,
+      body: { dailyReviewLimit: 60 },
+    });
+    const { body } = await harness.call('GET', '/settings/languages', { token: account.token });
+
+    const languages = (body as { languages: { languageCode: string }[] }).languages;
+    expect(languages.map((entry) => entry.languageCode)).toEqual(['ko']);
+  });
+
+  it('404s a language the app does not teach', async () => {
+    const harness = start();
+    const account = await withAccount(harness);
+
+    const { status } = await harness.call('GET', '/settings/languages/xx', {
+      token: account.token,
+    });
+
+    // Not a 400: the code is part of the path, so an unknown one means the
+    // resource is not there.
+    expect(status).toBe(404);
+  });
+
+  it('keeps one account out of another account\u2019s settings', async () => {
+    const harness = start();
+    const mine = await withAccount(harness, 'mine@example.com');
+    const theirs = await withAccount(harness, 'theirs@example.com');
+
+    const written = await harness.call('PUT', '/settings', {
+      token: mine.token,
+      body: { appearance: 'dark' },
+    });
+    const { body } = await harness.call('GET', '/settings', { token: theirs.token });
+
+    // Again: assert the write landed, or a broken PUT would make the isolation
+    // check pass for the wrong reason.
+    expect(written.body).toMatchObject({ appearance: 'dark' });
+    expect(body).toMatchObject({ appearance: 'system' });
+  });
+
+  it('needs a token', async () => {
+    const harness = start();
+    const { status } = await harness.call('GET', '/settings');
+    expect(status).toBe(401);
+  });
+
+  it('does not touch the state blob', async () => {
+    const harness = start();
+    const account = await withAccount(harness);
+
+    await harness.call('PUT', '/settings', { token: account.token, body: { appearance: 'dark' } });
+    const { body } = await harness.call('GET', '/state', { token: account.token });
+
+    // Settings live beside the deck, not inside it. If changing a preference
+    // moved the state revision, every settings change would make every other
+    // device's next push conflict.
+    expect(body).toMatchObject({ revision: 0, values: {} });
+  });
+});

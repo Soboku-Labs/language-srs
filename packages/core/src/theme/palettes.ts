@@ -329,3 +329,31 @@ export function getToneColor(theme: LanguageTheme, tone: number): string {
   if (palette.length === 0) return theme.colors.text;
   return palette[(tone - 1) % palette.length] ?? theme.colors.textMuted;
 }
+
+/**
+ * The product's own colour, as distinct from any language's ink.
+ *
+ * Every palette above belongs to a language — Cinnabar is Mandarin, Celadon is
+ * Korean — and switching language changes them. The wordmark, the gate and the
+ * icons must not change, because they are what stays the same across all four;
+ * a logo that is red in Mandarin and green in Korean is not a logo.
+ *
+ * A warm orange: the colour of the lacquer on a gate, which is what 門 is and
+ * what the front page is built around. It sits beside all four inks without
+ * being mistaken for any of them — the nearest is Cinnabar, and Cinnabar is a
+ * cooler, bluer red.
+ *
+ * Both values are chosen against the grounds they sit on rather than one being
+ * lightened from the other: 4.7:1 on paper and 7:1 on slate, so the wordmark is
+ * readable text in either theme rather than decoration that happens to be
+ * legible in one. Asserted in `palettes.test.ts`.
+ */
+export const BRAND = {
+  /** On the paper ground. */
+  orange: '#B8521F',
+  /** On the slate ground. */
+  orangeDark: '#E8864F',
+  /** A pale wash, for a tinted bar or a hover. */
+  orangeSoft: '#FAEFE8',
+  orangeSoftDark: '#2A1A11',
+} as const;

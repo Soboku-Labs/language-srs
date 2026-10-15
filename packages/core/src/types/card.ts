@@ -142,10 +142,24 @@ export interface StudyProfile {
    */
   enabledCardKinds?: CardKind[];
   /**
-   * Hour at which the study day rolls over, 0-23. Four in the morning by
-   * default, so a late-night session counts towards the day it started in.
+   * @deprecated Moved to the account. Read `StudyEngine.dayStartHour` instead.
+   *
+   * One person had as many study days as they had languages, so a 2am sitting
+   * counted towards different dates depending on which language it was in. The
+   * field stays so an older build reading the same synced blob still finds it,
+   * and `migrateMeta` carries any value that was set here up to the account.
    */
   dayStartHour: number;
+  /**
+   * When the learner said what they wanted from this language.
+   *
+   * Absent means they have not been asked yet. The engine creates a profile
+   * the moment a language is touched — it needs something to schedule against
+   * — so the existence of a profile says nothing about whether anybody chose
+   * anything, and the app was treating the two as the same thing. This is the
+   * difference: a default the app picked, or an answer somebody gave.
+   */
+  setUpAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

@@ -3,6 +3,7 @@ import {
   LANGUAGE_CODES,
   getCulture,
   getLanguageProfile,
+  canUse,
   getTeacher,
   type Appearance,
   type Backdrop,
@@ -10,9 +11,14 @@ import {
 } from '@language-srs/core';
 import { Scene } from '../components/Scene';
 import { TeacherAvatar } from '../components/Teacher';
+import { Maker } from '../components/Maker';
+import { Wordmark } from '../components/Logo';
 import { useAuth, useEngine } from '../providers';
 import { useRouter } from '../router';
+import { useSettings } from '../settings';
 import { useTheme } from '../theme';
+import { useTravel } from '../travel';
+import { useAccess } from '../components/Locked';
 import { Caption, Rise, Screen, Segmented } from '../ui';
 
 /**
@@ -61,15 +67,16 @@ const FAQ = [
 ];
 
 export function Landing() {
-  const { engine, revision, setActiveLanguage, mutate } = useEngine();
+  const { engine, revision, setActiveLanguage } = useEngine();
+  const { appearance, backdrop, setAppearance, setBackdrop } = useSettings();
   const { account, isSignedIn } = useAuth();
   const { navigate } = useRouter();
   const { colorsFor } = useTheme();
+  const { tier } = useAccess();
 
   /** The window being looked into, which widens to take more of the row. */
   const [open, setOpen] = useState<LanguageCode | undefined>();
-  /** Set while the scene expands, so the page does not flicker mid-travel. */
-  const [travelling, setTravelling] = useState<LanguageCode | undefined>();
+  const { to: travelling, travel } = useTravel();
 
   const state = useMemo(() => {
     // Started means *reviewed*. The engine creates a Mandarin profile on first
@@ -92,15 +99,40 @@ export function Landing() {
   /*
    * Going in.
    *
-   * The scene expands to fill the screen before the route changes, so arriving
-   * at the day reads as having walked through the window rather than as a page
-   * swap that happens to share a colour.
+   * The window expands while a wash in the language's own colour closes over
+   * it, the route changes underneath, and the wash lifts on the other side.
+   * The timing and the veil live in `travel.tsx`, because the veil has to
+   * outlive this screen — the swap it exists to hide is this screen being
+   * unmounted.
+   *
+   * Where it lands depends on whether anybody has ever said what they want
+   * from this language. A profile exists from the moment a language is
+   * touched, so its existence proves nothing; `setUpAt` is the answer, and
+   * having reviewed cards counts too — somebody mid-deck should not be
+   * stopped and asked to set up the thing they are already doing.
    */
   const enter = (code: LanguageCode) => {
-    setTravelling(code);
-    window.setTimeout(() => {
-      void setActiveLanguage(code).then(() => navigate('/home'));
-    }, 320);
+    /*
+     * A second language sends you to the account, not into a dead end.
+     *
+     * The window carries a "Free account" badge before it is pressed, so this
+     * is not a surprise — and going to the sign-in page rather than refusing
+     * in place means the next thing on screen is the thing that unblocks it.
+     */
+    if (!canUse('multipleLanguages', tier) && state.started.size > 0 && !state.started.has(code)) {
+      navigate('/sign-in');
+      return;
+    }
+
+    const asked =
+      engine.hasProfile(code) &&
+      (Boolean(engine.getProfile(code).setUpAt) ||
+        engine.getAllCards(code).some((card) => card.reps > 0));
+
+    travel(code, async () => {
+      await setActiveLanguage(code);
+      navigate(asked ? '/home' : '/start');
+    });
   };
 
   return (
@@ -108,7 +140,7 @@ export function Landing() {
       <Rise index={0}>
         <header className="topbar">
           <div className="topbar__brand">
-            <span className="wordmark">mon</span>
+            <Wordmark />
             <span className="topbar__line">
               Exam-shaped review for Mandarin, Japanese, Korean and Vietnamese.
             </span>
@@ -131,10 +163,8 @@ export function Landing() {
                 { value: 'dark', label: 'Dark' },
                 { value: 'system', label: 'Auto' },
               ]}
-              value={engine.appearance}
-              onChange={(value) =>
-                void mutate((instance) => instance.setAppearance(value as Appearance))
-              }
+              value={appearance}
+              onChange={(value) => void setAppearance(value as Appearance)}
             />
             <Segmented
               label="Background"
@@ -142,10 +172,8 @@ export function Landing() {
                 { value: 'calm', label: 'Calm' },
                 { value: 'living', label: 'Living' },
               ]}
-              value={engine.backdrop}
-              onChange={(value) =>
-                void mutate((instance) => instance.setBackdrop(value as Backdrop))
-              }
+              value={backdrop}
+              onChange={(value) => void setBackdrop(value as Backdrop)}
             />
             <button
               type="button"
@@ -178,6 +206,15 @@ export function Landing() {
           const culture = getCulture(code);
           const teacher = getTeacher(code);
           const started = state.started.has(code);
+          /*
+           * Reached, not hit.
+           *
+           * A second language needs an account, and the honest place to say
+           * so is on the door before anything is chosen — not after somebody
+           * has walked in, set up an exam and started a deck. The badge is
+           * small and the window still opens; what it opens onto explains.
+           */
+          const needsAccount = !canUse('multipleLanguages', tier) && state.started.size > 0 && !started;
 
           return (
             <button
@@ -221,6 +258,9 @@ export function Landing() {
                 </span>
 
                 {started ? <span className="window__badge">Started</span> : null}
+                {needsAccount ? (
+                  <span className="window__badge window__badge--locked">Free account</span>
+                ) : null}
               </span>
             </button>
           );
@@ -242,6 +282,16 @@ export function Landing() {
           Your cards, history and schedule stay on this device unless you sign in, in which case they
           are kept in step across the devices you use and nowhere else.
         </Caption>
+
+        {/*
+          Below the argument, because somebody who has read this far is the
+          one person on this page who might want to know what is coming.
+        */}
+        <button type="button" className="below__link" onClick={() => navigate('/upcoming')}>
+          What&rsquo;s coming next
+        </button>
+
+        <Maker />
       </section>
     </Screen>
   );

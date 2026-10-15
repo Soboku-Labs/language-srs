@@ -239,7 +239,7 @@ function CardRow({ card, now }: { card: Card; now: string }) {
           <span
             className="track__fill"
             style={{
-              width: `${Math.max(2, Math.round(recall * 100))}%`,
+              ['--fill' as string]: Math.max(0.02, recall),
               ...(card.suspended ? { background: 'var(--ink-faint)' } : {}),
             }}
           />

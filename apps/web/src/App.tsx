@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { useEngine, AuthProvider, EngineProvider } from './providers';
 import { SyncProvider } from './sync';
+import { SettingsProvider, useSettings } from './settings';
+import { TravelProvider } from './travel';
 import { RouterProvider, matchPath, useRouter } from './router';
 import { ThemeProvider } from './theme';
 import { Dashboard } from './screens/Dashboard';
@@ -15,6 +17,8 @@ import { Learn } from './screens/Learn';
 import { Practice } from './screens/Practice';
 import { GrammarPoint } from './screens/GrammarPoint';
 import { SignIn } from './screens/SignIn';
+import { Start } from './screens/Start';
+import { Roadmap } from './screens/Roadmap';
 import { StorageWarning } from './components/StorageWarning';
 import { Caption, Screen, TextButton, Title } from './ui';
 
@@ -23,8 +27,9 @@ import { Caption, Screen, TextButton, Title } from './ui';
  *
  * Auth wraps the engine, because which account you are decides which slice of
  * storage the engine reads. Sync sits inside both — it needs an account and an
- * engine and renders neither. Theme is innermost because it follows the active
- * language, which is engine state.
+ * engine and renders neither. Settings sits inside those because it reconciles
+ * the engine's values against the server's. Theme is innermost because it
+ * follows the active language and the appearance, which are both settings.
  */
 export function App() {
   return (
@@ -32,7 +37,9 @@ export function App() {
       <AuthProvider>
         <EngineProvider>
           <SyncProvider>
-            <Themed />
+            <SettingsProvider>
+              <Themed />
+            </SettingsProvider>
           </SyncProvider>
         </EngineProvider>
       </AuthProvider>
@@ -42,9 +49,8 @@ export function App() {
 
 function Themed() {
   const { engine, revision } = useEngine();
+  const { appearance, backdrop } = useSettings();
   const language = useMemo(() => engine.activeLanguage, [engine, revision]);
-  const backdrop = useMemo(() => engine.backdrop, [engine, revision]);
-  const appearance = useMemo(() => engine.appearance, [engine, revision]);
 
   /*
    * On the document, not on a component.
@@ -60,7 +66,12 @@ function Themed() {
 
   return (
     <ThemeProvider languageCode={language} appearance={appearance}>
-      <Chrome />
+      {/* Inside the theme, because the veil is painted in the destination
+          language's colours; above the routes, because it has to still be
+          there while they swap. */}
+      <TravelProvider>
+        <Chrome />
+      </TravelProvider>
     </ThemeProvider>
   );
 }
@@ -76,15 +87,25 @@ function Themed() {
  * progress bar and a way out — and a title bar above it would be a second
  * header competing with the card for the only thing that should be looked at.
  */
-const TITLES: { pattern: string; title: string }[] = [
-  { pattern: '/learn', title: 'Grammar' },
-  { pattern: '/learn/:id', title: 'Grammar' },
-  { pattern: '/words', title: 'Words' },
-  { pattern: '/word/:id', title: 'Word' },
-  { pattern: '/stats', title: 'Progress' },
-  { pattern: '/settings', title: 'Settings' },
-  { pattern: '/account', title: 'Account' },
-  { pattern: '/import', title: 'Add words' },
+/** Matches the `<title>` and description in index.html, for the door. */
+const DOOR_TITLE = 'Mon \u2014 exam-aligned review for HSK, JLPT, TOPIK';
+const DOOR_DESCRIPTION =
+  'Spaced repetition built around your exam date. Mandarin, Japanese, Korean and Vietnamese, scheduled so nothing lands after the paper. Free, works offline.';
+
+const TITLES: { pattern: string; title: string; description?: string }[] = [
+  { pattern: '/learn', title: 'Grammar', description: 'Grammar points read first, then practised four ways.' },
+  { pattern: '/learn/:id', title: 'Grammar', description: 'A grammar point, with its pattern, examples and the pitfall.' },
+  { pattern: '/words', title: 'Words', description: 'Every word in your deck, and how well each one is holding.' },
+  { pattern: '/word/:id', title: 'Word', description: 'One word: its reading, its meanings and your own notes.' },
+  { pattern: '/stats', title: 'Progress', description: 'Retention per skill, your streak and how ready you are for the paper.' },
+  { pattern: '/settings', title: 'Settings', description: 'Exam, level, daily amounts and how the app looks.' },
+  {
+    pattern: '/upcoming',
+    title: 'Upcoming',
+    description: 'What is being built next for Mon, in the order it is being built.',
+  },
+  { pattern: '/account', title: 'Account', description: 'Carry your deck and its schedule between devices.' },
+  { pattern: '/import', title: 'Add words', description: 'Bring your own word list in, or back yours up.' },
 ];
 
 function Chrome() {
@@ -101,8 +122,25 @@ function Chrome() {
    * it, so it is reached from the door rather than standing in front of it.
    */
 
+  /*
+   * Title and description, kept in step with the route.
+   *
+   * The description matters because this is one HTML document serving every
+   * path: without updating it, a link shared from /upcoming carries the front
+   * page's description, and every page a crawler reaches claims to be the
+   * same page. The title on the door is the full one rather than the bare
+   * brand — "Mon" alone tells somebody scanning a list of tabs or results
+   * nothing.
+   */
   useEffect(() => {
-    document.title = titled ? `${titled.title} · Mon` : 'Mon';
+    document.title = titled ? `${titled.title} · Mon` : DOOR_TITLE;
+
+    const description = titled?.description ?? DOOR_DESCRIPTION;
+    document.querySelector('meta[name="description"]')?.setAttribute('content', description);
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', description);
+    document
+      .querySelector('meta[property="og:title"]')
+      ?.setAttribute('content', titled ? `${titled.title} · Mon` : DOOR_TITLE);
   }, [titled]);
 
   return (
@@ -139,11 +177,14 @@ function Routes() {
   if (path === '/' || path === '') return <Landing />;
   if (path === '/home') return <Dashboard />;
   if (path === '/review') return <Review />;
+  // Asked once per language, before the first session rather than after it.
+  if (path === '/start') return <Start />;
 
   if (path === '/learn') return <Learn />;
   if (path === '/words') return <Words />;
   if (path === '/stats') return <Stats />;
   if (path === '/settings') return <Settings />;
+  if (path === '/upcoming') return <Roadmap />;
   if (path === '/import') return <Import />;
 
   // The picker is the door now. Kept so a bookmark from the old structure

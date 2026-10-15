@@ -4,8 +4,11 @@ import type {
   AuthErrorCode,
   AuthResult,
   AuthSessionInfo,
+  LanguageSettings,
+  LanguageSettingsPatch,
   PublicUser,
   StudySessionRecord,
+  UserSettings,
   VocabularyLevel,
   VocabularyManifest,
 } from '@language-srs/core';
@@ -146,6 +149,46 @@ export class ApiClient {
 
   pushStudySessions(token: string, sessions: StudySessionRecord[]): Promise<{ sessions: StudySessionRecord[] }> {
     return this.request('POST', '/study-sessions', { token, body: { sessions } });
+  }
+
+  // ---------------------------------------------------------------- settings
+  //
+  // Separate from `/state` on purpose. State is an opaque blob behind a
+  // revision check: two devices writing it race, and the loser reconciles. A
+  // preference is not like that — nobody wants "your dark mode conflicted" —
+  // so these are plain last-write-wins reads and writes the server can read
+  // the contents of, and changing one does not bump the state revision and
+  // make the next deck push conflict.
+
+  getUserSettings(token: string): Promise<UserSettings> {
+    return this.request('GET', '/settings', { token });
+  }
+
+  /** A patch: absent fields keep their current value. */
+  putUserSettings(token: string, patch: Partial<UserSettings>): Promise<UserSettings> {
+    return this.request('PUT', '/settings', { token, body: patch });
+  }
+
+  /** Only the languages this account has actually set something for. */
+  listLanguageSettings(token: string): Promise<{ languages: LanguageSettings[] }> {
+    return this.request('GET', '/settings/languages', { token });
+  }
+
+  /** The stored settings for a language, or the defaults it would start at. */
+  getLanguageSettings(token: string, code: string): Promise<LanguageSettings> {
+    return this.request('GET', `/settings/languages/${encodeURIComponent(code)}`, { token });
+  }
+
+  /** `examDate: null` cancels a booked exam; leaving it out keeps it. */
+  putLanguageSettings(
+    token: string,
+    code: string,
+    patch: LanguageSettingsPatch,
+  ): Promise<LanguageSettings> {
+    return this.request('PUT', `/settings/languages/${encodeURIComponent(code)}`, {
+      token,
+      body: patch,
+    });
   }
 
   // ---------------------------------------------------------------- vocabulary

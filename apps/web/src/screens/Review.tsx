@@ -22,6 +22,9 @@ import { useEngine } from '../providers';
 import { useRouter } from '../router';
 import { BigButton, Caption, Rise, Row, Screen, TextButton, Title, ToneText } from '../ui';
 import { useTheme } from '../theme';
+import { useCoarsePointer } from '../pointer';
+import { Handwriting } from '../components/Handwriting';
+import { usesCharacterWriting } from '@language-srs/core';
 
 /**
  * The review session.
@@ -75,6 +78,8 @@ export function Review() {
   const forcedReveal = query.get('reveal') === '1';
 
   const [revealed, setRevealed] = useState(forcedReveal);
+  /** Handwriting needs a finger; see the queue below and `Handwriting.tsx`. */
+  const coarsePointer = useCoarsePointer();
   const [attempt, setAttempt] = useState<AnswerAttempt | undefined>();
   const [chosenId, setChosenId] = useState<string | undefined>();
   const [session, setSession] = useState({ reviewed: 0, recalled: 0 });
@@ -97,7 +102,31 @@ export function Review() {
    * card it names rather than by filtering the queue, because filtering is not
    * something this `buildStudyQueue` does.
    */
-  const queue = useMemo(() => engine.getQueue(), [engine, revision]);
+  const queue = useMemo(() => {
+    const built = engine.getQueue();
+    if (coarsePointer) return built;
+
+    /*
+     * Handwriting cards need a finger, so they are held back on a mouse.
+     *
+     * Decided here, where the card is served, rather than in the deck. The
+     * deck is the same on every device — a card is not deleted because
+     * somebody opened the app on a laptop — so these simply wait for the next
+     * session on a phone. Writing a character with a mouse practises mouse
+     * control, not handwriting.
+     *
+     * Only for scripts with characters to draw. A Vietnamese `writing` card is
+     * composition rather than strokes, and needs a keyboard rather than a
+     * finger, so it stays in the queue everywhere.
+     */
+    return {
+      ...built,
+      cards: built.cards.filter(
+        (pair) =>
+          pair.card.kind !== 'writing' || !usesCharacterWriting(pair.entry.languageCode),
+      ),
+    };
+  }, [engine, revision, coarsePointer]);
 
   const current: CardWithEntry | undefined = useMemo(() => {
     if (pinnedCard) {
@@ -391,7 +420,7 @@ export function Review() {
         <div className="track">
           <div
             className="track__fill"
-            style={{ width: `${total > 0 ? (session.reviewed / total) * 100 : 0}%` }}
+            style={{ ['--fill' as string]: total > 0 ? session.reviewed / total : 0 }}
           />
         </div>
       </div>
@@ -716,6 +745,26 @@ function CardFront({ pair, revealed }: { pair: CardWithEntry; revealed: boolean 
         <div className="front__stack">
           <span className="prompt-gloss">{entry.meanings.join(', ')}</span>
           <Caption>{entry.reading}</Caption>
+          {/*
+            Only served on a touchscreen, so the pad is always drawable here.
+            `reveal` is withheld until the answer is shown, or the character
+            could be traced rather than recalled.
+          */}
+          {/*
+            Only where the script has characters to recall stroke by stroke.
+
+            The Vietnamese framework weights `writing` from level 3, but
+            Vietnamese is written in a Latin alphabet — there "writing" means
+            composition, and a character pad would be asking somebody to
+            finger-paint a word they can already spell. `usesCharacterWriting`
+            is the same test the setup screen uses.
+          */}
+          {usesCharacterWriting(entry.languageCode) ? (
+            <Handwriting
+              label={`Write ${entry.meanings[0] ?? 'the character'}`}
+              {...(revealed ? { reveal: entry.target } : {})}
+            />
+          ) : null}
         </div>
       );
 

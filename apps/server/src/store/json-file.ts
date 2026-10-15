@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { AccountState, StudySessionRecord } from '@language-srs/core';
+import type { AccountState, LanguageSettings, UserSettings, StudySessionRecord } from '@language-srs/core';
 import type { ServerStore, SessionRecord, UserRecord } from './types.ts';
 
 interface FileShape {
@@ -9,9 +9,21 @@ interface FileShape {
   sessions: SessionRecord[];
   state: Record<string, AccountState>;
   studySessions: Record<string, StudySessionRecord[]>;
+  /** Keyed by user id. */
+  userSettings: Record<string, UserSettings>;
+  /** Keyed by `${userId}:${languageCode}`. */
+  languageSettings: Record<string, LanguageSettings>;
 }
 
-const EMPTY: FileShape = { version: 1, users: [], sessions: [], state: {}, studySessions: {} };
+const EMPTY: FileShape = {
+  version: 1,
+  users: [],
+  sessions: [],
+  state: {},
+  studySessions: {},
+  userSettings: {},
+  languageSettings: {},
+};
 
 /**
  * Persistence for a single-process deployment.
@@ -49,6 +61,8 @@ export class JsonFileServerStore implements ServerStore {
     try {
       const raw = await readFile(path, 'utf8');
       const parsed = JSON.parse(raw) as Partial<FileShape>;
+      // EMPTY first, so a file written before settings existed gains the two
+      // new maps rather than arriving with them undefined.
       store.data = { ...structuredClone(EMPTY), ...parsed };
     } catch (error) {
       // A missing file is a first run. Anything else — a truncated or corrupt
@@ -163,6 +177,32 @@ export class JsonFileServerStore implements ServerStore {
 
   async putStudySessions(userId: string, records: StudySessionRecord[]): Promise<void> {
     this.data.studySessions[userId] = records.map((record) => ({ ...record }));
+    await this.flush();
+  }
+
+  async getUserSettings(userId: string): Promise<UserSettings | undefined> {
+    const found = this.data.userSettings[userId];
+    return found ? structuredClone(found) : undefined;
+  }
+
+  async putUserSettings(userId: string, settings: UserSettings): Promise<void> {
+    this.data.userSettings[userId] = structuredClone(settings);
+    await this.flush();
+  }
+
+  async listLanguageSettings(userId: string): Promise<LanguageSettings[]> {
+    return Object.entries(this.data.languageSettings)
+      .filter(([key]) => key.startsWith(`${userId}:`))
+      .map(([, value]) => structuredClone(value));
+  }
+
+  async getLanguageSettings(userId: string, code: string): Promise<LanguageSettings | undefined> {
+    const found = this.data.languageSettings[`${userId}:${code}`];
+    return found ? structuredClone(found) : undefined;
+  }
+
+  async putLanguageSettings(userId: string, settings: LanguageSettings): Promise<void> {
+    this.data.languageSettings[`${userId}:${settings.languageCode}`] = structuredClone(settings);
     await this.flush();
   }
 }

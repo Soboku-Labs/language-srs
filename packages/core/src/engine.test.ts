@@ -850,3 +850,209 @@ describe('how alive the background is', () => {
     expect(engine.backdrop).toBe('calm');
   });
 });
+
+/**
+ * One study day, for the whole account.
+ *
+ * This moved off the per-language profile, where one person could end up with
+ * two different study days — a 2am sitting counting towards different dates
+ * depending on which language it happened to be in.
+ */
+describe('when the study day rolls over', () => {
+  it('defaults to four in the morning', async () => {
+    const { engine } = await makeEngine();
+    expect(engine.dayStartHour).toBe(4);
+  });
+
+  it('is one value for every language', async () => {
+    const { engine } = await makeEngine();
+    await engine.setDayStartHour(2);
+
+    await engine.setActiveLanguage('ja');
+    // Not a per-language question any more: switching language must not change
+    // when today started.
+    expect(engine.dayStartHour).toBe(2);
+  });
+
+  it('survives a restart', async () => {
+    const { engine, store } = await makeEngine();
+    await engine.setDayStartHour(7);
+
+    const reopened = await StudyEngine.create({
+      store,
+      seedEntries: SEED_ENTRIES,
+      clock: fixedClock(NOW),
+    });
+    expect(reopened.dayStartHour).toBe(7);
+  });
+
+  it('clamps an hour that is not one', async () => {
+    const { engine } = await makeEngine();
+    await engine.setDayStartHour(42);
+    expect(engine.dayStartHour).toBe(23);
+    await engine.setDayStartHour(-3);
+    expect(engine.dayStartHour).toBe(0);
+  });
+
+  /**
+   * The behaviour the setting exists for.
+   *
+   * Study at 02:00, then look at the app at 10:00 the same morning. With the
+   * day starting at four, the sitting belongs to yesterday and today is empty
+   * — which is the point: finishing at 2am should not mean the next evening
+   * already counts as a second day's work. Move the boundary to midnight and
+   * the same sitting becomes part of today.
+   *
+   * Asserted through the counts rather than on the hour itself, because the
+   * hour is only worth storing if it moves the boundary.
+   */
+  it('decides which day a small-hours sitting counts towards', async () => {
+    const { engine } = await makeEngine('2026-03-02T02:00:00.000Z');
+    const card = engine.getQueue().cards[0]!.card;
+    await engine.grade(card.id, 3);
+
+    const laterThatMorning = '2026-03-02T10:00:00.000Z';
+    const worked = (stats: ReturnType<StudyEngine['getStats']>) =>
+      stats.today.newCards + stats.today.reviews;
+
+    // 02:00 is still the 1st; 10:00 is the 2nd. Different study days.
+    expect(worked(engine.getStats('zh', laterThatMorning))).toBe(0);
+
+    await engine.setDayStartHour(0);
+    // Now both are the 2nd, so the sitting is today's.
+    expect(worked(engine.getStats('zh', laterThatMorning))).toBe(1);
+  });
+
+  /**
+   * An account that set this before the move must not lose it.
+   *
+   * Without the migration their study day silently returns to four, which
+   * breaks a streak for a reason they cannot see.
+   */
+  it('carries an hour up from an old per-language profile', async () => {
+    const store = new MemoryStore();
+    const profile: StudyProfile = {
+      ...DEFAULT_STUDY_PROFILE,
+      languageCode: 'zh',
+      examTrackId: 'hsk3',
+      targetLevelId: 'hsk3-1',
+      dayStartHour: 2,
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    await store.set(
+      STORAGE_KEYS.meta,
+      JSON.stringify({
+        version: 1,
+        activeLanguage: 'zh',
+        profiles: { zh: profile },
+        schedulerConfig: {},
+      }),
+    );
+
+    const engine = await StudyEngine.create({
+      store,
+      seedEntries: SEED_ENTRIES,
+      clock: fixedClock(NOW),
+    });
+    expect(engine.dayStartHour).toBe(2);
+  });
+
+  it('leaves a default-hour profile at the default', async () => {
+    const store = new MemoryStore();
+    await store.set(
+      STORAGE_KEYS.meta,
+      JSON.stringify({
+        version: 1,
+        activeLanguage: 'zh',
+        profiles: {
+          zh: {
+            ...DEFAULT_STUDY_PROFILE,
+            languageCode: 'zh',
+            examTrackId: 'hsk3',
+            targetLevelId: 'hsk3-1',
+            createdAt: NOW,
+            updatedAt: NOW,
+          },
+        },
+        schedulerConfig: {},
+      }),
+    );
+
+    const engine = await StudyEngine.create({
+      store,
+      seedEntries: SEED_ENTRIES,
+      clock: fixedClock(NOW),
+    });
+    expect(engine.dayStartHour).toBe(4);
+  });
+});
+
+/**
+ * Preferences have one carrier, and the blob is not it.
+ *
+ * Appearance, backdrop and the start of the day have their own endpoints. They
+ * also sit in the same `meta` key as the deck's bookkeeping, so a synced blob
+ * carries a copy — and if that copy wins, choosing dark on one device gets
+ * undone by a sync from another that has not heard about it yet.
+ */
+describe('settings and the synced blob', () => {
+  it('keeps this device’s appearance when a blob says otherwise', async () => {
+    const { engine } = await makeEngine();
+    await engine.setAppearance('dark');
+    await engine.setBackdrop('living');
+    await engine.setDayStartHour(2);
+
+    // A blob from a device that still thinks the account is light and calm.
+    const other = await makeEngine();
+    await other.engine.setAppearance('light');
+    await other.engine.setBackdrop('calm');
+    await other.engine.setDayStartHour(9);
+    await engine.importState(await other.engine.exportState());
+
+    expect(engine.appearance).toBe('dark');
+    expect(engine.backdrop).toBe('living');
+    expect(engine.dayStartHour).toBe(2);
+  });
+
+  it('takes the blob’s settings when this device has never chosen', async () => {
+    // The other half of the rule: silence is not a preference. A fresh browser
+    // signing in should adopt the account's look rather than impose defaults.
+    const chosen = await makeEngine();
+    await chosen.engine.setAppearance('dark');
+    await chosen.engine.setBackdrop('living');
+
+    const fresh = await makeEngine();
+    await fresh.engine.importState(await chosen.engine.exportState());
+
+    expect(fresh.engine.appearance).toBe('dark');
+    expect(fresh.engine.backdrop).toBe('living');
+  });
+
+  it('still carries them in the blob, for an older build reading it', async () => {
+    const { engine } = await makeEngine();
+    await engine.setAppearance('dark');
+
+    const exported = await engine.exportState();
+    const meta = JSON.parse(exported[STORAGE_KEYS.meta]!) as { appearance?: string };
+    expect(meta.appearance).toBe('dark');
+  });
+
+  it('survives the preserved settings across a restart', async () => {
+    const { engine, store } = await makeEngine();
+    await engine.setAppearance('dark');
+
+    const other = await makeEngine();
+    await other.engine.setAppearance('light');
+    await engine.importState(await other.engine.exportState());
+
+    // Written to the store, not only held in memory: an import that only fixed
+    // the field in memory would lose it on the next launch.
+    const reopened = await StudyEngine.create({
+      store,
+      seedEntries: SEED_ENTRIES,
+      clock: fixedClock(NOW),
+    });
+    expect(reopened.appearance).toBe('dark');
+  });
+});

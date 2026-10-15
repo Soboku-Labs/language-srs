@@ -107,7 +107,26 @@ export function generateCardsForEntry(
 
   return allowed
     .filter((kind) => isCardKindApplicable(entry, kind))
-    .map((kind) => existingById.get(cardId(entry.id, kind)) ?? createCard(entry, kind, level.id, now));
+    .map((kind) => {
+      const existing = existingById.get(cardId(entry.id, kind));
+      if (!existing) return createCard(entry, kind, level.id, now);
+
+      /*
+       * Reuse the card, but not its level tag.
+       *
+       * This used to return the existing card exactly as found, which is
+       * right for every field except one. The same word belongs to different
+       * levels in different tracks — HSK 3's `hsk3-1` is HSK 2's `hsk2-1` —
+       * and the session queue admits a card by testing `card.levelId`
+       * against the levels in scope. So after switching track, every card
+       * still carried the old track's level and the queue matched none of
+       * them: a deck of 119 cards serving nothing, with no error anywhere.
+       *
+       * Only the tag is rewritten. Stability, difficulty, due date and reps
+       * are the learner's history; re-tagging must not cost them a day of it.
+       */
+      return existing.levelId === level.id ? existing : { ...existing, levelId: level.id };
+    });
 }
 
 /**

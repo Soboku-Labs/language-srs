@@ -1,4 +1,4 @@
-import type { AccountState, StudySessionRecord, Timestamp } from '@language-srs/core';
+import type { AccountState, LanguageSettings, UserSettings, StudySessionRecord, Timestamp } from '@language-srs/core';
 
 /**
  * Everything the API needs to keep, and nothing about how.
@@ -24,6 +24,21 @@ export interface ServerStore {
 
   getState(userId: string): Promise<AccountState | undefined>;
   putState(userId: string, state: AccountState): Promise<void>;
+
+  /*
+   * Settings are stored apart from the state blob, and readably.
+   *
+   * The blob is the engine's own storage keys and the server must not try to
+   * interpret it. Settings are the opposite: the server needs to read them to
+   * answer for them, and one day to act on them. Keeping them here means a
+   * preference is a row rather than a string inside a string.
+   */
+  getUserSettings(userId: string): Promise<UserSettings | undefined>;
+  putUserSettings(userId: string, settings: UserSettings): Promise<void>;
+
+  listLanguageSettings(userId: string): Promise<LanguageSettings[]>;
+  getLanguageSettings(userId: string, code: string): Promise<LanguageSettings | undefined>;
+  putLanguageSettings(userId: string, settings: LanguageSettings): Promise<void>;
 
   listStudySessions(userId: string): Promise<StudySessionRecord[]>;
   putStudySessions(userId: string, records: StudySessionRecord[]): Promise<void>;

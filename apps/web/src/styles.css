@@ -1874,3 +1874,34 @@ a { color: var(--accent); }
   letter-spacing: 0.04em;
   color: var(--brand);
 }
+
+/* ---------------------------------------------------------------- gates
+
+   A feature behind a free account. Rendered where the feature would have
+   been, in the page's own flow — never as a dialog over something somebody
+   was already doing. See components/Locked.tsx for why.
+
+   Deliberately quiet: a tinted panel and the brand's own orange, not a
+   warning colour. This is an offer, and styling it like an error teaches
+   people that the app is full of things they have done wrong.
+*/
+.locked {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-card);
+}
+.locked__name {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--brand);
+}
+
+/* On the door, under the "Started" badge's position. */
+.window__badge--locked {
+  top: auto;
+  bottom: var(--space-lg);
+  color: var(--brand);
+}

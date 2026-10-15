@@ -11,6 +11,7 @@ import {
   type LanguageCode,
 } from '@language-srs/core';
 import { useEngine } from '../providers';
+import { Locked } from '../components/Locked';
 import { useRouter } from '../router';
 import { BigButton, Caption, Choice, Rise, Row, Screen, Section, TextButton } from '../ui';
 
@@ -120,6 +121,14 @@ export function Import() {
 
   return (
     <Screen>
+      {/*
+        Wrapped whole rather than disabling the paste box.
+
+        A form you can fill in and then cannot submit is the worst version of
+        a gate: it takes the effort first and refuses afterwards. This says
+        what it is before anything has been typed.
+      */}
+      <Locked feature="importVocabulary">
       <Rise index={0}>
         <Section title="Format">
           <Row wrap>
@@ -258,7 +267,10 @@ export function Import() {
         </Rise>
       ) : null}
 
+      </Locked>
+
       <Rise index={4}>
+        <Locked feature="exportVocabulary">
         <Section title="Back up">
           <Caption>
             Everything you have for {getLanguageProfile(active).name}, including your own notes, as JSON
@@ -269,6 +281,7 @@ export function Import() {
             <textarea className="field field--mono" value={exported} readOnly rows={6} aria-label="Exported JSON" />
           ) : null}
         </Section>
+        </Locked>
       </Rise>
     </Screen>
   );

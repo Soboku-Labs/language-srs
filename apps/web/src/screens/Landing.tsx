@@ -3,6 +3,7 @@ import {
   LANGUAGE_CODES,
   getCulture,
   getLanguageProfile,
+  canUse,
   getTeacher,
   type Appearance,
   type Backdrop,
@@ -17,6 +18,7 @@ import { useRouter } from '../router';
 import { useSettings } from '../settings';
 import { useTheme } from '../theme';
 import { useTravel } from '../travel';
+import { useAccess } from '../components/Locked';
 import { Caption, Rise, Screen, Segmented } from '../ui';
 
 /**
@@ -70,6 +72,7 @@ export function Landing() {
   const { account, isSignedIn } = useAuth();
   const { navigate } = useRouter();
   const { colorsFor } = useTheme();
+  const { tier } = useAccess();
 
   /** The window being looked into, which widens to take more of the row. */
   const [open, setOpen] = useState<LanguageCode | undefined>();
@@ -109,6 +112,18 @@ export function Landing() {
    * stopped and asked to set up the thing they are already doing.
    */
   const enter = (code: LanguageCode) => {
+    /*
+     * A second language sends you to the account, not into a dead end.
+     *
+     * The window carries a "Free account" badge before it is pressed, so this
+     * is not a surprise — and going to the sign-in page rather than refusing
+     * in place means the next thing on screen is the thing that unblocks it.
+     */
+    if (!canUse('multipleLanguages', tier) && state.started.size > 0 && !state.started.has(code)) {
+      navigate('/sign-in');
+      return;
+    }
+
     const asked =
       engine.hasProfile(code) &&
       (Boolean(engine.getProfile(code).setUpAt) ||
@@ -191,6 +206,15 @@ export function Landing() {
           const culture = getCulture(code);
           const teacher = getTeacher(code);
           const started = state.started.has(code);
+          /*
+           * Reached, not hit.
+           *
+           * A second language needs an account, and the honest place to say
+           * so is on the door before anything is chosen — not after somebody
+           * has walked in, set up an exam and started a deck. The badge is
+           * small and the window still opens; what it opens onto explains.
+           */
+          const needsAccount = !canUse('multipleLanguages', tier) && state.started.size > 0 && !started;
 
           return (
             <button
@@ -234,6 +258,9 @@ export function Landing() {
                 </span>
 
                 {started ? <span className="window__badge">Started</span> : null}
+                {needsAccount ? (
+                  <span className="window__badge window__badge--locked">Free account</span>
+                ) : null}
               </span>
             </button>
           );

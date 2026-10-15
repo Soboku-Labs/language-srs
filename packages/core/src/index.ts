@@ -356,6 +356,17 @@ export { cardId, parseCardId, reviewLogId, studySessionId } from './utils/id';
 export type { Appearance, Backdrop } from './settings';
 export { BRAND } from './theme/palettes';
 export {
+  ANONYMOUS_HISTORY_DAYS,
+  FEATURES,
+  canUse,
+  featuresUnlockedBy,
+  tierFor,
+  tierReaches,
+  type AccessTier,
+  type Feature,
+  type FeatureId,
+} from './access';
+export {
   DEFAULT_LANGUAGE_SETTINGS,
   DEFAULT_USER_SETTINGS,
   SETTINGS_LIMITS,

@@ -263,18 +263,23 @@ Until that is done the workflow runs green but publishes nothing.
 Two details the build handles that catch most static exports on Pages:
 
 - A project site is served from `/<repo>/`, not the domain root, so the build sets
-  `EXPO_WEB_BASE_URL=/language-srs` and Expo prefixes every asset and route. It is
-  read from the environment rather than hard-coded so `npm run web` still works at
-  the root locally.
-- Pages runs Jekyll, which drops anything whose name starts with an underscore —
-  including Expo's entire `_expo/` bundle directory. The build writes `.nojekyll`
-  to disable that, plus a `404.html` so unknown URLs land in the app rather than
-  on GitHub's error page.
+  `WEB_BASE_URL=/language-srs/` and Vite prefixes every asset. It is read from the
+  environment rather than hard-coded so `npm run web:vite` still works at the root
+  locally. The handful of links written by hand in `index.html` — the icons and
+  the manifest — use `%BASE_URL%` for the same reason: every unknown path is
+  served the same document, so a relative href resolves against whatever URL was
+  opened and 404s from anything nested like `/word/zh-nihao`.
+- Pages runs Jekyll, which drops anything whose name starts with an underscore.
+  The build writes `.nojekyll` to disable that, plus a `404.html` copy of
+  `index.html` so unknown URLs boot the app rather than showing GitHub's error
+  page. Pages serves that document with a 404 *status*, which is expected and
+  does not stop the app rendering.
 
 Build it locally exactly as CI does:
 
 ```bash
-npm run web:pages   # writes apps/mobile/dist, ready to serve at /language-srs/
+npm run web:pages   # the Vite app -> apps/web/dist, ready to serve at /language-srs/
+npm run expo:pages  # the Expo web export -> apps/mobile/dist (not deployed)
 ```
 
 Native builds need a Mac with Xcode (iOS) or Android Studio:

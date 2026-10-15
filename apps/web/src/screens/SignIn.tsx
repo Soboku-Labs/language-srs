@@ -37,7 +37,7 @@ const MESSAGES: Partial<Record<AuthErrorCode | 'offline', string>> = {
 };
 
 export function SignIn() {
-  const { useThisDevice, authenticate, canSignIn } = useAuth();
+  const { useThisDevice, useDemo, authenticate, canSignIn } = useAuth();
   const { navigate, query } = useRouter();
 
   /*
@@ -213,6 +213,23 @@ export function SignIn() {
               Carrying progress between devices needs a server, and this build has none configured.
             </Caption>
           ) : null}
+
+          {/*
+            A look around, for the things an account unlocks that cannot be
+            described — a second language, importing a word list, the writing
+            books. Asking somebody to make an account to find out whether they
+            want one is the wrong way round.
+
+            Not a credential: nothing is registered and there is no demo user
+            on any server. It is this browser showing the whole UI, in its own
+            storage slice, saying so throughout.
+          */}
+          <TextButton
+            label="Look around with a demo first"
+            muted
+            disabled={busy}
+            onClick={() => run(() => useDemo())}
+          />
         </Section>
       </Rise>
     </Screen>

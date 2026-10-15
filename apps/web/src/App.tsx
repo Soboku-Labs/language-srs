@@ -21,6 +21,7 @@ import { Start } from './screens/Start';
 import { Roadmap } from './screens/Roadmap';
 import { Write } from './screens/Write';
 import { StorageWarning } from './components/StorageWarning';
+import { DemoBanner } from './components/DemoBanner';
 import { Caption, Screen, TextButton, Title } from './ui';
 
 /**
@@ -148,6 +149,9 @@ function Chrome() {
     <>
       {/* Above the header, because unsaved work outranks knowing where you are. */}
       <StorageWarning />
+      {/* And above that in importance but below it on screen: losing work is
+          urgent, being in the demo is a standing condition. */}
+      <DemoBanner />
       {titled ? (
         <header className="chrome">
           <button type="button" className="chrome__back" onClick={back} aria-label="Go back">

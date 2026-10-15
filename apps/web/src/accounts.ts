@@ -20,6 +20,13 @@ import { webStore } from './storage';
  *
  * The device profile is not a lesser option. For somebody studying on one
  * machine it is the right one, and the app is complete without ever signing in.
+ *
+ * There is a third, which is not a way of using the app but a way of looking at
+ * it: **the demo**. It opens the account-only features so somebody can see what
+ * an account is for before making one. It exists entirely in this browser —
+ * there is no demo user on the server, nothing is sent anywhere, and the only
+ * thing it has in common with an account is which parts of the UI are
+ * reachable. See `createDemoAccount`.
  */
 
 const ACCOUNT_KEY = 'srs:v1:account';
@@ -28,6 +35,8 @@ export interface StoredAccount {
   id: string;
   displayName: string;
   createdAt: string;
+  /** A look around rather than an account. See `createDemoAccount`. */
+  demo?: true;
   /** Present for a server account; absent for a device profile. */
   email?: string;
   /** The bearer token, for a server account. */
@@ -38,6 +47,49 @@ export interface StoredAccount {
 
 /** Whether this account's progress is carried off the device. */
 export const isRemote = (account: StoredAccount | undefined): boolean => Boolean(account?.token);
+
+/** Whether this is the demo rather than somebody's own profile. */
+export const isDemo = (account: StoredAccount | undefined): boolean => account?.demo === true;
+
+/**
+ * A fixed id, so the demo is one sandbox rather than a new one per visit.
+ *
+ * Also why it is readable: it ends up as a storage prefix, and somebody
+ * looking at their own browser storage should be able to tell at a glance
+ * which slice is the demo and which is theirs.
+ */
+export const DEMO_ACCOUNT_ID = 'demo';
+
+/**
+ * A look around, with the account-only features open.
+ *
+ * Most of what an account unlocks cannot be described, only used — a second
+ * language, importing a word list, the writing books. Asking somebody to make
+ * an account to find out whether they want one is the wrong way round.
+ *
+ * **There is no demo user on the server, in production or anywhere else.** It
+ * is not a credential: nothing is registered, no password exists, and nothing
+ * can be signed in as. It is this browser deciding to show the whole UI, which
+ * is a decision about rendering rather than about authentication. That is also
+ * why it cannot be abused — there is nothing to abuse, only a local flag that
+ * grants no access to any server resource.
+ *
+ * It gets its own storage slice, so looking around does not touch the deck
+ * somebody has been building on this device, and leaving does not take
+ * anything of theirs with it.
+ *
+ * `token` is deliberately absent, so `isRemote` is false and the sync layer
+ * stays switched off. The demo never talks to a server, which is the honest
+ * behaviour: there is no account for it to sync to.
+ */
+export async function createDemoAccount(): Promise<StoredAccount> {
+  return saveAccount({
+    id: DEMO_ACCOUNT_ID,
+    displayName: 'Demo',
+    createdAt: new Date().toISOString(),
+    demo: true,
+  });
+}
 
 /** A readable id, because it ends up in a storage prefix somebody may have to read. */
 function newId(): string {

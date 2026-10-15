@@ -13,9 +13,23 @@ import { Caption, TextButton } from '../ui';
  * is one line or a rewrite.
  */
 export function useAccess() {
-  const { isSignedIn } = useAuth();
-  const tier = tierFor({ signedIn: isSignedIn });
-  return { tier, can: (feature: FeatureId) => canUse(feature, tier) };
+  const { synced, demo } = useAuth();
+
+  /*
+   * An account, or the demo — not merely "has a local profile".
+   *
+   * This read `isSignedIn`, which is true for a *device profile* as well:
+   * pressing "Use this device", which creates no account and sends nothing
+   * anywhere, opened every gate. The whole thing was decorative, and silently
+   * so, because the locks still appeared for somebody who had not chosen
+   * anything yet — which is the state anybody testing it would be in.
+   *
+   * `synced` is the honest test: there is a token, so there is an account on
+   * a server. The demo is the one deliberate exception, and it says so on
+   * screen the entire time it is on.
+   */
+  const tier = tierFor({ signedIn: synced || demo });
+  return { tier, can: (feature: FeatureId) => canUse(feature, tier), demo };
 }
 
 /**

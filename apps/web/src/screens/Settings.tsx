@@ -35,7 +35,7 @@ export function Settings() {
     updateLanguage,
     error,
   } = useSettings();
-  const { account, synced, canSignIn, signOut } = useAuth();
+  const { account, synced, demo, canSignIn, signOut } = useAuth();
   const { navigate } = useRouter();
 
   const code = engine.activeLanguage;
@@ -299,7 +299,7 @@ export function Settings() {
       <Rise index={7}>
         <Section title="Account">
           <DetailRow
-            label={synced ? 'Signed in as' : 'Using this device as'}
+            label={demo ? 'Looking around as' : synced ? 'Signed in as' : 'Using this device as'}
             value={account?.displayName ?? 'Not signed in'}
           />
           {account?.email ? <DetailRow label="Email" value={account.email} /> : null}
@@ -309,12 +309,13 @@ export function Settings() {
           ) : (
             <>
               <Caption>
-                A local profile in this browser. Progress is not carried to your other devices, and
-                nothing is sent anywhere.
+                {demo
+                  ? 'The demo. Every account-only feature is open to look at, nothing is saved to an account, and there is no demo account on the server — this is only this browser.'
+                  : 'A local profile in this browser. Progress is not carried to your other devices, and nothing is sent anywhere.'}
               </Caption>
               {canSignIn ? (
                 <TextButton
-                  label="Create an account to sync"
+                  label={demo ? 'Make a real account' : 'Create an account to sync'}
                   onClick={() => navigate('/sign-in?new=1&from=%2Fsettings')}
                 />
               ) : null}
@@ -322,7 +323,7 @@ export function Settings() {
           )}
 
           <TextButton
-            label="Sign out"
+            label={demo ? 'Leave the demo' : 'Sign out'}
             muted
             onClick={() => {
               // The deck stays behind, under this account's own storage prefix,

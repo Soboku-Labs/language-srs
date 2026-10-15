@@ -33,6 +33,7 @@ export function GrammarPoint({ id }: { id: string }) {
   }
 
   const learned = engine.isGrammarLearned(point.id);
+  const due = engine.grammarDue(point.id);
   const siblings = getGrammarPoints(point.languageCode);
   const index = siblings.findIndex((candidate) => candidate.id === point.id);
   const next = siblings[index + 1];
@@ -81,11 +82,28 @@ export function GrammarPoint({ id }: { id: string }) {
         </Rise>
       ) : null}
 
+      {/*
+        Reading it is not the test.
+
+        This used to end in "mark as understood", which asked the learner to
+        judge their own understanding at the moment it was freshest — when that
+        judgement is worth least. It leads into practice instead, and the
+        practice is what moves the point along.
+      */}
       <Rise index={5}>
         <BigButton
-          label={learned ? 'Understood' : 'Mark as understood'}
-          hint={learned ? 'Tap to unmark' : 'Your own call — nothing is tested here'}
-          onClick={() => void mutate((instance) => instance.setGrammarLearned(point.id, !learned))}
+          label={learned ? 'Practise this' : 'Try it'}
+          hint={
+            learned
+              ? due
+                ? `Last practised ${describeAgo(engine.grammarLearnedAt(point.id), engine.now())} · next ${describeDue(due, engine.now())}`
+                : undefined
+              : 'Four short exercises, then it comes back later'
+          }
+          onClick={() => {
+            if (!learned) void mutate((instance) => instance.setGrammarLearned(point.id, true));
+            navigate(`/practice/${point.id}`);
+          }}
         />
       </Rise>
 
@@ -99,4 +117,20 @@ export function GrammarPoint({ id }: { id: string }) {
       </Rise>
     </Screen>
   );
+}
+
+/** "2 days ago", loosely. */
+function describeAgo(at: string | undefined, now: string): string {
+  if (!at) return 'recently';
+  const days = Math.round((Date.parse(now) - Date.parse(at)) / 86_400_000);
+  if (Number.isNaN(days) || days <= 0) return 'today';
+  return days === 1 ? 'yesterday' : `${days} days ago`;
+}
+
+/** "in 3 days", or "now" when it is waiting. */
+function describeDue(due: string, now: string): string {
+  const days = Math.round((Date.parse(due) - Date.parse(now)) / 86_400_000);
+  if (Number.isNaN(days)) return 'soon';
+  if (days <= 0) return 'now';
+  return days === 1 ? 'tomorrow' : `in ${days} days`;
 }

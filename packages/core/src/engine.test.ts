@@ -747,3 +747,77 @@ describe('grammar progress', () => {
     expect(phone.engine.isGrammarLearned('zh-hen-adj')).toBe(true);
   });
 });
+
+describe('grammar practice, spaced', () => {
+  it('falls due immediately after reading, since reading is not the test', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-shi', true);
+
+    expect(engine.grammarDue('zh-shi')).toBe(NOW);
+    expect(engine.grammarDueNow(['zh-shi', 'zh-ma'])).toEqual(['zh-shi']);
+  });
+
+  it('widens the interval with each clean sitting', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-shi', true);
+
+    await engine.recordGrammarPractice('zh-shi', true);
+    expect(engine.grammarStreak('zh-shi')).toBe(1);
+    const first = engine.grammarDue('zh-shi')!;
+
+    await engine.recordGrammarPractice('zh-shi', true);
+    expect(engine.grammarStreak('zh-shi')).toBe(2);
+    // Each rung is further out than the one before it.
+    expect(engine.grammarDue('zh-shi')!.localeCompare(first)).toBeGreaterThan(0);
+  });
+
+  it('drops a failed point to the bottom rather than down one rung', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-shi', true);
+    await engine.recordGrammarPractice('zh-shi', true);
+    await engine.recordGrammarPractice('zh-shi', true);
+    expect(engine.grammarStreak('zh-shi')).toBe(2);
+
+    await engine.recordGrammarPractice('zh-shi', false);
+    // Getting a rule wrong means the understanding was not there, which is not
+    // the same as having forgotten it.
+    expect(engine.grammarStreak('zh-shi')).toBe(0);
+    expect(engine.grammarDue('zh-shi')).toBe(addDays(NOW, 1));
+  });
+
+  it('keeps a point out of the queue until it is due again', async () => {
+    const { engine } = await makeEngine();
+    await engine.setGrammarLearned('zh-shi', true);
+    await engine.recordGrammarPractice('zh-shi', true);
+
+    // The bottom rung, one day, is where a *failed* point lands; a clean
+    // sitting goes straight to the second, three days out.
+    expect(engine.grammarDue('zh-shi')).toBe(addDays(NOW, 3));
+    expect(engine.grammarDueNow(['zh-shi'])).toEqual([]);
+    expect(engine.grammarDueNow(['zh-shi'], addDays(NOW, 2))).toEqual([]);
+    expect(engine.grammarDueNow(['zh-shi'], addDays(NOW, 3))).toEqual(['zh-shi']);
+  });
+
+  it('reads forward progress stored before practice was scheduled', async () => {
+    // The first version kept a bare timestamp per point. Those are real
+    // progress on somebody's device, so they are migrated rather than dropped.
+    const store = new MemoryStore();
+    await store.set(STORAGE_KEYS.grammar, JSON.stringify({ 'zh-shi': '2026-02-01T09:00:00.000Z' }));
+
+    const engine = await StudyEngine.create({ store, seedEntries: SEED_ENTRIES, clock: fixedClock(NOW) });
+
+    expect(engine.isGrammarLearned('zh-shi')).toBe(true);
+    expect(engine.grammarLearnedAt('zh-shi')).toBe('2026-02-01T09:00:00.000Z');
+    // Read and never practised, so it is due now.
+    expect(engine.grammarDueNow(['zh-shi'])).toEqual(['zh-shi']);
+  });
+
+  it('ignores a corrupt record rather than failing to open', async () => {
+    const store = new MemoryStore();
+    await store.set(STORAGE_KEYS.grammar, JSON.stringify({ 'zh-shi': { nonsense: true }, 'zh-ma': null }));
+
+    const engine = await StudyEngine.create({ store, seedEntries: SEED_ENTRIES, clock: fixedClock(NOW) });
+    expect(engine.isGrammarLearned('zh-shi')).toBe(false);
+    expect(engine.isGrammarLearned('zh-ma')).toBe(false);
+  });
+});

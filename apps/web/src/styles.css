@@ -1217,3 +1217,89 @@ a { color: var(--accent); }
 @media (min-width: 1024px) {
   .points { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
 }
+
+/* ----------------------------------------------------------- practising it
+
+   Four shapes in one sitting, so this is mostly about making them feel like
+   one thing: the same card, the same gap, the same green when it is right.
+*/
+
+/* The sentence under practice, with its gap. */
+.card--quiet { gap: var(--space-sm); align-items: center; text-align: center; }
+.sentence {
+  margin: 0;
+  font-size: var(--text-target-small);
+  line-height: 1.5;
+  text-align: center;
+}
+.sentence__gloss { font-size: var(--text-caption); color: var(--ink-muted); }
+
+/* The gap holds its own width so the sentence does not jump when it fills. */
+.gap {
+  display: inline-block;
+  min-width: 2ch;
+  padding: 0 2px;
+  color: var(--ink-faint);
+  border-bottom: 2px solid var(--accent);
+  transition: color var(--duration-instant) var(--ease);
+}
+.gap--right { color: var(--good); border-bottom-color: var(--good); }
+.gap--wrong { color: var(--again); border-bottom-color: var(--again); }
+
+.field--answer { text-align: center; font-size: var(--text-heading); }
+
+/* Matching: two columns of chips, tap one then the other. */
+.match { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); }
+.match__column { display: flex; flex-direction: column; gap: var(--space-sm); }
+.chip {
+  padding: var(--space-md);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: var(--text-caption);
+  line-height: 18px;
+  text-align: left;
+  border: 1.5px solid transparent;
+  transition:
+    background var(--duration-instant) var(--ease),
+    border-color var(--duration-instant) var(--ease),
+    opacity var(--duration-base) var(--ease);
+}
+.chip--picked { border-color: var(--accent); background: var(--accent-soft); }
+.chip--solved { opacity: 0.4; background: color-mix(in srgb, var(--good) 14%, var(--surface)); }
+/* A shake rather than a red wall: a mispair is a normal part of matching. */
+.chip--wrong { animation: nudge 240ms var(--ease); border-color: var(--again); }
+
+@keyframes nudge {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.recall__form {
+  font-size: var(--text-target-small);
+  font-weight: var(--weight-strong);
+  color: var(--accent);
+}
+.pattern--inline { width: 100%; }
+
+/* The two self-graded answers, weighted so neither is the obvious tap. */
+.verdict__button {
+  flex: 1;
+  padding: var(--space-md);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+}
+.verdict__button--good { background: color-mix(in srgb, var(--good) 14%, var(--surface)); color: var(--good); }
+
+/* Due outranks done, so it is a word rather than a tick. */
+.point__due {
+  margin-left: auto;
+  font-size: var(--text-micro);
+  font-weight: var(--weight-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  white-space: nowrap;
+}

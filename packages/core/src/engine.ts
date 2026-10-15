@@ -34,7 +34,7 @@ import {
 } from './types/card';
 import { LANGUAGE_CODES, getLanguageProfile, type LanguageCode } from './types/language';
 import type { GradeResult, Rating, ReviewSource } from './types/review';
-import { endOfStudyDay, systemClock, type Clock } from './utils/date';
+import { addDays, endOfStudyDay, systemClock, type Clock } from './utils/date';
 import { buildWidgetSnapshot, buildWidgetTimeline, pickSpotlight, type WidgetSnapshot, type WidgetTimeline } from './widget/payload';
 import { applyPendingGrades, type PendingWidgetGrade } from './widget/pending';
 
@@ -69,6 +69,25 @@ export const STORAGE_KEYS = {
  * cannot rewind a session.
  */
 const MAX_UNDO_DEPTH = 10;
+
+/**
+ * How far apart grammar practice is spaced, in days, by how many clean
+ * sittings in a row the point has had.
+ *
+ * A deliberately plain ladder — see `recordGrammarPractice` for why this does
+ * not borrow the vocabulary scheduler.
+ */
+const GRAMMAR_INTERVAL_DAYS = [1, 3, 7, 16, 35] as const;
+
+/** What is remembered about a grammar point between sittings. */
+export interface GrammarProgress {
+  /** When it was first read. */
+  learnedAt: string;
+  /** When it next wants practising. */
+  due: string;
+  /** Clean sittings in a row, which is the rung on the ladder above. */
+  streak: number;
+}
 
 export const SYNCED_STORAGE_KEYS: string[] = [
   STORAGE_KEYS.meta,
@@ -154,8 +173,8 @@ export class StudyEngine {
   private importedEntries: LexicalEntry[];
   private pending: PendingWidgetGrade[];
   private sessions: StudySessionRecord[];
-  /** Grammar point id -> when it was marked understood. */
-  private grammar: Record<string, string>;
+  /** Grammar point id -> what is known about it. */
+  private grammar: Record<string, GrammarProgress>;
   /**
    * Vocabulary handed in at runtime, from the API.
    *
@@ -185,7 +204,7 @@ export class StudyEngine {
       importedEntries: LexicalEntry[];
       pending: PendingWidgetGrade[];
       sessions: StudySessionRecord[];
-      grammar: Record<string, string>;
+      grammar: Record<string, GrammarProgress>;
     },
   ) {
     this.clock = options.clock ?? systemClock;
@@ -217,7 +236,7 @@ export class StudyEngine {
       importedEntries: await readJson<LexicalEntry[]>(store, STORAGE_KEYS.entries, []),
       pending: await readJson<PendingWidgetGrade[]>(store, STORAGE_KEYS.pending, []),
       sessions: await readJson<StudySessionRecord[]>(store, STORAGE_KEYS.sessions, []),
-      grammar: await readJson<Record<string, string>>(store, STORAGE_KEYS.grammar, {}),
+      grammar: readGrammar(await readJson<Record<string, unknown>>(store, STORAGE_KEYS.grammar, {})),
     });
 
     // A fresh install has no profile and no cards; a returning one may have new
@@ -821,31 +840,81 @@ export class StudyEngine {
   /**
    * Grammar points the learner has worked through.
    *
-   * Marked by hand rather than scheduled. A grammar point is not a fact that
-   * fades on a curve — it is understood or it is not, and the cards that
-   * practise it are what the scheduler is for. So this records that somebody
-   * has read and accepted a point, and nothing here competes with the deck.
+   * Reading a point and ticking "understood" is the learner judging their own
+   * understanding at the moment it is freshest, which is when that judgement
+   * is worth least. So a point is not finished when it is read — it is read,
+   * then practised, and the practice comes back on a widening interval.
+   *
+   * The spacing here is a plain ladder rather than FSRS. FSRS is fitted to
+   * recalling a single item, and a grammar point is not one item: it is a rule
+   * practised through whichever sentences happen to be generated that sitting.
+   * Borrowing the vocabulary scheduler's numbers would be borrowing their
+   * authority without their calibration, so this says what it is.
    */
   isGrammarLearned(id: string): boolean {
     return this.grammar[id] !== undefined;
   }
 
-  /** When a point was marked, if it has been. */
+  /** When a point was first read, if it has been. */
   grammarLearnedAt(id: string): string | undefined {
-    return this.grammar[id];
+    return this.grammar[id]?.learnedAt;
   }
 
-  /** How many of the given points are marked, for a syllabus's progress. */
+  /** How many of the given points have been read, for a syllabus's progress. */
   countGrammarLearned(ids: string[]): number {
     return ids.filter((id) => this.grammar[id] !== undefined).length;
   }
 
-  /** Mark a point understood, or take the mark off again. */
+  /** How far up the ladder a point has climbed. */
+  grammarStreak(id: string): number {
+    return this.grammar[id]?.streak ?? 0;
+  }
+
+  /** When a point next wants practising. */
+  grammarDue(id: string): string | undefined {
+    return this.grammar[id]?.due;
+  }
+
+  /** The points, among those given, that are ready to be practised now. */
+  grammarDueNow(ids: string[], now = this.clock()): string[] {
+    return ids.filter((id) => {
+      const record = this.grammar[id];
+      return record !== undefined && record.due <= now;
+    });
+  }
+
+  /** Mark a point read, or take the mark off again. */
   async setGrammarLearned(id: string, learned: boolean): Promise<void> {
     if (learned === this.isGrammarLearned(id)) return;
 
-    if (learned) this.grammar[id] = this.clock();
-    else delete this.grammar[id];
+    if (learned) {
+      const now = this.clock();
+      // Due straight away: reading it is not the test, and the first practice
+      // should be available while the explanation is still in mind.
+      this.grammar[id] = { learnedAt: now, due: now, streak: 0 };
+    } else {
+      delete this.grammar[id];
+    }
+
+    await writeJson(this.options.store, STORAGE_KEYS.grammar, this.grammar);
+    await this.notifyChanged();
+  }
+
+  /**
+   * Record a sitting of practice on a point.
+   *
+   * A clean sitting moves it one rung up the ladder. A failed one drops it to
+   * the bottom rather than down a step: getting a rule wrong means the
+   * understanding was not there, and resuming at four days would be treating a
+   * misunderstanding as a lapse of memory.
+   */
+  async recordGrammarPractice(id: string, passed: boolean): Promise<void> {
+    const now = this.clock();
+    const existing = this.grammar[id] ?? { learnedAt: now, due: now, streak: 0 };
+    const streak = passed ? existing.streak + 1 : 0;
+    const days = GRAMMAR_INTERVAL_DAYS[Math.min(streak, GRAMMAR_INTERVAL_DAYS.length - 1)]!;
+
+    this.grammar[id] = { learnedAt: existing.learnedAt, due: addDays(now, days), streak };
 
     await writeJson(this.options.store, STORAGE_KEYS.grammar, this.grammar);
     await this.notifyChanged();
@@ -883,7 +952,7 @@ export class StudyEngine {
     // Reloaded like everything else: the values are written to the store above,
     // and a field left unread here would keep the previous device's answer in
     // memory until the next launch.
-    this.grammar = await readJson<Record<string, string>>(this.options.store, STORAGE_KEYS.grammar, {});
+    this.grammar = readGrammar(await readJson<Record<string, unknown>>(this.options.store, STORAGE_KEYS.grammar, {}));
     this.reindexEntries();
 
     await this.ensureProfile(this.meta.activeLanguage);
@@ -1076,4 +1145,35 @@ export class StudyEngine {
     await this.syncCards();
     await this.notifyChanged();
   }
+}
+
+/**
+ * Read stored grammar progress, including the shape it used to have.
+ *
+ * The first version of this stored a bare timestamp per point, before practice
+ * was scheduled. Those records are real progress on somebody's device, so they
+ * are read forward rather than discarded: the timestamp becomes the date it was
+ * read, and the point falls due immediately, which is correct — it was read and
+ * never practised.
+ */
+function readGrammar(raw: Record<string, unknown>): Record<string, GrammarProgress> {
+  const out: Record<string, GrammarProgress> = {};
+
+  for (const [id, value] of Object.entries(raw)) {
+    if (typeof value === 'string') {
+      out[id] = { learnedAt: value, due: value, streak: 0 };
+      continue;
+    }
+    if (typeof value !== 'object' || value === null) continue;
+
+    const record = value as Partial<GrammarProgress>;
+    if (typeof record.learnedAt !== 'string') continue;
+    out[id] = {
+      learnedAt: record.learnedAt,
+      due: typeof record.due === 'string' ? record.due : record.learnedAt,
+      streak: typeof record.streak === 'number' ? record.streak : 0,
+    };
+  }
+
+  return out;
 }

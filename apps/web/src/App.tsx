@@ -12,6 +12,7 @@ import { Stats } from './screens/Stats';
 import { Settings } from './screens/Settings';
 import { Import } from './screens/Import';
 import { Learn } from './screens/Learn';
+import { Practice } from './screens/Practice';
 import { GrammarPoint } from './screens/GrammarPoint';
 import { SignIn } from './screens/SignIn';
 import { StorageWarning } from './components/StorageWarning';
@@ -134,6 +135,9 @@ function Routes() {
   // The picker is the door now. Kept so a bookmark from the old structure
   // lands somewhere sensible rather than on "not found".
   if (path === '/languages') return <Redirect to="/" />;
+
+  const practice = matchPath('/practice/:id', path);
+  if (practice?.id) return <Practice id={practice.id} />;
 
   const grammar = matchPath('/learn/:id', path);
   if (grammar?.id) return <GrammarPoint id={grammar.id} />;

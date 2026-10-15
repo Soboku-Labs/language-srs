@@ -72,7 +72,7 @@ export function Learn() {
         <Caption>
           {total === 0
             ? `No grammar notes for ${profile.name} yet.`
-            : `${done} of ${total} points marked as understood. Reading one does not add anything to your deck — the cards practise it, these explain it.`}
+            : `${done} of ${total} points started. Each one is read once, then practised on a widening interval — reading it is not the test.`}
         </Caption>
       </Rise>
 
@@ -98,6 +98,7 @@ export function Learn() {
             <div className="points">
               {group.points.map((point) => {
                 const learned = engine.isGrammarLearned(point.id);
+                const due = learned && engine.grammarDueNow([point.id]).length > 0;
                 return (
                   <button
                     key={point.id}
@@ -110,8 +111,13 @@ export function Learn() {
                       <span className="point__title">{point.title}</span>
                       <span className="point__summary">{point.summary}</span>
                     </span>
-                    {learned ? (
-                      <span className="point__check" aria-label="Understood">
+                    {/* Due outranks done: a point waiting to be practised is
+                        the one worth tapping, and a tick beside it would say
+                        the opposite. */}
+                    {due ? (
+                      <span className="point__due">Practise</span>
+                    ) : learned ? (
+                      <span className="point__check" aria-label="Practised">
                         ✓
                       </span>
                     ) : null}

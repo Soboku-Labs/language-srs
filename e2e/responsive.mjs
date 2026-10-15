@@ -20,7 +20,7 @@
 import { chromium } from 'playwright';
 const BASE = process.argv[2] ?? 'http://127.0.0.1:4200';
 const SIZES = [[320,568,'xs'],[360,640,'small'],[390,664,'phone'],[480,800,'big-phone'],[768,1024,'tablet'],[1024,768,'small-laptop'],[1280,800,'laptop'],[1680,1050,'wide']];
-const ROUTES = ['/','/home','/review','/learn','/learn/zh-shi','/words','/stats','/settings','/import'];
+const ROUTES = ['/','/home','/review','/learn','/learn/zh-shi','/practice/zh-shi','/words','/stats','/settings','/import'];
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const bad = [];
 const failures = [];

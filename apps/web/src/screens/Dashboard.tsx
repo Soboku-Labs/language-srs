@@ -37,19 +37,30 @@ export function Dashboard() {
       journey: engine.getJourney(),
       goal: engine.getDailyGoal(),
       grammar: (() => {
-        const points = getGrammarPoints(profile.languageCode);
-        return { total: points.length, learned: engine.countGrammarLearned(points.map((p) => p.id)) };
+        const ids = getGrammarPoints(profile.languageCode).map((point) => point.id);
+        return {
+          total: ids.length,
+          learned: engine.countGrammarLearned(ids),
+          due: engine.grammarDueNow(ids).length,
+        };
       })(),
     };
   }, [engine, revision]);
 
   const { profile, language, level, queue, stats, readiness, journey, goal, grammar } = view;
+  /*
+   * In priority order: practice that is waiting, then points never read, then
+   * the quiet state. Due practice leads because it is the only one of the
+   * three with a deadline attached to it.
+   */
   const grammarDetail =
     grammar.total === 0
       ? 'nothing yet'
-      : grammar.learned === grammar.total
-        ? `all ${grammar.total} read`
-        : `${grammar.total - grammar.learned} to read`;
+      : grammar.due > 0
+        ? `${grammar.due} to practise`
+        : grammar.learned < grammar.total
+          ? `${grammar.total - grammar.learned} to read`
+          : 'all caught up';
   // The calendar day, as the seed for the teacher's greeting.
   const today = engine.now().slice(0, 10);
   const waiting = queue.breakdown.due + queue.breakdown.fresh + queue.breakdown.learning;

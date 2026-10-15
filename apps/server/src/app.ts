@@ -4,6 +4,7 @@ import { bearerFrom } from './crypto/tokens.ts';
 import { ApiError } from './http/errors.ts';
 import { Router, readJsonBody, type RouteContext, type RouteResult } from './http/router.ts';
 import { AuthService, toPublicUser } from './services/auth.ts';
+import { SettingsService } from './services/settings.ts';
 import { StateConflictError, StateService } from './services/state.ts';
 import type { VocabularyService } from './services/vocabulary.ts';
 import type { ServerStore, SessionRecord, UserRecord } from './store/types.ts';
@@ -51,6 +52,7 @@ export function createApp(options: AppOptions): Server {
   const now = options.now ?? (() => new Date());
   const auth = new AuthService({ store: options.store, now, ...(options.authOptions ?? {}) });
   const state = new StateService(options.store);
+  const settings = new SettingsService(options.store);
   const limits = options.maxBodyBytes ?? { default: 256 * 1024, state: 16 * 1024 * 1024 };
   const allowedOrigins = options.allowedOrigins ?? ['*'];
 
@@ -144,6 +146,46 @@ export function createApp(options: AppOptions): Server {
     );
 
     return { status: 200, body: { revision: next.revision, updatedAt: next.updatedAt } };
+  });
+
+  // ---------------------------------------------------------------- settings
+
+  /*
+   * Two resources, because they are two subjects.
+   *
+   * These sit beside the state blob rather than inside it. The blob is the
+   * engine's own keys and the server must not interpret it; settings are the
+   * opposite — readable, answerable, and the thing another device needs before
+   * it has synced anything at all.
+   */
+  router.get('/settings', async (context) => {
+    const { user } = await require(context);
+    return { status: 200, body: await settings.getUser(user.id) };
+  });
+
+  router.put('/settings', async (context) => {
+    const { user } = await require(context);
+    const input = asObject(context.body);
+    return { status: 200, body: await settings.putUser(user.id, input, now()) };
+  });
+
+  router.get('/settings/languages', async (context) => {
+    const { user } = await require(context);
+    return { status: 200, body: { languages: await settings.listLanguages(user.id) } };
+  });
+
+  router.get('/settings/languages/:code', async (context) => {
+    const { user } = await require(context);
+    return { status: 200, body: await settings.getLanguage(user.id, context.params.code ?? '') };
+  });
+
+  router.put('/settings/languages/:code', async (context) => {
+    const { user } = await require(context);
+    const input = asObject(context.body);
+    return {
+      status: 200,
+      body: await settings.putLanguage(user.id, context.params.code ?? '', input, now()),
+    };
   });
 
   // ---------------------------------------------------------------- sittings

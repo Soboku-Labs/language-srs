@@ -35,6 +35,7 @@ import {
 import { LANGUAGE_CODES, getLanguageProfile, type LanguageCode } from './types/language';
 import type { GradeResult, Rating, ReviewSource } from './types/review';
 import { addDays, endOfStudyDay, systemClock, type Clock } from './utils/date';
+import type { Appearance, Backdrop } from './settings';
 import { buildWidgetSnapshot, buildWidgetTimeline, pickSpotlight, type WidgetSnapshot, type WidgetTimeline } from './widget/payload';
 import { applyPendingGrades, type PendingWidgetGrade } from './widget/pending';
 
@@ -138,33 +139,6 @@ interface EngineMeta {
   /** Light, dark, or whatever the device is set to. Absent means the device. */
   appearance?: Appearance;
 }
-
-/**
- * Light or dark, or neither decided here.
- *
- * `system` is the default and follows the device, which is right for most
- * people most of the time. The two explicit settings exist because the device
- * is not always right: a phone that flips to dark at sunset is wrong for
- * somebody studying under a desk lamp, and the reverse is wrong on a train at
- * night.
- */
-export type Appearance = 'system' | 'light' | 'dark';
-
-/**
- * How alive the background is.
- *
- * Not a skin. The two settings are a real disagreement about what a study app
- * should be, and both sides of it are reasonable:
- *
- * - **calm** — the scene is a still drawing. It moves when the learner moves,
- *   and otherwise it is a picture on a wall. Nothing competes with the card.
- * - **living** — the weather runs. Cloud drifts, kites sway, water moves, the
- *   light shifts across the sky. It is the same place, awake.
- *
- * It belongs to the account rather than the browser, because somebody who
- * wants their app still wants it still on their phone too.
- */
-export type Backdrop = 'calm' | 'living';
 
 export interface StudyEngineOptions {
   store: KeyValueStore;

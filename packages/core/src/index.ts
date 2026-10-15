@@ -351,6 +351,17 @@ export type { Clock } from './utils/date';
 export { cardId, parseCardId, reviewLogId, studySessionId } from './utils/id';
 
 // Engine
+export type { Appearance, Backdrop } from './settings';
+export {
+  DEFAULT_LANGUAGE_SETTINGS,
+  DEFAULT_USER_SETTINGS,
+  SETTINGS_LIMITS,
+  normaliseLanguageSettings,
+  normaliseUserSettings,
+  type LanguageSettings,
+  type LanguageSettingsPatch,
+  type UserSettings,
+} from './settings';
 export {
   BLANK,
   buildGrammarExercises,
@@ -374,8 +385,6 @@ export {
   STORAGE_KEYS,
   SYNCED_STORAGE_KEYS,
   StudyEngine,
-  type Appearance,
-  type Backdrop,
   type GrammarProgress,
 } from './engine';
 export type { StudyEngineOptions } from './engine';

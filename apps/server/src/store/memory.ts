@@ -1,4 +1,4 @@
-import type { AccountState, StudySessionRecord } from '@language-srs/core';
+import type { AccountState, LanguageSettings, StudySessionRecord, UserSettings } from '@language-srs/core';
 import type { ServerStore, SessionRecord, UserRecord } from './types.ts';
 
 /**
@@ -16,6 +16,9 @@ export class MemoryServerStore implements ServerStore {
   private readonly sessionsByToken = new Map<string, string>();
   private readonly state = new Map<string, AccountState>();
   private readonly studySessions = new Map<string, StudySessionRecord[]>();
+  private readonly userSettings = new Map<string, UserSettings>();
+  /** Keyed by `${userId}:${languageCode}`, which is the natural primary key. */
+  private readonly languageSettings = new Map<string, LanguageSettings>();
 
   async createUser(user: UserRecord): Promise<void> {
     this.users.set(user.id, { ...user });
@@ -89,5 +92,29 @@ export class MemoryServerStore implements ServerStore {
       userId,
       records.map((record) => ({ ...record })),
     );
+  }
+
+  async getUserSettings(userId: string): Promise<UserSettings | undefined> {
+    const found = this.userSettings.get(userId);
+    return found ? { ...found } : undefined;
+  }
+
+  async putUserSettings(userId: string, settings: UserSettings): Promise<void> {
+    this.userSettings.set(userId, { ...settings });
+  }
+
+  async listLanguageSettings(userId: string): Promise<LanguageSettings[]> {
+    return [...this.languageSettings.entries()]
+      .filter(([key]) => key.startsWith(`${userId}:`))
+      .map(([, value]) => ({ ...value }));
+  }
+
+  async getLanguageSettings(userId: string, code: string): Promise<LanguageSettings | undefined> {
+    const found = this.languageSettings.get(`${userId}:${code}`);
+    return found ? { ...found } : undefined;
+  }
+
+  async putLanguageSettings(userId: string, settings: LanguageSettings): Promise<void> {
+    this.languageSettings.set(`${userId}:${settings.languageCode}`, { ...settings });
   }
 }

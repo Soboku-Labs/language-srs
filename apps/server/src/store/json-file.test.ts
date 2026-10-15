@@ -129,6 +129,7 @@ describe('the JSON file store', () => {
     expect(await store.listSessionsForUser('user-1')).toHaveLength(1);
     expect(await store.listSessionsForUser('user-2')).toHaveLength(1);
   });
+
   /**
    * Found by deploying it. A container running as an unprivileged user with a
    * root-owned volume starts fine, passes its health check, and then fails on
@@ -154,4 +155,60 @@ describe('the JSON file store', () => {
       await chmod(directory, 0o700);
     },
   );
+
+  it('persists settings per user and per language', async () => {
+    const { path, store } = await temporaryStore();
+    await store.putUserSettings('user-1', {
+      appearance: 'dark',
+      backdrop: 'living',
+      dayStartHour: 6,
+      updatedAt: '2026-07-31T09:00:00.000Z',
+    });
+    await store.putLanguageSettings('user-1', {
+      languageCode: 'zh',
+      examTrackId: 'hsk',
+      targetLevelId: 'hsk-3',
+      dailyNewLimit: 25,
+      dailyReviewLimit: 200,
+      desiredRetention: 0.92,
+      updatedAt: '2026-07-31T09:00:00.000Z',
+    });
+    await store.putLanguageSettings('user-2', {
+      languageCode: 'ja',
+      examTrackId: 'jlpt',
+      targetLevelId: 'jlpt-n5',
+      dailyNewLimit: 5,
+      dailyReviewLimit: 50,
+      desiredRetention: 0.9,
+      updatedAt: '2026-07-31T09:00:00.000Z',
+    });
+
+    const reopened = await JsonFileServerStore.open(path);
+    expect(await reopened.getUserSettings('user-1')).toMatchObject({ appearance: 'dark' });
+    expect(await reopened.getUserSettings('user-2')).toBeUndefined();
+    // Keyed by user and language together, so listing one account cannot pick
+    // up another's row.
+    expect(await reopened.listLanguageSettings('user-1')).toHaveLength(1);
+    expect(await reopened.getLanguageSettings('user-1', 'ja')).toBeUndefined();
+  });
+
+  /**
+   * Settings were added after the first deployments, so a file on disk may not
+   * have the two maps at all. Opening one must not leave them undefined — the
+   * first `listLanguageSettings` would throw on `Object.entries(undefined)`.
+   */
+  it('opens a file written before settings existed', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'srs-store-'));
+    directories.push(directory);
+    const path = JsonFileServerStore.pathFor(directory);
+    await writeFile(
+      path,
+      JSON.stringify({ version: 1, users: [user], sessions: [], state: {}, studySessions: {} }),
+      'utf8',
+    );
+
+    const store = await JsonFileServerStore.open(path);
+    expect(await store.listLanguageSettings('user-1')).toEqual([]);
+    expect(await store.getUserSettings('user-1')).toBeUndefined();
+  });
 });

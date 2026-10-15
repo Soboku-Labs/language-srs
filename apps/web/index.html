@@ -18,10 +18,23 @@
       light/dark pair uses media queries so the favicon follows the browser
       theme rather than disappearing into one of them.
     -->
-    <link rel="icon" href="icon.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
-    <link rel="icon" href="icon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
-    <link rel="apple-touch-icon" href="apple-touch-icon.svg" />
-    <link rel="manifest" href="manifest.webmanifest" />
+    <!--
+      Absolute, via Vite's build-time base, rather than relative.
+
+      Every unmatched path is served this same document, so a relative href is
+      resolved against whatever URL the learner happened to open. From
+      /word/zh-nihao, "icon.svg" means /word/icon.svg and the icons and the
+      installable manifest both 404 — on exactly the deep links somebody is
+      most likely to have bookmarked or shared.
+
+      The manifest's own relative entries are fine: those resolve against the
+      manifest's URL, so fixing this one link fixes start_url and the icons
+      inside it too.
+    -->
+    <link rel="icon" href="%BASE_URL%icon.svg" type="image/svg+xml" media="(prefers-color-scheme: light)" />
+    <link rel="icon" href="%BASE_URL%icon-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)" />
+    <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon.svg" />
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
     <style>
       :root { color-scheme: light dark; }
       html, body { margin: 0; height: 100%; background: #FBFAF8; }

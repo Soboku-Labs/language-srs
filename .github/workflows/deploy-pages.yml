@@ -43,9 +43,16 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Builds apps/web, the Vite app. It was the Expo export until this
+      # deployed nothing anybody was working on: every change to the web app
+      # lands in apps/web, and the site was still serving apps/mobile. The Expo
+      # project stays in the repo for the iOS and Android builds, where its
+      # React Native runtime is the point — it is simply not what the web
+      # should be served from.
+      #
       # Sets the /language-srs sub-path, then writes .nojekyll and 404.html.
-      # Without .nojekyll, Pages' Jekyll step drops the _expo/ bundle directory
-      # and the site serves a blank page.
+      # The 404 is a copy of index.html, which is what makes a deep link such as
+      # /stats boot the app instead of showing Pages' own not-found page.
       #
       # API_URL is a repository *variable* (Settings ▸ Secrets and variables ▸
       # Actions ▸ Variables), not a secret: it is inlined into a public bundle,
@@ -54,14 +61,14 @@ jobs:
       # says so, which is the right behaviour for a fork with no server.
       - name: Build web
         env:
-          EXPO_PUBLIC_API_URL: ${{ vars.API_URL }}
+          VITE_API_URL: ${{ vars.API_URL }}
         run: npm run web:pages
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/mobile/dist
+          path: apps/web/dist
 
   deploy:
     needs: build

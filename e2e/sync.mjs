@@ -19,11 +19,13 @@
  *
  * Usage — needs a server and a built web app pointed at it:
  *
- *   npm run build --workspace @language-srs/server
- *   PORT=4060 node apps/server/dist/main.js &
- *   VITE_API_URL=http://127.0.0.1:4060 npm run build --workspace @language-srs/web
- *   npx vite preview --port 4200 --outDir apps/web/dist &
- *   node e2e/sync.mjs [webUrl] [apiUrl]
+ *   PORT=4060 DATA_DIR=memory npm run server &
+ *   VITE_API_URL=http://127.0.0.1:4060 npm run web:vite:build
+ *   npm run preview --workspace @language-srs/web -- --port 4200 &
+ *   npm run e2e:sync
+ *
+ * `DATA_DIR=memory` keeps the accounts this test registers out of a real
+ * `.data` directory; it registers a fresh one on every run.
  */
 import { chromium } from 'playwright';
 

@@ -36,6 +36,7 @@ import { LANGUAGE_CODES, getLanguageProfile, type LanguageCode } from './types/l
 import type { GradeResult, Rating, ReviewSource } from './types/review';
 import { addDays, endOfStudyDay, systemClock, type Clock } from './utils/date';
 import { SETTINGS_LIMITS, type Appearance, type Backdrop } from './settings';
+import { buildBooks, type Book, type ChapterProgress } from './books';
 import { buildWidgetSnapshot, buildWidgetTimeline, pickSpotlight, type WidgetSnapshot, type WidgetTimeline } from './widget/payload';
 import { applyPendingGrades, type PendingWidgetGrade } from './widget/pending';
 
@@ -52,6 +53,8 @@ export const STORAGE_KEYS = {
   sessions: `${KEY_PREFIX}:sessions`,
   /** Grammar points the learner has worked through, by id. */
   grammar: `${KEY_PREFIX}:grammar`,
+  /** Writing-book progress, by chapter id. */
+  writing: `${KEY_PREFIX}:writing`,
   /** The flattened snapshot the native widget reads. Never read back by the app. */
   widget: `${KEY_PREFIX}:widget`,
 } as const;
@@ -97,6 +100,7 @@ export const SYNCED_STORAGE_KEYS: string[] = [
   STORAGE_KEYS.entries,
   STORAGE_KEYS.sessions,
   STORAGE_KEYS.grammar,
+  STORAGE_KEYS.writing,
 ];
 
 /**
@@ -215,6 +219,7 @@ export class StudyEngine {
   private sessions: StudySessionRecord[];
   /** Grammar point id -> what is known about it. */
   private grammar: Record<string, GrammarProgress>;
+  private writing: Record<string, ChapterProgress>;
   /**
    * Vocabulary handed in at runtime, from the API.
    *
@@ -245,6 +250,7 @@ export class StudyEngine {
       pending: PendingWidgetGrade[];
       sessions: StudySessionRecord[];
       grammar: Record<string, GrammarProgress>;
+      writing: Record<string, ChapterProgress>;
     },
   ) {
     this.clock = options.clock ?? systemClock;
@@ -255,6 +261,7 @@ export class StudyEngine {
     this.pending = state.pending;
     this.sessions = state.sessions;
     this.grammar = state.grammar;
+    this.writing = state.writing;
     this.reindexEntries();
   }
 
@@ -279,6 +286,7 @@ export class StudyEngine {
       pending: await readJson<PendingWidgetGrade[]>(store, STORAGE_KEYS.pending, []),
       sessions: await readJson<StudySessionRecord[]>(store, STORAGE_KEYS.sessions, []),
       grammar: readGrammar(await readJson<Record<string, unknown>>(store, STORAGE_KEYS.grammar, {})),
+      writing: await readJson<Record<string, ChapterProgress>>(store, STORAGE_KEYS.writing, {}),
     });
 
     // A fresh install has no profile and no cards; a returning one may have new
@@ -1059,6 +1067,53 @@ export class StudyEngine {
    * understanding was not there, and resuming at four days would be treating a
    * misunderstanding as a lapse of memory.
    */
+  // ---------------------------------------------------------------- writing
+
+  /**
+   * The writing books for a language, with no progress attached.
+   *
+   * Rebuilt rather than stored: the books are a view of the syllabus and the
+   * deck, and storing them would mean a learner who imports a word list has
+   * books that do not contain it until something invalidates a cache.
+   */
+  getBooks(code: LanguageCode = this.meta.activeLanguage): Book[] {
+    return buildBooks(code, this.getProfile(code).targetLevelId, this.getEntries(code));
+  }
+
+  /** Progress through every chapter, by chapter id. */
+  getWritingProgress(): Record<string, ChapterProgress> {
+    // Copied, so a caller cannot mutate the engine's state by holding it.
+    return Object.fromEntries(
+      Object.entries(this.writing).map(([id, value]) => [id, { ...value, written: [...value.written] }]),
+    );
+  }
+
+  /**
+   * Record that a character was written.
+   *
+   * Idempotent on the entry: writing the same character a second time is
+   * practice rather than progress, and ticking it twice would let a chapter
+   * read as finished when half of it had never been attempted.
+   *
+   * There is no "wrong" here, and that is deliberate. Nothing in the app can
+   * see what was drawn, so the only honest record is that it was attempted.
+   * The scheduler already knows whether the character is remembered — that is
+   * what the `writing` card kind is for — and inventing a pass/fail from a
+   * canvas nobody read would be a number with nothing behind it.
+   */
+  async recordWritten(chapterId: string, entryId: string): Promise<void> {
+    const existing = this.writing[chapterId] ?? { written: [] };
+    if (existing.written.includes(entryId)) return;
+
+    this.writing[chapterId] = {
+      written: [...existing.written, entryId],
+      lastWrittenAt: this.now(),
+    };
+
+    await writeJson(this.options.store, STORAGE_KEYS.writing, this.writing);
+    await this.notifyChanged();
+  }
+
   async recordGrammarPractice(id: string, passed: boolean): Promise<void> {
     const now = this.clock();
     const existing = this.grammar[id] ?? { learnedAt: now, due: now, streak: 0 };
@@ -1141,6 +1196,7 @@ export class StudyEngine {
     // and a field left unread here would keep the previous device's answer in
     // memory until the next launch.
     this.grammar = readGrammar(await readJson<Record<string, unknown>>(this.options.store, STORAGE_KEYS.grammar, {}));
+    this.writing = await readJson<Record<string, ChapterProgress>>(this.options.store, STORAGE_KEYS.writing, {});
     this.reindexEntries();
 
     await this.ensureProfile(this.meta.activeLanguage);

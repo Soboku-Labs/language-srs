@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  bookFraction,
   getGrammarPoints,
   describePlace,
   findExamLevel,
@@ -53,6 +54,22 @@ export function Dashboard() {
    * the quiet state. Due practice leads because it is the only one of the
    * three with a deadline attached to it.
    */
+  /*
+   * How far through the writing books, or nothing at all.
+   *
+   * Computed here rather than inside the tile so a language with no character
+   * practice renders no tile, instead of one that says "0%" about something
+   * that does not exist for it.
+   */
+  const writing = useMemo(() => {
+    const books = engine.getBooks(profile.languageCode);
+    if (books.length === 0) return undefined;
+    const progress = engine.getWritingProgress();
+    const done = books.reduce((sum, book) => sum + bookFraction(book, progress), 0) / books.length;
+    return done > 0 ? `${Math.round(done * 100)}% written` : `${books.length} books`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, revision, profile.languageCode]);
+
   const grammarDetail =
     grammar.total === 0
       ? 'nothing yet'
@@ -202,6 +219,11 @@ export function Dashboard() {
             detail={`${stats.coverage.entriesStarted} started`}
             onClick={() => navigate('/words')}
           />
+          {/* Only where the script has characters to draw — see the books
+              module. Hidden rather than shown-and-empty for Vietnamese. */}
+          {writing ? (
+            <ModeLink label="Writing" detail={writing} onClick={() => navigate('/write')} />
+          ) : null}
           <ModeLink
             label="Progress"
             detail={profile.examDate ? describeCountdown(readiness.daysToExam) : 'streak and retention'}

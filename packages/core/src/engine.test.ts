@@ -1056,3 +1056,75 @@ describe('settings and the synced blob', () => {
     expect(reopened.appearance).toBe('dark');
   });
 });
+
+/**
+ * Writing books, which are a different activity from the review queue.
+ *
+ * The queue decides what you see and when. A workbook is the same characters,
+ * in order, with the ones you have done marked off — so progress here is a
+ * count rather than a schedule.
+ */
+describe('writing books', () => {
+  it('offers books for a language written in characters', async () => {
+    const { engine } = await makeEngine();
+    const books = engine.getBooks('zh');
+    expect(books.length).toBeGreaterThan(0);
+    expect(books[0]!.chapters.length).toBeGreaterThan(0);
+  });
+
+  it('offers none for a Latin-alphabet language', async () => {
+    const { engine } = await makeEngine();
+    await engine.setActiveLanguage('vi');
+    expect(engine.getBooks('vi')).toEqual([]);
+  });
+
+  it('records a character as written, once', async () => {
+    const { engine } = await makeEngine();
+    const chapter = engine.getBooks('zh')[0]!.chapters[0]!;
+    const character = chapter.items[0]!.character;
+
+    await engine.recordWritten(chapter.id, character);
+    await engine.recordWritten(chapter.id, character);
+
+    // Writing it twice is practice, not progress. Counting it twice would let
+    // a chapter read as finished with half of it never attempted.
+    expect(engine.getWritingProgress()[chapter.id]?.written).toEqual([character]);
+  });
+
+  it('keeps progress across a restart', async () => {
+    const { engine, store } = await makeEngine();
+    const chapter = engine.getBooks('zh')[0]!.chapters[0]!;
+    await engine.recordWritten(chapter.id, chapter.items[0]!.character);
+
+    const reopened = await StudyEngine.create({
+      store,
+      seedEntries: SEED_ENTRIES,
+      clock: fixedClock(NOW),
+    });
+    expect(reopened.getWritingProgress()[chapter.id]?.written).toHaveLength(1);
+  });
+
+  it('hands back a copy, so a caller cannot write to the engine', async () => {
+    const { engine } = await makeEngine();
+    const chapter = engine.getBooks('zh')[0]!.chapters[0]!;
+    await engine.recordWritten(chapter.id, chapter.items[0]!.character);
+
+    engine.getWritingProgress()[chapter.id]!.written.push('smuggled');
+    expect(engine.getWritingProgress()[chapter.id]?.written).not.toContain('smuggled');
+  });
+
+  it('travels with the account rather than staying on the device', async () => {
+    const { engine } = await makeEngine();
+    const chapter = engine.getBooks('zh')[0]!.chapters[0]!;
+    await engine.recordWritten(chapter.id, chapter.items[0]!.character);
+
+    // A workbook you are halfway through is exactly the thing that should be
+    // on your phone when you pick it up.
+    const exported = await engine.exportState();
+    expect(exported[STORAGE_KEYS.writing]).toBeDefined();
+
+    const other = await makeEngine();
+    await other.engine.importState(exported);
+    expect(other.engine.getWritingProgress()[chapter.id]?.written).toHaveLength(1);
+  });
+});

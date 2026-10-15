@@ -19,6 +19,7 @@ import { GrammarPoint } from './screens/GrammarPoint';
 import { SignIn } from './screens/SignIn';
 import { Start } from './screens/Start';
 import { Roadmap } from './screens/Roadmap';
+import { Write } from './screens/Write';
 import { StorageWarning } from './components/StorageWarning';
 import { Caption, Screen, TextButton, Title } from './ui';
 
@@ -185,6 +186,9 @@ function Routes() {
   if (path === '/stats') return <Stats />;
   if (path === '/settings') return <Settings />;
   if (path === '/upcoming') return <Roadmap />;
+  // One route family, because the books, their chapters and a page of one are
+  // a single activity that the back button should walk out through.
+  if (path === '/write' || path.startsWith('/write/')) return <Write />;
   if (path === '/import') return <Import />;
 
   // The picker is the door now. Kept so a bookmark from the old structure

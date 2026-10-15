@@ -115,6 +115,55 @@ export type { DailyGoal } from './session/goal';
 export { JOURNEYS, getJourney, getLadder, stageEarned } from './journey';
 export type { Journey, JourneyLadder, JourneyStage } from './journey';
 
+// Answering — multiple choice, typed input, tone questions
+//
+// Distinct from `practice/`, which checks an answer the learner has given. This
+// decides *how* a card is asked and builds the options: the exams are almost
+// entirely multiple choice, and a learner who has only ever revealed and
+// self-graded has never practised picking the right answer out of four with
+// three plausible ones beside it.
+export {
+  CHOICE_COUNT,
+  MEANING_KINDS,
+  PRODUCTION_KINDS,
+  buildChoiceOptions,
+  buildQuestion,
+  buildToneOptions,
+  checkTypedAnswer,
+  editDistance,
+  expectedAnswers,
+  isAutoGraded,
+  isTypingFeasible,
+  normaliseAnswer,
+  optionLabel,
+  resolveAnswerMode,
+  seededRandom,
+  stripDiacritics,
+  suggestRating,
+  toneName,
+} from './answer';
+export type {
+  AnswerAttempt,
+  AnswerCheck,
+  AnswerMode,
+  AnswerOption,
+  AnswerQuality,
+  BuildQuestionOptions,
+  Question,
+} from './answer';
+
+// Deck — the learner's words as a browsable list, for search and triage
+//
+// `stats/words` answers "how strong is each word" for the grid; this answers
+// "show me the words matching this, sorted like that", which is a different
+// question and wants a different shape.
+export { countByStatus, filterDeck, sortDeck, summariseDeck } from './deck';
+export type { DeckEntry, DeckFilter, DeckSort, DeckStatus, SummariseDeckOptions } from './deck';
+
+// Sync — how two devices reconcile when both have studied
+export { mergeStateValues } from './sync';
+export type { StateMergeResult } from './sync';
+
 // Triage — the words that are fighting the learner
 export { describeStruggle, findStrugglingCards } from './triage';
 export type { FindStrugglingOptions, StruggleReason, StrugglingCard } from './triage';

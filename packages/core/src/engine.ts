@@ -1,4 +1,6 @@
-import { generateCards } from './cards/factory';
+import { buildQuestion, type AnswerMode, type Question } from './answer';
+import { createCard, generateCards } from './cards/factory';
+import { summariseDeck, type DeckEntry } from './deck';
 import { SEED_ENTRIES } from './data/seed';
 import { findExamTrack, getExamTrack, getLevelIdsInScope } from './exams';
 import { getJourney, type Journey } from './journey';
@@ -32,7 +34,7 @@ import {
 } from './types/card';
 import { LANGUAGE_CODES, getLanguageProfile, type LanguageCode } from './types/language';
 import type { GradeResult, Rating, ReviewSource } from './types/review';
-import { systemClock, type Clock } from './utils/date';
+import { endOfStudyDay, systemClock, type Clock } from './utils/date';
 import { buildWidgetSnapshot, buildWidgetTimeline, pickSpotlight, type WidgetSnapshot, type WidgetTimeline } from './widget/payload';
 import { applyPendingGrades, type PendingWidgetGrade } from './widget/pending';
 
@@ -58,6 +60,14 @@ export const STORAGE_KEYS = {
  * regenerated on every state change, so syncing it would double the payload to
  * transfer something the receiving device is about to overwrite anyway.
  */
+/**
+ * How many gradings back you can undo.
+ *
+ * Deep enough to fix a mis-tap noticed a few cards later, shallow enough that it
+ * cannot rewind a session.
+ */
+const MAX_UNDO_DEPTH = 10;
+
 export const SYNCED_STORAGE_KEYS: string[] = [
   STORAGE_KEYS.meta,
   STORAGE_KEYS.cards,
@@ -150,6 +160,14 @@ export class StudyEngine {
    * payload by a megabyte to say nothing new.
    */
   private vocabulary: LexicalEntry[] = [];
+  /**
+   * Cards as they were before their last grading, newest last.
+   *
+   * Deep enough to fix a mis-tap noticed a few cards later, shallow enough that
+   * it cannot be used to rewind a session — which would turn undo into a way to
+   * farm the streak.
+   */
+  private readonly undoStack: { card: Card; logId: string }[] = [];
   private readonly entriesById = new Map<string, LexicalEntry>();
   private readonly clock: Clock;
 
@@ -247,6 +265,18 @@ export class StudyEngine {
 
   getAllCards(code: LanguageCode = this.meta.activeLanguage): Card[] {
     return this.cards.filter((card) => card.languageCode === code);
+  }
+
+  /**
+   * Every known word in one language, as a list.
+   *
+   * The pool distractors are drawn from, which is why it is every entry rather
+   * than only the ones in scope: a plausible wrong answer for an HSK 1 word is
+   * often an HSK 2 word, and limiting the pool to the current level makes the
+   * options easier than the exam's.
+   */
+  getEntries(code: LanguageCode = this.meta.activeLanguage): LexicalEntry[] {
+    return [...this.entriesById.values()].filter((entry) => entry.languageCode === code);
   }
 
   getEntry(entryId: string): LexicalEntry | undefined {
@@ -414,6 +444,46 @@ export class StudyEngine {
 
   // ---------------------------------------------------------------- studying
 
+  /**
+   * The queue, with each card already turned into a question.
+   *
+   * Mode, distractors and interval previews resolved here rather than by the
+   * caller. A client assembling its own questions needs the entry pool, the
+   * profile's retention and its exam date to do it, and will get one of the
+   * three wrong — which shows up as the same card being asked differently on a
+   * phone than on a laptop.
+   */
+  getQuestions(
+    options: {
+      code?: LanguageCode;
+      sessionLimit?: number;
+      now?: Timestamp;
+      preferred?: AnswerMode;
+    } = {},
+  ): { questions: Question[]; queue: StudyQueue } {
+    const code = options.code ?? this.meta.activeLanguage;
+    const now = options.now ?? this.now();
+    const queue = this.getQueue({ ...options, code, now });
+
+    // Built once and shared: the pool is every entry in the language, and
+    // rebuilding it per card would re-walk the whole deck for each question.
+    const pool = this.getEntries(code);
+    const profile = this.getProfile(code);
+
+    return {
+      queue,
+      questions: queue.cards.map((pair) =>
+        buildQuestion({
+          pair,
+          pool,
+          profile,
+          now,
+          ...(options.preferred !== undefined ? { preferred: options.preferred } : {}),
+        }),
+      ),
+    };
+  }
+
   getQueue(options: { code?: LanguageCode; sessionLimit?: number; now?: Timestamp } = {}): StudyQueue {
     const code = options.code ?? this.meta.activeLanguage;
     const profile = this.getProfile(code);
@@ -448,6 +518,10 @@ export class StudyEngine {
       ...(options.durationMs !== undefined ? { durationMs: options.durationMs } : {}),
       source: options.source ?? 'app',
     });
+
+    // Remembered before it is replaced, so a mis-tap can be taken back.
+    this.undoStack.push({ card, logId: result.log.id });
+    if (this.undoStack.length > MAX_UNDO_DEPTH) this.undoStack.shift();
 
     this.cards[index] = result.card;
     this.logs.push(result.log);
@@ -540,6 +614,130 @@ export class StudyEngine {
       ...(options.limit !== undefined ? { limit: options.limit } : {}),
       ...(options.since !== undefined ? { since: options.since } : {}),
     });
+  }
+
+  /** Suspend or restore every card for one word. */
+  async setEntrySuspended(entryId: string, suspended: boolean): Promise<void> {
+    let changed = false;
+    this.cards = this.cards.map((card) => {
+      if (card.entryId !== entryId || Boolean(card.suspended) === suspended) return card;
+      changed = true;
+      return { ...card, suspended };
+    });
+
+    if (!changed) return;
+    await this.persistCards();
+    await this.notifyChanged();
+  }
+
+  // ------------------------------------------------- undo, burying, rescue
+
+  /**
+   * Methods the deck and review screens act through.
+   *
+   * `undoLastGrade` exists because a mis-tap is a real event and the scheduler
+   * treats a stray Again as evidence about memory. `resetCard` and `clearLeech`
+   * are the two ways out for a word that has been forgotten so often that FSRS
+   * has correctly learned it is hard and will keep returning it forever.
+   */
+  async undoLastGrade(): Promise<boolean> {
+    const previous = this.undoStack.pop();
+    if (!previous) return false;
+
+    const index = this.cards.findIndex((card) => card.id === previous.card.id);
+    if (index === -1) return false;
+
+    this.cards[index] = previous.card;
+    this.logs = this.logs.filter((log) => log.id !== previous.logId);
+
+    await Promise.all([this.persistCards(), this.persistLogs()]);
+    await this.notifyChanged();
+    return true;
+  }
+
+  get canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+
+  async setCardBuried(cardId: string, until?: Timestamp): Promise<void> {
+    const index = this.cards.findIndex((card) => card.id === cardId);
+    if (index === -1) return;
+
+    const card = this.cards[index]!;
+    const profile = this.getProfile(card.languageCode);
+    const buriedUntil = until ?? endOfStudyDay(this.now(), profile.dayStartHour);
+
+    this.cards[index] = { ...card, buriedUntil };
+    await this.persistCards();
+    await this.notifyChanged();
+  }
+
+  getAvailableWordCount(code: LanguageCode = this.meta.activeLanguage): number {
+    const scope = new Set(getLevelIdsInScope(this.getProfile(code).targetLevelId));
+    return this.getEntries(code).filter((entry) => entry.levelIds.some((id) => scope.has(id))).length;
+  }
+
+  getDeck(code: LanguageCode = this.meta.activeLanguage, now: Timestamp = this.now()): DeckEntry[] {
+    const profile = this.getProfile(code);
+    return summariseDeck({
+      entries: this.getEntries(code),
+      cards: this.getAllCards(code),
+      now,
+      targetLevelId: profile.targetLevelId,
+    });
+  }
+
+  async resetCard(cardId: string): Promise<void> {
+    const index = this.cards.findIndex((card) => card.id === cardId);
+    if (index === -1) return;
+
+    const card = this.cards[index]!;
+    const entry = this.entriesById.get(card.entryId);
+    if (!entry) return;
+
+    this.cards[index] = {
+      ...createCard(entry, card.kind, card.levelId, this.now()),
+      // Kept from the old card: when the learner first met this word, and any
+      // decision they have made about whether it should be in rotation.
+      createdAt: card.createdAt,
+      ...(card.suspended !== undefined ? { suspended: card.suspended } : {}),
+    };
+
+    await this.persistCards();
+    await this.notifyChanged();
+  }
+
+  async clearLeech(cardId: string): Promise<void> {
+    const index = this.cards.findIndex((card) => card.id === cardId);
+    if (index === -1) return;
+
+    const card = this.cards[index]!;
+    if (!card.leech) return;
+
+    // Lapses are reset alongside the flag, because the scheduler re-raises the
+    // flag from the lapse count — leaving it would mean the flag came back on the
+    // very next lapse and the button appeared to do nothing.
+    this.cards[index] = { ...card, leech: false, lapses: 0 };
+    await this.persistCards();
+    await this.notifyChanged();
+  }
+
+  async setEntryNote(entryId: string, note: string): Promise<void> {
+    const entry = this.entriesById.get(entryId);
+    if (!entry) return;
+
+    const trimmed = note.trim();
+    if ((entry.mnemonic ?? '') === trimmed) return;
+
+    const { mnemonic: _dropped, ...withoutNote } = entry;
+    const updated: LexicalEntry = trimmed ? { ...entry, mnemonic: trimmed } : withoutNote;
+
+    const existing = this.importedEntries.filter((candidate) => candidate.id !== entryId);
+    this.importedEntries = [...existing, updated];
+    this.reindexEntries();
+
+    await writeJson(this.options.store, STORAGE_KEYS.entries, this.importedEntries);
+    await this.notifyChanged();
   }
 
   // ---------------------------------------------------------------- sittings

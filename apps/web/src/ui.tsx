@@ -122,14 +122,29 @@ export function BigButton({
   hint,
   onClick,
   disabled,
+  /**
+   * `quiet` draws it as an outline rather than a filled block.
+   *
+   * For a second full-width action on the same screen. Two filled buttons
+   * read as two primary actions, and whichever is lower on the page wins by
+   * weight — on the sign-in screen that made "Use this device" the loudest
+   * thing on a page whose job is signing in.
+   */
+  quiet = false,
 }: {
   label: string;
   hint?: string;
   onClick: () => void;
   disabled?: boolean;
+  quiet?: boolean;
 }) {
   return (
-    <button type="button" className="button" onClick={onClick} disabled={disabled}>
+    <button
+      type="button"
+      className={`button${quiet ? ' button--quiet' : ''}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
       {label}
       {hint ? <span className="button__hint">{hint}</span> : null}
     </button>

@@ -2189,3 +2189,46 @@ a { color: var(--accent); }
   cursor: pointer;
   text-decoration: underline;
 }
+
+/* ---------------------------------------------------------------- sign in */
+.signin__head {
+  display: grid;
+  gap: var(--space-xs);
+  justify-items: center;
+  text-align: center;
+  padding: var(--space-lg) 0 var(--space-sm);
+}
+
+/*
+  A build fact, stated plainly.
+
+  Not an error colour: nothing has gone wrong, this build simply has no API.
+  Styling it as a failure would tell somebody the app is broken when it is
+  working exactly as deployed.
+*/
+.notice {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--surface-raised);
+  border-radius: var(--radius-card);
+}
+.notice__title {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+
+/*
+  A second full-width action, drawn as an outline.
+
+  Two filled buttons on one screen read as two primary actions, and the lower
+  one wins by weight regardless of which matters more. See `BigButton`.
+*/
+.button--quiet {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.button--quiet:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--ink-faint); }
+.button--quiet .button__hint { opacity: 0.85; color: var(--ink-muted); }

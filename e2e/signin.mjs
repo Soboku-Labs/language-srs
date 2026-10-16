@@ -247,6 +247,50 @@ if (unknown !== shown) {
   failures.push(`an unknown email says "${unknown}" but a wrong password says "${shown}" — the form tells a stranger which emails are registered`);
 }
 
+// --------------------------------------- the test credential signs you in
+
+/*
+ * Something to type, for a build with no server.
+ *
+ * The deployed site has no API, so the form had nothing to accept and was
+ * hidden entirely — which is why there appeared to be no sign-in page at all.
+ * `test` / `test` is something it can accept. It authenticates nothing: it
+ * lands in the same local demo the button opens, with no token, so it cannot
+ * reach a server resource because it never obtains anything to reach one
+ * with.
+ *
+ * Asserted through the form rather than by calling the helper, because what
+ * matters is that typing them and pressing Sign in works.
+ */
+const tester = await device('test-credential');
+await tester.goto(`${BASE}/sign-in`, { waitUntil: 'networkidle' });
+await tester.waitForTimeout(700);
+
+const panel = tester.locator('.testcreds');
+if ((await panel.count()) === 0) {
+  failures.push('the sign-in form does not offer the test credential, so there is nothing to type');
+} else {
+  await panel.click();
+  await tester.waitForTimeout(400);
+  const typed = [
+    await tester.locator('input[name="email"]').inputValue(),
+    await tester.locator('input[name="password"]').inputValue(),
+  ];
+  await tester.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await tester.waitForTimeout(3500);
+
+  const record = await tester.evaluate(() => {
+    const raw = localStorage.getItem('srs:v1:account');
+    return raw ? JSON.parse(raw) : null;
+  });
+  console.log(`test credential ${typed.join(' / ')} -> demo=${record?.demo === true} token=${Boolean(record?.token)}`);
+
+  if (record?.demo !== true) failures.push('the test credential did not sign anybody in');
+  if (record?.token) {
+    failures.push('the test credential produced a token — it is meant to authenticate nothing');
+  }
+}
+
 // ------------------------------------------- the demo opens what it claims
 
 /*

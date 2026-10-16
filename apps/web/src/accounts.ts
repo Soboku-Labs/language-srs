@@ -82,6 +82,28 @@ export const DEMO_ACCOUNT_ID = 'demo';
  * stays switched off. The demo never talks to a server, which is the honest
  * behaviour: there is no account for it to sync to.
  */
+/**
+ * A credential you can type, for a build with no server behind it.
+ *
+ * The deployed site has no API, so there is no account to make and nothing to
+ * sign in to — and "press the demo button" is not what somebody looking at a
+ * sign-in form is trying to do. These are the words to type instead.
+ *
+ * **It authenticates nothing.** There is no test user on any server; typing
+ * these lands in the same local demo the button opens, with the same banner
+ * saying so and the same absence of a token. It cannot reach a server
+ * resource because it never obtains anything to reach one with, which is why
+ * it is safe to ship alongside the real form: the real credentials still go
+ * to the real API, and only this exact pair is intercepted.
+ */
+export const TEST_EMAIL = 'test';
+export const TEST_PASSWORD = 'test';
+
+/** Whether what was typed is the local test pair rather than a real account. */
+export function isTestCredential(email: string, password: string): boolean {
+  return email.trim().toLowerCase() === TEST_EMAIL && password === TEST_PASSWORD;
+}
+
 export async function createDemoAccount(): Promise<StoredAccount> {
   return saveAccount({
     id: DEMO_ACCOUNT_ID,

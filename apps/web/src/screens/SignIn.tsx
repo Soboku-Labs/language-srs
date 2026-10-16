@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { PASSWORD_MIN_LENGTH, type AuthErrorCode } from '@language-srs/core';
 import { ApiRequestError } from '@language-srs/client';
+import { TEST_EMAIL, TEST_PASSWORD } from '../accounts';
+import { hasBackend } from '../api';
 import { useAuth, type AuthMode } from '../providers';
 import { useRouter } from '../router';
 import { BigButton, Caption, Rise, Screen, Section, TextButton, Title } from '../ui';
@@ -54,7 +56,11 @@ export function SignIn() {
    * locked-feature panels. Everything else means sign in, which is also what
    * the route is called.
    */
-  const [mode, setMode] = useState<AuthMode>(query.get('new') === '1' ? 'register' : 'signIn');
+  const [mode, setMode] = useState<AuthMode>(
+    // Never register where there is no server to register with: `?new=1`
+    // arrives from the gates and the bar, which do not know that.
+    query.get('new') === '1' && hasBackend ? 'register' : 'signIn',
+  );
 
   /*
    * Where to go afterwards.
@@ -156,16 +162,27 @@ export function SignIn() {
               this browser.
             </Caption>
             <Caption>
-              Carrying progress to a second device is the only thing an account adds, and it is
-              the only thing missing here.
+              The test account below works here and signs you in locally, so you can see the whole
+              app. Carrying progress to a second device is the one thing it cannot do.
             </Caption>
           </div>
         </Rise>
       ) : null}
 
-      {canSignIn ? (
-        <Rise index={1}>
-          <Section title={registering ? 'Create an account' : 'Sign in'}>
+      {/*
+        The form shows even where there is no API.
+        
+        It used to be hidden entirely, on the grounds that a password field
+        with nothing behind it is a lie told to whoever types into it. That
+        was right when nothing was behind it. The test credential is
+        something behind it, so a build with no server now has a sign-in form
+        that accepts exactly one thing and says which.
+
+        Registering still needs a server, so that half stays hidden rather
+        than offering to create an account that cannot exist.
+      */}
+      <Rise index={1}>
+        <Section title={registering ? 'Create an account' : 'Sign in'}>
             <form
               className="stack"
               onSubmit={(event) => {
@@ -229,16 +246,46 @@ export function SignIn() {
                 onClick={submit}
               />
             </form>
-            <TextButton
-              label={registering ? 'I already have an account' : 'Create an account instead'}
+          {/*
+              The credentials, written down.
+
+              Somebody who has come to a sign-in form is trying to type
+              something, and "press the other button instead" is not an answer
+              to that. These fill the form and go through the same submit as any
+              other sign-in — they just resolve locally, because there is no
+              server to resolve them against.
+            */}
+            <button
+              type="button"
+              className="testcreds"
               onClick={() => {
-                setMode(registering ? 'signIn' : 'register');
+                setMode('signIn');
+                setEmail(TEST_EMAIL);
+                setPassword(TEST_PASSWORD);
                 setError(undefined);
               }}
-            />
-          </Section>
-        </Rise>
-      ) : null}
+            >
+              <span className="testcreds__label">Try it with a test account</span>
+              <span className="testcreds__pair">
+                {TEST_EMAIL} / {TEST_PASSWORD}
+              </span>
+              <span className="testcreds__note">
+                Fills the form above. Opens the same demo: nothing is kept, and nothing is sent.
+              </span>
+            </button>
+
+            {/* Only where an account can actually be created. */}
+            {canSignIn ? (
+              <TextButton
+                label={registering ? 'I already have an account' : 'Create an account instead'}
+                onClick={() => {
+                  setMode(registering ? 'signIn' : 'register');
+                  setError(undefined);
+                }}
+              />
+            ) : null}
+        </Section>
+      </Rise>
 
       <Rise index={2}>
         <Section {...(canSignIn ? { title: 'Not sure yet?' } : {})}>

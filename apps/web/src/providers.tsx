@@ -24,6 +24,7 @@ import {
   forgetAccount,
   isDemo,
   isRemote,
+  isTestCredential,
   loadAccount,
   saveAccount,
   storeFor,
@@ -126,6 +127,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
        * that syncs down lands where the deck that syncs up came from.
        */
       authenticate: async (mode, credentials, onWaking) => {
+        /*
+         * The test pair, before anything is sent anywhere.
+         *
+         * Checked first so it works on a build with no API at all, which is
+         * the case it exists for — the deployed site has no server, so the
+         * form would otherwise have nothing to talk to. It lands in the same
+         * demo the button opens: same banner, same storage slice, same
+         * absence of a token.
+         *
+         * Only this exact pair. Everything else goes to the real API and is
+         * verified there, so this is not a way past authentication — there is
+         * nothing here to get past.
+         */
+        if (isTestCredential(credentials.email, credentials.password)) {
+          const next = await createDemoAccount();
+          await seedDemoDeck(storeFor(next));
+          setAccount(next);
+          return;
+        }
+
         const device = deviceName();
         const result =
           mode === 'register'

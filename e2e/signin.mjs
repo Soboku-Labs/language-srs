@@ -76,7 +76,16 @@ const hasBearerToken = (page) =>
 const bar = await device('bar');
 await bar.goto(BASE, { waitUntil: 'networkidle' });
 await bar.waitForTimeout(700);
-await bar.locator('.topbar__account').click();
+// The bar offers both now, and each must open its own form. One control
+// serving both meant whichever it opened was wrong for half the people
+// pressing it.
+const barControls = (await bar.locator('.topbar__controls button').allInnerTexts()).map((t) =>
+  t.trim(),
+);
+if (!barControls.includes('Sign in')) failures.push('the bar does not offer "Sign in"');
+if (!barControls.includes('Sign up')) failures.push('the bar does not offer "Sign up"');
+
+await bar.getByRole('button', { name: 'Sign in', exact: true }).click();
 await bar.waitForTimeout(600);
 
 const barHeading = await heading(bar);
@@ -112,6 +121,23 @@ if (failures.length > 0) {
 }
 
 /*
+ * And the other door opens the other form.
+ *
+ * The bar names both now. A single control had to serve somebody returning
+ * and somebody who has never been here, and whichever form it opened was
+ * wrong for half the people pressing it.
+ */
+await bar.goto(BASE, { waitUntil: 'networkidle' });
+await bar.waitForTimeout(600);
+await bar.getByRole('button', { name: 'Sign up', exact: true }).click();
+await bar.waitForTimeout(600);
+const signUpHeading = await heading(bar);
+console.log(`bar "Sign up" -> "${signUpHeading}"`);
+if (!/create/i.test(signUpHeading)) {
+  failures.push(`pressing "Sign up" opened "${signUpHeading}" instead of a sign-up form`);
+}
+
+/*
  * Make the account the rest of the run uses.
  *
  * The toggle is only there when the screen opened in sign-in mode, which is
@@ -133,35 +159,61 @@ await bar.getByRole('button', { name: 'Create account' }).click();
 await bar.waitForTimeout(3000);
 if (!(await hasAccountRecord(bar))) failures.push('creating an account through the toggle did not sign anybody in');
 
-// -------------------------------- a locked feature offers to create one
+// ------------------------------- a study route asks for an account, and returns you
 
-const locked = await device('locked');
-await locked.goto(`${BASE}/import`, { waitUntil: 'networkidle' });
-await locked.waitForTimeout(700);
-await locked.locator('.locked').first().getByText('Create an account').click();
-await locked.waitForTimeout(600);
+/*
+ * Studying needs an account, so this is a redirect rather than a lock.
+ *
+ * There used to be a lock panel on `/import` offering to make one. Now a
+ * signed-out visitor never reaches that screen at all — they are sent to the
+ * sign-up form before it renders. What has to stay true is the second half:
+ * whatever they were going to do, they end up doing it, rather than being
+ * dropped at the front door to find their own way back.
+ */
+const sent = await device('sent');
+await sent.goto(`${BASE}/import`, { waitUntil: 'networkidle' });
+await sent.waitForTimeout(900);
 
-const lockedHeading = await heading(locked);
-console.log(`locked feature -> "${lockedHeading}" at ${locked.url().replace(BASE, '')}`);
-if (!/create/i.test(lockedHeading)) {
-  failures.push(`"Create an account" opened "${lockedHeading}" instead of a sign-up form`);
+const sentTo = sent.url().replace(BASE, '');
+const sentHeading = await heading(sent);
+console.log(`/import signed out -> ${sentTo} "${sentHeading}"`);
+
+if (!sentTo.startsWith('/sign-in')) {
+  failures.push(`/import was reachable without an account — it went to ${sentTo}`);
+}
+if (!sentTo.includes('from=')) {
+  failures.push('the redirect did not record where the learner was going, so they cannot be returned to it');
+}
+if (!/create/i.test(sentHeading)) {
+  failures.push(`being asked for an account opened "${sentHeading}" rather than a sign-up form`);
 }
 
-// And it must put you back where you were, not at the front door.
-await locked.getByText('I already have an account').click();
-await locked.waitForTimeout(300);
-await locked.locator('input[name="email"]').fill(EMAIL);
-await locked.locator('input[name="password"]').fill(PASSWORD);
-await locked.getByRole('button', { name: 'Sign in' }).click();
-await locked.waitForTimeout(3500);
+// And signing in from there puts them back on the thing they wanted.
+await sent.getByText('I already have an account').click();
+await sent.waitForTimeout(300);
+await sent.locator('input[name="email"]').fill(EMAIL);
+await sent.locator('input[name="password"]').fill(PASSWORD);
+await sent.getByRole('button', { name: 'Sign in' }).click();
+await sent.waitForTimeout(3500);
 
-const returnedTo = locked.url().replace(BASE, '');
-const importUsable = (await locked.locator('textarea').count()) > 0;
-console.log(`after signing in from /import -> ${returnedTo}, import usable: ${importUsable}`);
+const returnedTo = sent.url().replace(BASE, '');
+const importUsable = (await sent.locator('textarea').count()) > 0;
+console.log(`after signing in -> ${returnedTo}, import usable: ${importUsable}`);
 if (!returnedTo.startsWith('/import')) {
-  failures.push(`signing in from /import returned to ${returnedTo} rather than to /import`);
+  failures.push(`signing in returned to ${returnedTo} rather than to /import`);
 }
-if (!importUsable) failures.push('the feature is still locked after signing in');
+if (!importUsable) failures.push('the feature is still not usable after signing in');
+
+// The door itself must stay open, or nobody can find out what this is before
+// being asked for an email.
+const doorOpen = await device('door');
+await doorOpen.goto(BASE, { waitUntil: 'networkidle' });
+await doorOpen.waitForTimeout(800);
+const doorLanguages = await doorOpen.locator('[data-language]').count();
+console.log(`door signed out -> ${doorLanguages} languages`);
+if (doorLanguages === 0) {
+  failures.push('the front door is behind the account requirement, so nobody can see what this is first');
+}
 
 // ------------------------------------------- the password actually matters
 
@@ -195,19 +247,20 @@ if (unknown !== shown) {
   failures.push(`an unknown email says "${unknown}" but a wrong password says "${shown}" — the form tells a stranger which emails are registered`);
 }
 
-// ------------------------------------- the four states, and what each opens
+// ------------------------------------------- the demo opens what it claims
 
 /*
- * The gate was decorative and silently so.
+ * Two states remain, not four.
  *
- * It keyed on "has a local profile", which is true for a device profile —
- * pressing "Use this device", which creates no account and sends nothing
- * anywhere, opened every account-only feature. Nobody noticed because the
- * locks *did* appear for somebody who had chosen nothing yet, which is the
- * state anybody checking it would be in.
+ * This used to check no-account, device-profile, demo and real account
+ * together, because the gate keyed on "has a local profile" and let a device
+ * profile through. Both of those states are gone: studying needs an account,
+ * so "Use this device" is not offered where there is a server to make one on,
+ * and somebody with no account is redirected before any screen renders —
+ * which the section above asserts.
  *
- * So all four states are asserted together, which is the only way the one
- * that was wrong stands out.
+ * What is left is the demo, which is the one thing that deliberately opens
+ * everything without an account, and has to say so.
  */
 async function openness(label, setup) {
   const page = await device(label);
@@ -223,26 +276,11 @@ async function openness(label, setup) {
   };
 }
 
-const nobody = await openness('nobody');
-console.log(`no account     locked=${nobody.locked} usable=${nobody.usable}`);
-if (!nobody.locked || nobody.usable) failures.push('an account-only feature is open to somebody with no account');
-
-const deviceOnly = await openness('device', async (page) => {
-  await page.goto(`${BASE}/sign-in`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(500);
-  await page.getByRole('button', { name: 'Use this device' }).click();
-  await page.waitForTimeout(1800);
-});
-console.log(`device profile locked=${deviceOnly.locked} usable=${deviceOnly.usable}`);
-if (!deviceOnly.locked || deviceOnly.usable) {
-  failures.push('"Use this device" opens the account-only features — it creates no account and sends nothing anywhere');
-}
-
 const demo = await openness('demo', async (page) => {
   await page.goto(`${BASE}/sign-in`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
   await page.getByText('Look around with a demo first').click();
-  await page.waitForTimeout(1800);
+  await page.waitForTimeout(2500);
 });
 console.log(`demo           locked=${demo.locked} usable=${demo.usable} banner=${demo.banner} token=${demo.token}`);
 if (demo.locked || !demo.usable) failures.push('the demo does not open the features it exists to show');

@@ -241,7 +241,7 @@ export function SignIn() {
       ) : null}
 
       <Rise index={2}>
-        <Section {...(canSignIn ? { title: 'Or' } : {})}>
+        <Section {...(canSignIn ? { title: 'Not sure yet?' } : {})}>
           {/* Not a fallback. For somebody studying on one machine this is the
               correct choice, and the app is complete without an account. */}
           {/*
@@ -253,13 +253,23 @@ export function SignIn() {
             Sign in button it sits under. Where there is no form it is the
             only action on the page, so it is filled again.
           */}
-          <BigButton
-            label="Use this device"
-            hint="Everything works offline. Nothing is sent anywhere."
-            disabled={busy}
-            quiet={canSignIn}
-            onClick={() => run(() => useThisDevice())}
-          />
+          {/*
+            Only where there is no server to make an account on.
+
+            Studying needs an account now, so offering "use this device"
+            beside the form would be offering a way past the requirement —
+            and the person who took it would hit the sign-in page again on the
+            next screen. Where there is no API it is the only way in, so it is
+            the only button.
+          */}
+          {!canSignIn ? (
+            <BigButton
+              label="Use this device"
+              hint="Everything works offline. Nothing is sent anywhere."
+              disabled={busy}
+              onClick={() => run(() => useThisDevice())}
+            />
+          ) : null}
 
 
           {/*

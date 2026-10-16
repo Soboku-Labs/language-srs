@@ -62,7 +62,7 @@ const FAQ = [
   {
     question: 'Do I need an account?',
     answer:
-      'No. Everything works on this device, offline, with nothing sent anywhere. An account exists for one reason: to carry your deck, every card’s schedule and your whole review history to your phone and back.',
+      'Yes, and it is free — an email and a password, no card now or later. It is how your deck, every card’s schedule and your whole review history follow you to your phone and back. If you would rather see it first, the demo opens everything without asking for anything: nothing in it is kept, and nothing leaves your browser.',
   },
 ];
 
@@ -177,13 +177,41 @@ export function Landing() {
               value={backdrop}
               onChange={(value) => void setBackdrop(value as Backdrop)}
             />
-            <button
-              type="button"
-              className="topbar__account"
-              onClick={() => navigate(isSignedIn ? '/settings' : '/sign-in')}
-            >
-              {isSignedIn ? (account?.displayName ?? 'Account') : 'Sign in'}
-            </button>
+            {/*
+              Two doors, not one with a toggle behind it.
+
+              A single "Sign in" button had to serve both somebody returning
+              and somebody who has never been here, and the screen it opened
+              could only be one of them — so one of the two always arrived at
+              the wrong form and had to find the small link that swaps it.
+              Naming both costs one button and removes that entirely.
+            */}
+            {isSignedIn ? (
+              <button
+                type="button"
+                className="topbar__account"
+                onClick={() => navigate('/settings')}
+              >
+                {account?.displayName ?? 'Account'}
+              </button>
+            ) : (
+              <span className="topbar__auth">
+                <button
+                  type="button"
+                  className="topbar__link"
+                  onClick={() => navigate('/sign-in')}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  className="topbar__account"
+                  onClick={() => navigate('/sign-in?new=1')}
+                >
+                  Sign up
+                </button>
+              </span>
+            )}
           </nav>
         </header>
       </Rise>

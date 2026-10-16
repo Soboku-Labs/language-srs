@@ -307,6 +307,15 @@ export function Start() {
         disabled={saving || !levelId}
       />
       <TextButton label="Skip — use the defaults" muted onClick={() => void skip()} />
+      {/*
+        A way back out, not just forward.
+
+        Both other controls commit to this language — one with answers, one
+        with defaults — so somebody who opened the wrong door had no way back
+        to the others except the browser's own back button. Choosing a
+        language should be as reversible as choosing one was.
+      */}
+      <TextButton label="Choose a different language" muted onClick={() => navigate('/')} />
     </Screen>
   );
 }

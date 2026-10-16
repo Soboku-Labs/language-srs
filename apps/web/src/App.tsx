@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { useEngine, AuthProvider, EngineProvider } from './providers';
+import { useEngine, useAuth, AuthProvider, EngineProvider } from './providers';
 import { SyncProvider } from './sync';
 import { SettingsProvider, useSettings } from './settings';
 import { TravelProvider } from './travel';
@@ -108,6 +108,23 @@ const TITLES: { pattern: string; title: string; description?: string }[] = [
   },
   { pattern: '/account', title: 'Account', description: 'Carry your deck and its schedule between devices.' },
   { pattern: '/import', title: 'Add words', description: 'Bring your own word list in, or back yours up.' },
+  /*
+   * The writing app, all three of its depths.
+   *
+   * These were missing, so `/write` rendered with no header at all: no title,
+   * no back arrow, and nothing else on the screen offering a way out. It was
+   * a page you could reach and not leave. The entry that was supposed to add
+   * them targeted a one-line version of the row above that had already been
+   * reformatted, so the edit silently did nothing — which is why the list
+   * below is checked by a test now rather than by reading it.
+   */
+  { pattern: '/write', title: 'Writing', description: 'Character practice, a chapter at a time.' },
+  { pattern: '/write/:book', title: 'Writing', description: 'The chapters of one writing book.' },
+  {
+    pattern: '/write/:book/:chapter',
+    title: 'Writing',
+    description: 'One character, as big as the screen allows.',
+  },
 ];
 
 function Chrome() {
@@ -172,9 +189,38 @@ function Redirect({ to }: { to: string }) {
   return null;
 }
 
+/**
+ * Which screens anybody can see without an account.
+ *
+ * The door, so somebody arriving can tell what this is before being asked for
+ * an email; the sign-in page itself, which would otherwise be unreachable;
+ * and what is coming next, which is a page about the product rather than part
+ * of it.
+ */
+const OPEN = new Set(['', '/', '/sign-in', '/upcoming']);
+
 function Routes() {
   const { path } = useRouter();
   const { navigate } = useRouter();
+  const { synced, demo, canSignIn } = useAuth();
+
+  /*
+   * Studying needs an account.
+   *
+   * The app used to be complete without one and said so. That has changed on
+   * purpose: an account is how somebody who finds this useful can be reached
+   * again, and it is free — no card, now or later. The demo exists so nobody
+   * has to hand over an email to find out whether they want to.
+   *
+   * Conditional on there being a server, and that is not a hedge. Requiring
+   * an account that cannot be created is a locked door with no key: the
+   * deployed site has no API today, and a build without one would be a blank
+   * product rather than a stricter one. The moment `VITE_API_URL` is set, the
+   * requirement applies with nothing here to change.
+   */
+  if (canSignIn && !synced && !demo && !OPEN.has(path)) {
+    return <Redirect to={`/sign-in?new=1&from=${encodeURIComponent(path)}`} />;
+  }
 
   if (path === '/sign-in') return <SignIn />;
 

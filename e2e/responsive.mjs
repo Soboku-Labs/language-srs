@@ -29,6 +29,26 @@ for (const [w,h,name] of SIZES) {
   const ctx = await browser.newContext({ viewport: { width: w, height: h } });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => bad.push(`${name}: pageerror ${e.message.slice(0,80)}`));
+  /*
+   * In through the demo.
+   *
+   * Studying needs an account now, so a signed-out visitor is redirected
+   * before any of these screens renders — and this suite is about layout at
+   * eight widths, not about authentication. The demo is the one way in that
+   * needs no server round trip and no account.
+   */
+  await page.goto(`${BASE}/sign-in`, { waitUntil: 'load' });
+  await page.waitForTimeout(500);
+  await page.getByText('Look around with a demo first').click();
+  await page.waitForFunction(
+    () => {
+      const raw = localStorage.getItem('srs:v1:account');
+      return raw && JSON.parse(raw).demo === true;
+    },
+    { timeout: 30_000 },
+  );
+  await page.waitForTimeout(800);
+
   await page.goto(BASE, { waitUntil: 'load' });
   await page.locator('[data-language]').first().click();
   // Wait for the app to arrive, rather than guessing how long travelling takes.

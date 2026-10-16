@@ -1,14 +1,23 @@
 /**
- * Study first, sign in afterwards. Does the work come with you?
+ * A device profile's deck comes with you when you make an account.
  *
- * Nothing stands between a visitor and studying, so the ordinary path is to
- * try the app and sign in once it is worth keeping. An account reads its deck
- * from its own storage prefix, which means without deliberate handling that
- * earlier studying simply stops being visible the moment somebody signs in —
- * still on disk, under a prefix nothing looks at, which to the person who did
- * the studying is indistinguishable from having been deleted by signing in.
+ * An account reads its deck from its own storage prefix, so without
+ * deliberate handling earlier studying stops being visible the moment
+ * somebody signs in — still on disk, under a prefix nothing looks at, which
+ * to the person who did the studying is indistinguishable from having been
+ * deleted by signing in. Measured before the fix: four cards studied, zero in
+ * the account.
  *
- * Measured before the fix: four cards studied, zero in the account.
+ * The route in has changed. Studying now needs an account, so nobody can
+ * study first and sign in later on a build with a server — but a device
+ * profile can still exist: made on a build published without an API, and
+ * still in the browser when one is configured. That learner is sent to the
+ * sign-up form, and what they did must survive it.
+ *
+ * So the profile and its deck are planted directly rather than studied in the
+ * browser, because the sequence that used to create them is gone. What is
+ * being tested is `adoptDeck`, which is unchanged and still the only thing
+ * standing between that learner and a deck that looks deleted.
  *
  * Usage — needs a server and a built web app pointed at it:
  *
@@ -48,47 +57,51 @@ const accountReviews = async () => {
   return found ? found[1] : 0;
 };
 
-// ------------------------------------------------- study without an account
+// ------------------------------- a device profile, from before there was an API
+
+/*
+ * Planted rather than studied.
+ *
+ * The sequence that used to produce this — open the app, pick a language,
+ * study, sign in later — cannot happen on a build with a server any more, so
+ * reproducing it through the UI is impossible. What can still happen is
+ * arriving with one of these already in the browser, which is exactly what
+ * this writes: an account record with no token, and a deck under its prefix.
+ */
+const PLANTED = 4;
 
 await page.goto(BASE, { waitUntil: 'load' });
-await page.locator('[data-language]').first().click();
-// Wait for the app to arrive, rather than guessing how long travelling takes.
-// Choosing a place runs a short animation and then navigates; a fixed sleep
-// races it, and the pending navigation lands *after* the next goto — which
-// leaves the test on the day screen looking for review options that are not
-// there. This is also what a learner does: they arrive, then they study.
-// A language nobody has set up now opens the setup interview first, so
-// arriving means landing on either, and completing the interview if it is
-// the one that came up. Written as "whichever comes" rather than always
-// expecting setup, so this keeps working for a language already set up.
-await page.waitForURL(/\/(home|start)$/, { timeout: 15_000 });
-if (page.url().endsWith('/start')) {
-  await page.getByRole('button', { name: 'Start learning' }).click();
-  await page.waitForURL('**/home', { timeout: 15_000 });
-}
-await page.goto(`${BASE}/review`, { waitUntil: 'load' });
-// Wait for the first card rather than assuming it is there the moment the
-// page loads. The queue is built after mount, and the setup step before this
-// added another navigation ahead of it, so an immediate `count()` found zero
-// and the loop broke on its first pass — reporting "nothing was studied" for
-// a review screen that was merely a few hundred milliseconds away.
-await page.locator('button.option:not([disabled])').first().waitFor({ timeout: 15_000 });
+await page.waitForTimeout(600);
 
-let graded = 0;
-for (let i = 0; i < 4; i += 1) {
-  const options = page.locator('button.option:not([disabled])');
-  if ((await options.count()) === 0) break;
-  await options.nth(0).click();
-  await page.waitForTimeout(220);
-  // A wrong answer offers "Got it"; a correct one offers the rating row.
-  const commit = page.locator('button.button, button.grade').first();
-  if ((await commit.count()) === 0) break;
-  await commit.click();
-  graded += 1;
-  await page.waitForTimeout(250);
-}
-console.log(`studied ${graded} cards without an account`);
-console.log('slices before signing in:', JSON.stringify(await slices()));
+await page.evaluate((count) => {
+  const id = 'device-from-before';
+  localStorage.setItem(
+    'srs:v1:account',
+    JSON.stringify({ id, displayName: 'This device', createdAt: new Date().toISOString() }),
+  );
+
+  // Enough of a deck to be worth not losing: logs are what the assertions
+  // count, and cards are what `adoptDeck` checks before deciding the target
+  // is empty.
+  const logs = Array.from({ length: count }, (_, index) => ({
+    id: `log-${index}`,
+    cardId: `zh-nihao:recognition`,
+    reviewedAt: new Date().toISOString(),
+    rating: 3,
+    stateBefore: 'new',
+    stateAfter: 'learning',
+    source: 'app',
+  }));
+  localStorage.setItem(`acct:${id}:srs:v1:logs`, JSON.stringify(logs));
+  localStorage.setItem(
+    `acct:${id}:srs:v1:cards`,
+    JSON.stringify([{ id: 'zh-nihao:recognition', entryId: 'zh-nihao', kind: 'recognition', levelId: 'hsk3-1', reps: 1 }]),
+  );
+}, PLANTED);
+
+const graded = PLANTED;
+console.log(`planted a device profile holding ${graded} reviews`);
+console.log('slices before signing up:', JSON.stringify(await slices()));
 
 // ------------------------------------------------------------- then sign in
 

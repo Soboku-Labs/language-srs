@@ -13,7 +13,7 @@ import { Caption, TextButton } from '../ui';
  * is one line or a rewrite.
  */
 export function useAccess() {
-  const { synced, demo } = useAuth();
+  const { synced, demo, canSignIn } = useAuth();
 
   /*
    * An account, or the demo — not merely "has a local profile".
@@ -28,7 +28,23 @@ export function useAccess() {
    * a server. The demo is the one deliberate exception, and it says so on
    * screen the entire time it is on.
    */
-  const tier = tierFor({ signedIn: synced || demo });
+  /*
+   * A build with no server does not gate, because it cannot ungate.
+   *
+   * The deployed site has no `VITE_API_URL`, so there is no account to make —
+   * and it was still showing every lock. The sequence was: a learner reaches
+   * "Your own word lists · Needs a free account — an email and a password,
+   * nothing else, no card", presses Create an account, and arrives at a page
+   * with no fields on it saying this build has no server. The product
+   * promised something it had no way to provide.
+   *
+   * Everything behind these gates works locally anyway; `sync` is the only
+   * one that genuinely needs a server, and it is already impossible without
+   * one. So where there is no backend the features are simply open, and the
+   * moment an API is configured the gates come back without anybody changing
+   * this file.
+   */
+  const tier = tierFor({ signedIn: synced || demo || !canSignIn });
   return { tier, can: (feature: FeatureId) => canUse(feature, tier), demo };
 }
 

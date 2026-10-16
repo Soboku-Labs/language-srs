@@ -4,6 +4,7 @@ import { ApiRequestError } from '@language-srs/client';
 import { useAuth, type AuthMode } from '../providers';
 import { useRouter } from '../router';
 import { BigButton, Caption, Rise, Screen, Section, TextButton, Title } from '../ui';
+import { Logo } from '../components/Logo';
 
 /**
  * Starting.
@@ -113,15 +114,54 @@ export function SignIn() {
 
   return (
     <Screen>
+      {/*
+        The one page where the mark belongs.
+
+        Everywhere else the product's name is a small thing in the corner,
+        because the learner is here to study rather than to admire a logo. A
+        page asking for an email is the exception: it is the page where
+        somebody decides whether they trust this with their study history, and
+        a bare "Mon" in body text is not much to go on.
+      */}
       <Rise index={0}>
-        <div className="stack--tight stack">
-          <Title>Mon</Title>
+        <div className="signin__head">
+          <Logo size={34} title="Mon" />
+          <Title>{registering ? 'Create your account' : 'Welcome back'}</Title>
           <Caption>
-            Exam-aligned review for Mandarin, Japanese, Korean and Vietnamese.
-            {canSignIn ? ' An account carries your progress to your phone. It is not required.' : ''}
+            {canSignIn
+              ? registering
+                ? 'An email and a password. No card, and nothing else asked for.'
+                : 'Your deck, its schedule and your whole history, wherever you left them.'
+              : 'Exam-aligned review for Mandarin, Japanese, Korean and Vietnamese.'}
           </Caption>
         </div>
       </Rise>
+
+      {/*
+        Said properly, not as a footnote.
+
+        This build has no API, so there is no account to make — and the page
+        was saying so in one line of small grey text under a button, which
+        reads as a page that is broken rather than a build that is configured
+        a particular way. It is the main thing on the screen when it is true,
+        because it is the answer to the question somebody came here with.
+      */}
+      {!canSignIn ? (
+        <Rise index={1}>
+          <div className="notice">
+            <span className="notice__title">No account on this build</span>
+            <Caption>
+              Accounts need a server, and this one is published without an API. Everything else
+              works: the whole deck, every exercise, the writing books and your progress, kept in
+              this browser.
+            </Caption>
+            <Caption>
+              Carrying progress to a second device is the only thing an account adds, and it is
+              the only thing missing here.
+            </Caption>
+          </div>
+        </Rise>
+      ) : null}
 
       {canSignIn ? (
         <Rise index={1}>
@@ -204,17 +244,23 @@ export function SignIn() {
         <Section {...(canSignIn ? { title: 'Or' } : {})}>
           {/* Not a fallback. For somebody studying on one machine this is the
               correct choice, and the app is complete without an account. */}
+          {/*
+            Outlined when there is a sign-in form above it.
+
+            It is a first-class choice and the app is complete without an
+            account — but on a page headed "Welcome back" it is the second
+            thing, and a filled black block at the bottom was out-shouting the
+            Sign in button it sits under. Where there is no form it is the
+            only action on the page, so it is filled again.
+          */}
           <BigButton
             label="Use this device"
             hint="Everything works offline. Nothing is sent anywhere."
             disabled={busy}
+            quiet={canSignIn}
             onClick={() => run(() => useThisDevice())}
           />
-          {!canSignIn ? (
-            <Caption>
-              Carrying progress between devices needs a server, and this build has none configured.
-            </Caption>
-          ) : null}
+
 
           {/*
             A look around, for the things an account unlocks that cannot be

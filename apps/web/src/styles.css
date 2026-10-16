@@ -2250,3 +2250,30 @@ a { color: var(--accent); }
   cursor: pointer;
 }
 .topbar__link:hover { color: var(--ink); }
+
+/*
+  The test credentials, offered as something to type.
+
+  A panel rather than a line of text, because its job is to be found by
+  somebody looking at a form and wondering what to put in it. Quiet colours:
+  it is a convenience, not a warning, and not the main action on the page.
+*/
+.testcreds {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  background: var(--surface-raised);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.testcreds:hover { border-color: var(--ink-faint); }
+.testcreds__label { font-size: var(--text-caption); font-weight: var(--weight-medium); color: var(--ink); }
+.testcreds__pair {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-caption);
+  color: var(--brand);
+}
+.testcreds__note { font-size: var(--text-micro); color: var(--ink-muted); }

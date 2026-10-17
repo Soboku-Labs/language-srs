@@ -32,7 +32,8 @@
     "e2e:responsive": "node e2e/responsive.mjs",
     "e2e:settings": "node e2e/settings.mjs",
     "e2e:signin": "node e2e/signin.mjs",
-    "e2e:exits": "node e2e/exits.mjs"
+    "e2e:exits": "node e2e/exits.mjs",
+    "e2e:languages": "node e2e/languages.mjs"
   },
   "devDependencies": {
     "playwright": "1.56.1",

@@ -68,7 +68,7 @@ const FAQ = [
 
 export function Landing() {
   const { engine, revision, setActiveLanguage } = useEngine();
-  const { appearance, backdrop, setAppearance, setBackdrop } = useSettings();
+  const { appearance, backdrop, setAppearance, setBackdrop, loadLanguage } = useSettings();
   const { account, isSignedIn } = useAuth();
   const { navigate } = useRouter();
   const { colorsFor } = useTheme();
@@ -126,13 +126,34 @@ export function Landing() {
       return;
     }
 
-    const asked =
-      engine.hasProfile(code) &&
-      (Boolean(engine.getProfile(code).setUpAt) ||
-        engine.getAllCards(code).some((card) => card.reps > 0));
-
     travel(code, async () => {
+      /*
+       * The account's answer for this language, before the question is asked.
+       *
+       * `asked` used to be computed out here, off whatever this browser
+       * happened to know — which for a language first opened on this device is
+       * nothing at all. So picking Korean up on a laptop and then opening it
+       * on a phone stopped its owner to ask what they wanted out of Korean, a
+       * language they had already set up.
+       *
+       * In practice the sign-in pass in `settings.tsx` usually gets there
+       * first; this was measured, not assumed, by watching the requests the
+       * door actually makes. It stays because it is the one guarantee that
+       * does not depend on when that pass last ran: whichever arrives first,
+       * the decision below is made with the account's answer in hand.
+       *
+       * Inside the travel callback because that is the moment the screen is
+       * already covered by the veil — the one place a round trip costs nothing
+       * visible. It resolves immediately when there is nothing to ask.
+       */
+      await loadLanguage(code);
       await setActiveLanguage(code);
+
+      const asked =
+        engine.hasProfile(code) &&
+        (Boolean(engine.getProfile(code).setUpAt) ||
+          engine.getAllCards(code).some((card) => card.reps > 0));
+
       navigate(asked ? '/home' : '/start');
     });
   };

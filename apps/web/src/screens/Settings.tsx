@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  LANGUAGE_CODES,
   addDays,
   findExamTrack,
   getExamTracksForLanguage,
@@ -27,8 +28,10 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 export function Settings() {
   const { engine, revision, mutate } = useEngine();
   const {
+    appearance,
     backdrop,
     dayStartHour,
+    setAppearance,
     setBackdrop,
     setDayStartHour,
     setExamTrack,
@@ -40,6 +43,25 @@ export function Settings() {
 
   const code = engine.activeLanguage;
   const profile = useMemo(() => engine.getProfile(code), [engine, revision, code]);
+  /**
+   * The other languages being studied, named so the split is concrete.
+   *
+   * Naming them beats saying "other languages keep their own": somebody who
+   * has only ever opened one language has no idea the sentence applies to
+   * them, and somebody studying two wants to know which two it is talking
+   * about. The verb has to agree with however many there are — the first
+   * version read "Japanese keep their own".
+   */
+  const othersLine = useMemo(() => {
+    const names = LANGUAGE_CODES.filter(
+      (candidate) => candidate !== code && engine.hasProfile(candidate),
+    ).map((candidate) => getLanguageProfile(candidate).name);
+
+    if (names.length === 0) return 'Every language you add keeps its own.';
+    if (names.length === 1) return `${names[0]} keeps its own.`;
+    const last = names[names.length - 1];
+    return `${names.slice(0, -1).join(', ')} and ${last} keep their own.`;
+  }, [engine, revision, code]);
   const available = useMemo(() => engine.getAvailableWordCount(code), [engine, revision, code]);
   const language = getLanguageProfile(code);
   const tracks = getExamTracksForLanguage(code);
@@ -68,18 +90,35 @@ export function Settings() {
 
   return (
     <Screen>
+      {/*
+        Two subjects, said out loud rather than left to prose.
+
+        Everything on this screen used to be one flat list under one sentence
+        explaining that some of it was about the open language and some of it
+        was about the person — which asks somebody to hold a rule in their head
+        while reading nine sections and work out, per section, which kind it
+        is. The exam, the level, the date and the daily amounts are *this
+        language's*; a second language has its own and they genuinely differ.
+        The headings carry that now, and the language is named in the one that
+        changes when you study something else.
+      */}
       <Rise index={0}>
-        <Caption>
-          Exam, level and daily amounts apply to {language.name}. Your day and the background
-          apply everywhere.
-        </Caption>
-        {/*
-          Said, not hidden, and not undone. A failed push leaves the setting
-          applied here — rolling back a choice somebody just made because the
-          network blinked is worse than it being a moment behind the server.
-        */}
-        {error ? <Caption>Saved on this device. Not reaching the server: {error}</Caption> : null}
+        <h2 className="settings__group">
+          <span className="settings__group-name">{language.name}</span>
+          <span className="settings__group-note">Just this language. {othersLine}</span>
+        </h2>
       </Rise>
+
+      {/*
+        Said, not hidden, and not undone. A failed push leaves the setting
+        applied here — rolling back a choice somebody just made because the
+        network blinked is worse than it being a moment behind the server.
+      */}
+      {error ? (
+        <Rise index={0}>
+          <Caption>Saved on this device. Not reaching the server: {error}</Caption>
+        </Rise>
+      ) : null}
 
       {tracks.length > 1 ? (
         <Rise index={1}>
@@ -239,6 +278,45 @@ export function Settings() {
         <Section title="Vocabulary">
           <DetailRow label={`Words for ${language.name}`} value={String(engine.getEntries(code).length)} />
           <TextButton label="Add or back up words" onClick={() => navigate('/import')} />
+        </Section>
+      </Rise>
+
+      <Rise index={6}>
+        <h2 className="settings__group">
+          <span className="settings__group-name">You</span>
+          <span className="settings__group-note">
+            The same in every language, on every device you sign in on.
+          </span>
+        </h2>
+      </Rise>
+
+      <Rise index={6}>
+        <Section title="Appearance">
+          {/*
+            Reachable here at last. It is on the account and has been since the
+            split, but the only control for it was in the front page's bar —
+            so somebody who signed in, chose a language and went looking for it
+            in Settings found the background but not the theme.
+          */}
+          <Row wrap>
+            {(
+              [
+                ['light', 'Light'],
+                ['dark', 'Dark'],
+                ['system', 'Auto'],
+              ] as const
+            ).map(([value, label]) => (
+              <Choice
+                key={value}
+                label={label}
+                selected={appearance === value}
+                onClick={() => void setAppearance(value)}
+              />
+            ))}
+          </Row>
+          <Caption>
+            Auto follows the device. The four places keep their own colours either way.
+          </Caption>
         </Section>
       </Rise>
 

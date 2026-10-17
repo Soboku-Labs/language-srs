@@ -132,6 +132,36 @@ a { color: var(--accent); }
   margin: 0;
 }
 
+/*
+ * The two subjects on the settings screen.
+ *
+ * Heavier than a `.section__title` on purpose: these are not another section
+ * but the line a reader is meant to cross. The rule above it does the
+ * separating, so the heading itself can stay quiet — a second loud element
+ * would compete with the section titles it is supposed to be grouping.
+ */
+.settings__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--line);
+}
+/* No rule above the first one: there is nothing yet to be separated from. */
+.settings__group:first-of-type { padding-top: 0; border-top: 0; }
+.settings__group-name {
+  font-size: var(--text-heading);
+  font-weight: var(--weight-strong);
+  color: var(--ink);
+}
+.settings__group-note {
+  font-size: var(--text-caption);
+  line-height: 19px;
+  font-weight: var(--weight-regular, 400);
+  color: var(--ink-muted);
+}
+
 /* --------------------------------------------------------------- type */
 
 .title { font-size: var(--text-title); font-weight: var(--weight-strong); margin: 0; }

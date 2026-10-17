@@ -1,4 +1,5 @@
 import {
+  LANGUAGE_CODES,
   SETTINGS_LIMITS,
   normaliseLanguageSettings,
   type Appearance,
@@ -79,6 +80,15 @@ interface SettingsValue {
   /** Change one language's study settings. Defaults to the active language. */
   updateLanguage(patch: LanguageSettingsPatch, code?: LanguageCode): Promise<void>;
   /**
+   * Pull one language's settings from the account before opening it.
+   *
+   * Awaited by the door, because what it finds decides where the door leads:
+   * a language already set up elsewhere goes to the deck, and one nobody has
+   * answered for goes to the setup questions. Resolves immediately when there
+   * is no account, no backend, or this language has already been settled.
+   */
+  loadLanguage(code: LanguageCode): Promise<void>;
+  /**
    * Switch exam track, keeping the equivalent position in the new one.
    *
    * Its own method rather than part of `updateLanguage` because the engine
@@ -109,6 +119,10 @@ function toLanguageSettings(profile: StudyProfile): LanguageSettingsPatch {
     dailyReviewLimit: profile.dailyReviewLimit,
     desiredRetention: profile.desiredRetention,
     ...(profile.enabledCardKinds ? { enabledCardKinds: profile.enabledCardKinds } : {}),
+    // Write-once on the server, so sending it can only ever set it. Leaving it
+    // out meant a device that had been told somebody answered the setup
+    // questions kept that to itself.
+    ...(profile.setUpAt ? { setUpAt: profile.setUpAt } : {}),
   };
 }
 
@@ -124,6 +138,15 @@ function toProfilePatch(settings: LanguageSettings): Partial<Omit<StudyProfile, 
     dailyReviewLimit: settings.dailyReviewLimit,
     desiredRetention: settings.desiredRetention,
     ...(settings.enabledCardKinds ? { enabledCardKinds: settings.enabledCardKinds } : {}),
+    /*
+     * Only ever set, never cleared.
+     *
+     * `setUpAt` is the record that somebody answered the setup questions for
+     * this language, and the server treats it as write-once for exactly this
+     * reason. Passing `undefined` through here would let a server row written
+     * before the field existed reopen the interview on somebody mid-deck.
+     */
+    ...(settings.setUpAt ? { setUpAt: settings.setUpAt } : {}),
   };
 }
 
@@ -171,25 +194,100 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [token],
   );
 
+  /**
+   * Which account has been settled, and which of its languages.
+   *
+   * One flag was enough while reconciliation meant "the language that happened
+   * to be open when you signed in". It is not enough now: every language is
+   * its own resource on the server, so the question is per language, and the
+   * answer has to survive opening a second one.
+   */
+  const reconciled = useRef<{ token?: string; user: boolean; languages: Set<LanguageCode> }>({
+    user: false,
+    languages: new Set(),
+  });
+
+  /**
+   * Bring one language's settings into line with the server.
+   *
+   * Idempotent per sign-in, and exported so that *opening* a language can wait
+   * for it. That matters more than it sounds: the door decides between the
+   * setup interview and the deck by reading `setUpAt` off the local profile,
+   * and a language first opened on this device has no local profile at all
+   * until `ensureProfile` invents one. Without this, picking Korean up on a
+   * laptop and then opening it on a phone asked the phone's owner to set up a
+   * language they had already set up, at a level they had not chosen.
+   */
+  const loadLanguage = useCallback(
+    async (code: LanguageCode) => {
+      if (!token || !hasBackend) return;
+      const state = reconciled.current;
+      /*
+       * A language this device has never opened is always asked about.
+       *
+       * The bookkeeping alone was not safe to trust here. The sign-in pass
+       * marks every language it touches, including ones it only *pushed* — so
+       * a language the account gained elsewhere could be marked settled by a
+       * push of this device's defaults, and this pull would then be skipped
+       * for the one case it exists to cover. Having no local profile is the
+       * unambiguous signal that nothing here knows anything about this
+       * language yet, whatever the bookkeeping says.
+       */
+      const unknownHere = !engine.hasProfile(code);
+      if (!unknownHere && state.token === token && state.languages.has(code)) return;
+      state.languages.add(code);
+
+      try {
+        const remote = await api().getLanguageSettings(token, code);
+        if (unset(remote.updatedAt)) {
+          // The server has never heard of this language. Whatever is here is
+          // the only record of it, which is the `adoptDeck` rule applied one
+          // language at a time.
+          const local = engine.hasProfile(code) ? engine.getProfile(code) : undefined;
+          if (local) {
+            await push((bearer) => api().putLanguageSettings(bearer, code, toLanguageSettings(local)));
+          }
+        } else {
+          await mutate((instance) => instance.updateProfile(code, toProfilePatch(remote)));
+        }
+      } catch (cause) {
+        // Left unmarked, so opening the language again tries again. A failed
+        // pull must not look like a settled one.
+        state.languages.delete(code);
+        setError((cause as Error).message);
+      }
+    },
+    [token, engine, mutate, push],
+  );
+
   /*
-   * Settle who is in charge, once per sign-in.
+   * Settle the whole account, once per sign-in.
    *
    * Guarded by the token so it runs again for a different account, and
    * cancelled on unmount so a slow response cannot write one account's
    * settings into another's engine — the same hazard as the sync layer's
    * store check, and for the same reason.
+   *
+   * Every language, not just the open one. The split put each language in its
+   * own resource precisely so they could differ; reconciling one of them meant
+   * a second language arrived at the defaults on a new device while the first
+   * arrived correct — the half-working kind of wrong that is hardest to spot.
    */
-  const reconciled = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!token || reconciled.current === token) return;
+    if (!token || !hasBackend) return;
+    if (reconciled.current.token !== token) {
+      reconciled.current = { token, user: false, languages: new Set() };
+    }
+    if (reconciled.current.user) return;
+    reconciled.current.user = true;
+
     let cancelled = false;
-    reconciled.current = token;
 
     void (async () => {
       try {
-        const [user, remote] = await Promise.all([
+        const [user, stored] = await Promise.all([
           api().getUserSettings(token),
-          api().getLanguageSettings(token, activeLanguage),
+          api().listLanguageSettings(token),
         ]);
         if (cancelled) return;
 
@@ -207,17 +305,41 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
         if (cancelled) return;
 
-        if (unset(remote.updatedAt)) {
-          await push((bearer) =>
-            api().putLanguageSettings(bearer, activeLanguage, toLanguageSettings(language)),
-          );
-        } else {
+        // Down first: anything the account already knows about wins, and
+        // `updateProfile` creates the profile, so a language started on
+        // another device exists here rather than having to be rediscovered.
+        for (const remote of stored.languages) {
+          if (cancelled) return;
+          reconciled.current.languages.add(remote.languageCode);
           await mutate((instance) =>
-            instance.updateProfile(activeLanguage, toProfilePatch(remote)),
+            instance.updateProfile(remote.languageCode, toProfilePatch(remote)),
           );
         }
+
+        /*
+         * Then up: anything this device has been studying that the account has
+         * not been told about.
+         *
+         * Not reachable from the web app as it stands — the account gate means
+         * no language can be set up before there is an account to set it up
+         * on — so this is the symmetrical case rather than a fixed bug, and it
+         * has no test for that reason. It earns its place because the gate is
+         * conditional on there being a server at all, and because a client
+         * without one (the widget, mobile) reaches this provider by the same
+         * door.
+         */
+        for (const code of LANGUAGE_CODES) {
+          if (cancelled) return;
+          if (reconciled.current.languages.has(code) || !engine.hasProfile(code)) continue;
+          reconciled.current.languages.add(code);
+          const local = engine.getProfile(code);
+          await push((bearer) => api().putLanguageSettings(bearer, code, toLanguageSettings(local)));
+        }
       } catch (cause) {
-        if (!cancelled) setError((cause as Error).message);
+        if (!cancelled) {
+          reconciled.current.user = false;
+          setError((cause as Error).message);
+        }
       }
     })();
 
@@ -236,6 +358,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       backdrop,
       dayStartHour,
       language,
+      loadLanguage,
       ...(error ? { error } : {}),
 
       setAppearance: async (next) => {
@@ -296,7 +419,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         );
       },
     }),
-    [appearance, backdrop, dayStartHour, language, error, activeLanguage, engine, mutate, push, token],
+    [
+      appearance,
+      backdrop,
+      dayStartHour,
+      language,
+      error,
+      activeLanguage,
+      engine,
+      mutate,
+      push,
+      token,
+      loadLanguage,
+    ],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
